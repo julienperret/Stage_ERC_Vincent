@@ -120,7 +120,7 @@ def reproj(file, outdir='memory:', crs='EPSG:3035'):
     return res['OUTPUT']
 
 # Exécute une requête sql silencieuse sur un fichier GPKG - void
-def squery(db, arg, isGPKG=False):
+def vquery(db, arg, isGPKG=False):
     connection = sqlite3.connect(db)
     connection.enable_load_extension(True)
     connection.load_extension('mod_spatialite.so')
@@ -289,7 +289,8 @@ if not os.path.exists('data'):
         WHEN "CODE_NAF1" = 'Q' THEN 'medical'
         ELSE 'autre' END
     """
-    geosirene.addExpressionField(expr, QgsField('type', QVariant.String, len=20))
+    geosirene.addExpressionField(
+        expr, QgsField('type', QVariant.String, len=20))
     reproj(clip(geosirene, zone_buffer), 'data/')
 
     # Correction de l'OCS
@@ -308,7 +309,7 @@ if not os.path.exists('data'):
 
     # Correction du PLU
     if os.path.exists('plu.shp'):
-        plu = QgsVectorLayer('plu.shp','plu')
+        plu = QgsVectorLayer('plu.shp', 'plu')
         plu.setProviderEncoding('windows-1258')
         plu.dataProvider().createSpatialIndex()
         expr = """ CASE
@@ -330,8 +331,9 @@ if not os.path.exists('data'):
         del plu
 
     # Traitement d'une couche facultative pour exclusion de zones bâties lors du calcul de densité
+    os.mkdir('data/restrict')
     if os.path.exists('exclusion.shp'):
-        reproj(clip('exclusion.shp', zone),'data/')
+        reproj(clip('exclusion.shp', zone), 'data/restrict/')
 
     # Reprojection en LAEA
     reproj(zone, 'data/')
@@ -360,7 +362,8 @@ if not os.path.exists('data'):
         if os.path.splitext(path)[1] == '.shp':
             layer = QgsVectorLayer('data/bati/' + path)
             layer.dataProvider().createSpatialIndex()
-            layer.addExpressionField('$area', QgsField('AIRE', QVariant.Double, len=10, prec=2))
+            layer.addExpressionField('$area', QgsField(
+                'AIRE', QVariant.Double, len=10, prec=2))
             batiPkg.append(layer)
     params = {
         'LAYERS': batiPkg,
@@ -370,17 +373,17 @@ if not os.path.exists('data'):
     processing.run('native:mergevectorlayers', params, feedback=feedback)
     del cleanPai, batiPkg, layer
 
-    #---! Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
-    os.mkdir('data/restrict')
-    bati_indif = QgsVectorLayer('data/bati/bati_indifferencie.shp', 'bati_indif')
+    # ---! Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
+    bati_indif = QgsVectorLayer(
+        'data/bati/bati_indifferencie.shp', 'bati_indif')
     bati_indif.dataProvider().createSpatialIndex()
 
     # Selection avec la couche facultative 'exclusion.shp'
-    if os.path.exists('data/exclusion.shp'):
+    if os.path.exists('data/restrict/exclusion.shp'):
         params = {
             'INPUT': bati_indif,
             'PREDICATE': 6,
-            'INTERSECT': 'data/exclusion.shp',
+            'INTERSECT': 'data/restrict/exclusion.shp',
             'METHOD': 0
         }
         processing.run('native:selectbylocation', params, feedback=feedback)
@@ -423,33 +426,44 @@ if not os.path.exists('data'):
     processing.run('native:selectbylocation', params, feedback=feedback)
 
     # Estimation du nombre d'étages
-    bati_indif.addExpressionField('$area', QgsField('AIRE', QVariant.Double, len=10, prec=2))
     expr = """ CASE
         WHEN "HAUTEUR" = 0 THEN 1
         WHEN "HAUTEUR" < 5 THEN 1
         ELSE "HAUTEUR"/3 END
     """
-    bati_indif.addExpressionField(expr, QgsField('NB_NIV', QVariant.Int, len=2))
+    bati_indif.addExpressionField(
+        expr, QgsField('NB_NIV', QVariant.Int, len=2))
 
     # Nettoyage des bâtiments supposés trop grand ou trop petit pour être habités
     params = {
         'INPUT': bati_indif,
-        'EXPRESSION' : ' "AIRE" < 50 OR "AIRE" > 10000 ',
-        'METHOD' : 1
+        'EXPRESSION': ' $area < 50 OR $area > 10000 ',
+        'METHOD': 1
     }
     processing.run('qgis:selectbyexpression', params, feedback=feedback)
 
     # Inversion de la selection pour export final
     bati_indif.invertSelection()
     params = {
-        'INPUT' : bati_indif,
-        'OUTPUT' : 'data/bati/bati_clean.shp'
+        'INPUT': bati_indif,
+        'OUTPUT': 'data/bati/bati_clean.shp'
     }
     processing.run('native:saveselectedfeatures', params, feedback=feedback)
     del bati_indif
 
-    #bati_clean = QgsVectorLayer('data/bati/bati_clean.shp', 'bati_clean')
-    #bati_clean.dataProvider().createSpatialIndex()
+    params = {
+        'INPUT' : 'data/bati/bati_clean.shp',
+        'OVERLAY' : 'data/iris.shp',
+        'INPUT_FIELDS' : ['ID','HAUTEUR','AIRE','NB_NIV'],
+        'OVERLAY_FIELDS' : ['CODE_IRIS','NOM_IRIS','TYP_IRIS','POP14','TXRP14'],
+        'OUTPUT' : 'data/bati/bati_inter_iris.shp'
+    }
+    processing.run('qgis:intersection', params, feedback=feedback)
+
+    bati_inter_iris = QgsVectorLayer('data/bati/bati_inter_iris.shp')
+    bati_inter_iris.dataProvider().createSpatialIndex()
+    bati_inter_iris.addExpressionField('$area', QgsField(
+        'area_iris', QVariant.Double, len=10, prec=2))
 
 if not os.path.exists('data/' + mode):
     os.mkdir('data/' + mode)
@@ -513,11 +527,18 @@ if not os.path.exists('data/' + mode):
     gdal.Warp(
         'data/' + mode + '/mnt.tif', tileList,
         format='GTiff', outputType=gdal.GDT_Float32,
-        xRes=gridSize, yRes=gridSize,
+        xRes=int(gridSize), yRes=int(gridSize),
         resampleAlg='cubicspline',
         srcSRS='EPSG:2154', dstSRS='EPSG:3035',
         outputBounds=(xMin, yMin, xMax, yMax),
         srcNodata=-99999
+    )
+    gdal.DEMProcessing(
+        'data/' + mode + '/slope.tif',
+        'data/' + mode + '/mnt.tif',
+        'slope',
+        format='GTiff',
+        slopeFormat='percent'
     )
 
 qgs.exitQgis()
