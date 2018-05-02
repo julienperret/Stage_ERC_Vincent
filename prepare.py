@@ -8,7 +8,6 @@ import gdal
 import numpy
 import pandas
 import csv
-import sqlite3
 
 # sys.path.append('/usr/share/qgis/python')
 from qgis.core import (
@@ -20,6 +19,7 @@ from qgis.core import (
     QgsField,
     QgsProcessingFeedback,
     QgsRectangle,
+    QgsVectorFileWriter,
     QgsVectorLayer,
     QgsVectorLayerJoinInfo
 )
@@ -119,26 +119,11 @@ def reproj(file, outdir='memory:', crs='EPSG:3035'):
     res = processing.run('native:reprojectlayer', params, feedback=feedback)
     return res['OUTPUT']
 
-# Exécute une requête sql silencieuse sur un fichier GPKG - void
-def vquery(db, arg, isGPKG=False):
-    connection = sqlite3.connect(db)
-    connection.enable_load_extension(True)
-    connection.load_extension('mod_spatialite.so')
-    cursor = connection.cursor()
-    if isGPKG:
-        cursor.execute('select EnableGpkgAmphibiousMode()')
-    cursor.executescript(arg)
-    connection.commit()
-    cursor.close()
-    connection.close()
-
-# Enregistre un fichier .tif à partir d'un array et de variables GDAL stockée au préalable
-def to_tif(array, cols, rows, dtype, proj, geot, path):
-    ds_out = driver.Create(path, cols, rows, 1, dtype)
-    ds_out.SetProjection(proj)
-    ds_out.SetGeoTransform(geot)
-    ds_out.GetRasterBand(1).WriteArray(array)
-    ds_out = None
+# Enregistre un objet QgsVectorLayer sur le disque
+def to_shp(layer, path):
+    writer = QgsVectorFileWriter(
+        path, 'utf-8', layer.fields(), layer.wkbType(), layer.sourceCrs(), 'ESRI Shapefile')
+    writer.addFeatures(layer.getFeatures())
 
 print('Commencé à ' + time.strftime('%H:%M:%S'))
 
@@ -452,18 +437,13 @@ if not os.path.exists('data'):
     del bati_indif
 
     params = {
-        'INPUT' : 'data/bati/bati_clean.shp',
-        'OVERLAY' : 'data/iris.shp',
-        'INPUT_FIELDS' : ['ID','HAUTEUR','AIRE','NB_NIV'],
-        'OVERLAY_FIELDS' : ['CODE_IRIS','NOM_IRIS','TYP_IRIS','POP14','TXRP14'],
-        'OUTPUT' : 'data/bati/bati_inter_iris.shp'
+        'INPUT': 'data/bati/bati_clean.shp',
+        'OVERLAY': 'data/iris.shp',
+        'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV'],
+        'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14', 'TXRP14'],
+        'OUTPUT': 'data/bati/bati_inter_iris.shp'
     }
     processing.run('qgis:intersection', params, feedback=feedback)
-
-    bati_inter_iris = QgsVectorLayer('data/bati/bati_inter_iris.shp')
-    bati_inter_iris.dataProvider().createSpatialIndex()
-    bati_inter_iris.addExpressionField('$area', QgsField(
-        'area_iris', QVariant.Double, len=10, prec=2))
 
 if not os.path.exists('data/' + mode):
     os.mkdir('data/' + mode)
@@ -485,6 +465,111 @@ if not os.path.exists('data/' + mode):
     }
     processing.run('qgis:creategrid', params, feedback=feedback)
     del zone_buffer, extent, extentStr
+    grid = QgsVectorLayer('data/' + mode + '/grid.shp', 'grid')
+
+    bati_inter_iris = QgsVectorLayer('data/bati/bati_inter_iris.shp')
+    bati_inter_iris.dataProvider().createSpatialIndex()
+    bati_inter_iris.addExpressionField('$area', QgsField(
+        'area_i', QVariant.Double, len=10, prec=2))
+    expr = ' "area_i" * "NB_NIV" * "TXRP14" '
+    bati_inter_iris.addExpressionField(expr, QgsField(
+        'planch', QVariant.Double, len=10, prec=2))
+    expr = ' ("planch" / sum("planch", group_by:="CODE_IRIS")) * "POP14" '
+    bati_inter_iris.addExpressionField(expr, QgsField(
+        'pop_bati', QVariant.Double, len=10, prec=2))
+
+    params = {
+        'INPUT': bati_inter_iris,
+        'OVERLAY': 'data/' + mode + '/grid.shp',
+        'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV', 'CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14', 'TXRP14', 'area_i', 'planch', 'pop_bati'],
+        'OVERLAY_FIELDS': ['id'],
+        'OUTPUT': 'data/' + mode + '/bati_inter_grid.shp'
+    }
+    processing.run('qgis:intersection', params, feedback=feedback)
+    del bati_inter_iris
+
+    bati_inter_grid = QgsVectorLayer(
+        'data/' + mode + '/bati_inter_grid.shp', 'bati_inter_grid')
+    bati_inter_grid.addExpressionField('$area', QgsField(
+        'area_g', QVariant.Double, len=10, prec=2))
+    expr = ' "area_g" / "area_i" * "pop_bati" '
+    bati_inter_grid.addExpressionField(expr, QgsField(
+        'pop_cell', QVariant.Double, len=10, prec=2))
+    expr = ' "area_g" * "NB_NIV" * "TXRP14" '
+    bati_inter_grid.addExpressionField(expr, QgsField(
+        'planch_g', QVariant.Double, len=10, prec=2))
+    expr = ' "planch_g" / "pop_cell" '
+    bati_inter_grid.addExpressionField(expr, QgsField(
+        'nb_m2_hab', QVariant.Double, len=10, prec=2))
+
+    params = {
+        'INPUT': bati_inter_grid,
+        'VALUES_FIELD_NAME': 'pop_cell',
+        'CATEGORIES_FIELD_NAME': 'id_2',
+        'OUTPUT': 'data/' + mode + '/stat_pop_grid.csv'
+    }
+    processing.run('qgis:statisticsbycategories', params, feedback=feedback)
+
+    params = {
+        'INPUT': bati_inter_grid,
+        'VALUES_FIELD_NAME': 'planch_g',
+        'CATEGORIES_FIELD_NAME': 'id_2',
+        'OUTPUT': 'data/' + mode + '/stat_planch_grid.csv'
+    }
+    processing.run('qgis:statisticsbycategories', params, feedback=feedback)
+
+    params = {
+        'INPUT': bati_inter_grid,
+        'VALUES_FIELD_NAME': 'nb_m2_hab',
+        'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
+        'OUTPUT': 'data/' + mode + '/stat_nb_m2_iris.csv'
+    }
+    processing.run('qgis:statisticsbycategories', params, feedback=feedback)
+
+    params = {
+        'INPUT': bati_inter_grid,
+        'VALUES_FIELD_NAME': 'planch_g',
+        'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
+        'OUTPUT': 'data/' + mode + '/stat_planch_iris.csv'
+    }
+    processing.run('qgis:statisticsbycategories', params, feedback=feedback)
+
+    to_shp(bati_inter_grid, 'data/' + mode + '/bati_inter_grid.shp')
+    del bati_inter_grid
+
+    csvPopG = QgsVectorLayer(
+        'data/' + mode + '/stat_pop_grid.csv', 'delimitedtext')
+    csvPopG.addExpressionField(
+        'to_real("sum")', QgsField('pop', QVariant.Double))
+
+    csvPlanchG = QgsVectorLayer(
+        'data/' + mode + '/stat_planch_grid.csv', 'delimitedtext')
+    csvPlanchG.addExpressionField(
+        'to_real("sum")', QgsField('s_planch', QVariant.Double))
+
+    csvM2I = QgsVectorLayer(
+        'data/' + mode + '/stat_nb_m2_iris.csv', 'delimitedtext')
+    csvM2I.addExpressionField(
+        'to_real("mean")', QgsField('nb_m2_hab', QVariant.Double))
+
+    csvPlanchI = QgsVectorLayer(
+        'data/' + mode + '/stat_planch_iris.csv', 'delimitedtext')
+    csvPlanchI.addExpressionField(
+        'to_real("q3")', QgsField('planch_q3', QVariant.Double))
+
+
+    statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum', 'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
+
+    join(grid, 'id', csvPopG, 'id_2', statBlackList)
+    join(grid, 'id', csvPlanchG, 'id_2', statBlackList)
+    to_shp(grid, 'data/' + mode + '/grid_stat.shp')
+    del csvPopG, csvPlanchG
+
+    iris = QgsVectorLayer('data/iris.shp', 'iris')
+    join(iris, 'CODE_IRIS', csvPlanchI, 'CODE_IRIS', statBlackList)
+    join(iris, 'CODE_IRIS', csvM2I, 'CODE_IRIS', statBlackList)
+    to_shp(iris, 'data/' + mode + '/iris_stat.shp')
+    del csvPlanchI, csvM2I, statBlackList
 
     # Objet pour transformation de coordonées
     l93 = QgsCoordinateReferenceSystem()
@@ -495,7 +580,6 @@ if not os.path.exists('data/' + mode):
     coordTr = QgsCoordinateTransform(l93, laea, trCxt)
 
     # BBOX pour extraction du MNT
-    grid = QgsVectorLayer('data/' + mode + '/grid.shp', 'grid')
     extent3035 = grid.extent()
     extent2154 = coordTr.transform(extent3035, coordTr.ReverseTransform)
 
@@ -533,6 +617,8 @@ if not os.path.exists('data/' + mode):
         outputBounds=(xMin, yMin, xMax, yMax),
         srcNodata=-99999
     )
+    del tileList
+
     gdal.DEMProcessing(
         'data/' + mode + '/slope.tif',
         'data/' + mode + '/mnt.tif',
