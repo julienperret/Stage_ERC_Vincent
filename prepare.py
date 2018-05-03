@@ -125,6 +125,14 @@ def to_shp(layer, path):
         path, 'utf-8', layer.fields(), layer.wkbType(), layer.sourceCrs(), 'ESRI Shapefile')
     writer.addFeatures(layer.getFeatures())
 
+# Enregistre un fichier .tif à partir d'un array et de variables GDAL stockée au préalable
+def to_tif(array, cols, rows, dtype, proj, geot, path):
+    ds_out = driver.Create(path, cols, rows, 1, dtype)
+    ds_out.SetProjection(proj)
+    ds_out.SetGeoTransform(geot)
+    ds_out.GetRasterBand(1).WriteArray(array)
+    ds_out = None
+
 print('Commencé à ' + time.strftime('%H:%M:%S'))
 
 # Gestion des XLS de l'INSEE, à faire une seule fois
@@ -230,15 +238,15 @@ if not os.path.exists('data'):
     for path in clipBati:
         reproj(clip(path, zone), 'data/bati/')
 
-    os.mkdir('data/reseau')
-    clipBuf = [
+    os.mkdir('data/transport')
+    clipRes = [
         '../global_data/rge/' + dept + '/bdtopo/ROUTE_PRIMAIRE.SHP',
         '../global_data/rge/' + dept + '/bdtopo/ROUTE_SECONDAIRE.SHP',
         '../global_data/rge/' + dept + '/bdtopo/TRONCON_VOIE_FERREE.SHP',
         '../global_data/rge/' + dept + '/bdtopo/GARE.SHP'
     ]
-    for path in clipBuf:
-        reproj(clip(path, zone_buffer), 'data/reseau/')
+    for path in clipRes:
+        reproj(clip(path, zone_buffer), 'data/transport/')
 
     os.mkdir('data/pai')
     clipPai = [
@@ -253,9 +261,36 @@ if not os.path.exists('data'):
     ]
     for path in clipPai:
         reproj(clip(path, zone_buffer), 'data/pai/')
-    del clipBati, clipBuf, clipPai, path
+    del clipBati, clipRes, clipPai, path
+
+    # Préparation de la couche transport
+    transports = []
+    if os.path.exists('transport_commun.shp'):
+        reproj(clip('transport_commun.shp', zone_buffer), '/data/transport/')
+        layer = QgsVectorLayer('/data/transport/transport_commun.shp', 'transport_commun')
+        transports.append(layer)
+
+    params = {
+        'INPUT': 'data/pai/transport.shp',
+        'EXPRESSION': """ "NATURE" = 'Station de métro' """,
+        'OUTPUT': 'memory:transport_commun_pai',
+        'FAIL_OUTPUT': 'memory:fail'
+    }
+    res = processing.run('native:extractbyexpression', params, feedback=feedback)
+    transports.append(res['OUTPUT'])
+    gare = QgsVectorLayer('data/transport/gare.shp', 'gare')
+    params = {'INPUT': gare, 'OUTPUT': 'memory:gare'}
+    res = processing.run('native:centroids', params, feedback=feedback)
+    transports.append(res['OUTPUT'])
+    params = {
+        'LAYERS': transports,
+        'CRS': 'EPSG:3035',
+        'OUTPUT': 'data/transport/arrets_transport.shp'
+    }
+    processing.run('native:mergevectorlayers', params, feedback=feedback)
 
     # Classification des points geosirene
+    os.mkdir('data/geosirene')
     geosirene = QgsVectorLayer(
         '../global_data/sirene/geosirene.shp', 'geosirene')
     geosirene.dataProvider().createSpatialIndex()
@@ -276,7 +311,14 @@ if not os.path.exists('data'):
     """
     geosirene.addExpressionField(
         expr, QgsField('type', QVariant.String, len=20))
-    reproj(clip(geosirene, zone_buffer), 'data/')
+    sireneLayer = reproj(clip(geosirene, zone_buffer))
+
+    params = {
+        'INPUT': sireneLayer,
+        'FIELD': 'type',
+        'OUTPUT': 'data/geosirene/'
+    }
+    processing.run('qgis:splitvectorlayer', params, feedback=feedback)
 
     # Correction de l'OCS
     if os.path.exists('ocsol.shp'):
@@ -341,6 +383,15 @@ if not os.path.exists('data'):
     }
     processing.run('native:mergevectorlayers', params, feedback=feedback)
 
+    # Fusion des routes primaires et secondaires
+    routes = ['data/transport/route_primaire.shp', 'data/transport/route_secondaire.shp']
+    params = {
+        'LAYERS': routes,
+        'CRS': 'EPSG:3035',
+        'OUTPUT': 'data/transport/routes.shp'
+    }
+    processing.run('native:mergevectorlayers', params, feedback=feedback)
+
     # Empaquetage de tout le bâti
     batiPkg = []
     for path in os.listdir('data/bati'):
@@ -356,7 +407,7 @@ if not os.path.exists('data'):
         'OUTPUT': 'data/bati/bati_merged.shp'
     }
     processing.run('native:mergevectorlayers', params, feedback=feedback)
-    del cleanPai, batiPkg, layer
+    del cleanPai, routes, batiPkg, layer
 
     # ---! Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
     bati_indif = QgsVectorLayer(
@@ -557,7 +608,6 @@ if not os.path.exists('data/' + mode):
     csvPlanchI.addExpressionField(
         'to_real("q3")', QgsField('planch_q3', QVariant.Double))
 
-
     statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum', 'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
     join(grid, 'id', csvPopG, 'id_2', statBlackList)
@@ -566,6 +616,7 @@ if not os.path.exists('data/' + mode):
     del csvPopG, csvPlanchG
 
     iris = QgsVectorLayer('data/iris.shp', 'iris')
+    iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=3))
     join(iris, 'CODE_IRIS', csvPlanchI, 'CODE_IRIS', statBlackList)
     join(iris, 'CODE_IRIS', csvM2I, 'CODE_IRIS', statBlackList)
     to_shp(iris, 'data/' + mode + '/iris_stat.shp')
