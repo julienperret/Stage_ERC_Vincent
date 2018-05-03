@@ -21,15 +21,13 @@ from qgis.core import (
     QgsRectangle,
     QgsVectorFileWriter,
     QgsVectorLayer,
-    QgsVectorLayerJoinInfo
-)
+    QgsVectorLayerJoinInfo)
 from qgis.analysis import QgsNativeAlgorithms
 from PyQt5.QtCore import QVariant
 
 QgsApplication.setPrefixPath('/usr', True)
 qgs = QgsApplication([], GUIenabled=False)
 qgs.initQgis()
-qgs.setMaxThreads(-1)
 
 sys.path.append('/usr/share/qgis/python/plugins')
 import processing
@@ -59,16 +57,16 @@ if(len(sys.argv) > 4):
     mode = sys.argv[4]
     if mode == 'strict':
         gridSize = '20'
-    elif mode == 'simple':
+    elif mode == 'souple':
         gridSize = '50'
     else:
-        print('Deux valeurs possibles pour le mode de seuillage : simple - strict ')
+        print('Deux valeurs possibles pour le mode de seuillage : souple - strict ')
         sys.exit()
-else :
-    mode = 'simple'
+else:
+    mode = 'souple'
     gridSize = '50'
 
-# Découpe un ensemble de layers avec gestion de l'encodage
+# Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
     if type(file) == QgsVectorLayer:
         params = {
@@ -129,7 +127,7 @@ def to_shp(layer, path):
     writer.addFeatures(layer.getFeatures())
 
 # Enregistre un fichier .tif à partir d'un array et de variables GDAL stockée au préalable
-def to_tif(array, cols, rows, dtype, proj, geot, path):
+def to_tif(array, dtype, path):
     ds_out = driver.Create(path, cols, rows, 1, dtype)
     ds_out.SetProjection(proj)
     ds_out.SetGeoTransform(geot)
@@ -270,7 +268,8 @@ if not os.path.exists('data'):
     transports = []
     if os.path.exists('transport_commun.shp'):
         reproj(clip('transport_commun.shp', zone_buffer), '/data/transport/')
-        layer = QgsVectorLayer('/data/transport/transport_commun.shp', 'transport_commun')
+        layer = QgsVectorLayer(
+            '/data/transport/transport_commun.shp', 'transport_commun')
         transports.append(layer)
 
     params = {
@@ -279,7 +278,8 @@ if not os.path.exists('data'):
         'OUTPUT': 'memory:transport_commun_pai',
         'FAIL_OUTPUT': 'memory:fail'
     }
-    res = processing.run('native:extractbyexpression', params, feedback=feedback)
+    res = processing.run('native:extractbyexpression',
+                         params, feedback=feedback)
     transports.append(res['OUTPUT'])
     gare = QgsVectorLayer('data/transport/gare.shp', 'gare')
     params = {'INPUT': gare, 'OUTPUT': 'memory:gare'}
@@ -336,6 +336,25 @@ if not os.path.exists('data'):
             '../global_data/oso/departement_' + dept + '.shp', 'oso')
         oso.dataProvider().createSpatialIndex()
         reproj(clip(oso, zone), 'data/')
+        del oso
+
+    # Traitement du shape de l'intérêt écologique
+    if os.path.exists('ecologie.shp'):
+        ecologie = QgsVectorLayer('ecologie.shp', 'ecologie')
+        ecoFields = []
+        for field in ecologie.fields() :
+            ecoFields.append(field.name())
+        if 'importance' not in ecoFields :
+            print("Attribut requis 'importance' manquant ou mal nommé dans la couche d'importance écologique")
+            sys.exit()
+        ecologie.addExpressionField('1 - ("importance"/100)', QgsField('interet', QVariant.Double))
+        params = {
+            'INPUT': ecologie,
+            'OUTPUT': 'memory:ecologie'
+        }
+        res = processing.run('native:fixgeometries', params, feedback=feedback)
+        reproj(clip(res['OUTPUT'],zone), 'data/')
+        del ecologie, ecoFields, field
 
     # Correction du PLU
     if os.path.exists('plu.shp'):
@@ -387,7 +406,8 @@ if not os.path.exists('data'):
     processing.run('native:mergevectorlayers', params, feedback=feedback)
 
     # Fusion des routes primaires et secondaires
-    routes = ['data/transport/route_primaire.shp', 'data/transport/route_secondaire.shp']
+    routes = ['data/transport/route_primaire.shp',
+              'data/transport/route_secondaire.shp']
     params = {
         'LAYERS': routes,
         'CRS': 'EPSG:3035',
@@ -515,12 +535,11 @@ if not os.path.exists('data/' + mode):
         'HOVERLAY': 0,
         'VOVERLAY': 0,
         'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/' + mode + '/grid.shp'
-    }
+        'OUTPUT': 'data/' + mode + '/grid.shp'}
     processing.run('qgis:creategrid', params, feedback=feedback)
     del zone_buffer, extent, extentStr
-    grid = QgsVectorLayer('data/' + mode + '/grid.shp', 'grid')
 
+    # Intersection entre le couche de bâti nettoyée et la grille
     bati_inter_iris = QgsVectorLayer('data/bati/bati_inter_iris.shp')
     bati_inter_iris.dataProvider().createSpatialIndex()
     bati_inter_iris.addExpressionField('$area', QgsField(
@@ -531,17 +550,16 @@ if not os.path.exists('data/' + mode):
     expr = ' ("planch" / sum("planch", group_by:="CODE_IRIS")) * "POP14" '
     bati_inter_iris.addExpressionField(expr, QgsField(
         'pop_bati', QVariant.Double, len=10, prec=2))
-
     params = {
         'INPUT': bati_inter_iris,
         'OVERLAY': 'data/' + mode + '/grid.shp',
         'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV', 'CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14', 'TXRP14', 'area_i', 'planch', 'pop_bati'],
         'OVERLAY_FIELDS': ['id'],
-        'OUTPUT': 'data/' + mode + '/bati_inter_grid.shp'
-    }
+        'OUTPUT': 'data/' + mode + '/bati_inter_grid.shp'}
     processing.run('qgis:intersection', params, feedback=feedback)
     del bati_inter_iris
 
+    # Calcul de stat sur la bâti dans la grille
     bati_inter_grid = QgsVectorLayer(
         'data/' + mode + '/bati_inter_grid.shp', 'bati_inter_grid')
     bati_inter_grid.addExpressionField('$area', QgsField(
@@ -556,28 +574,26 @@ if not os.path.exists('data/' + mode):
     bati_inter_grid.addExpressionField(expr, QgsField(
         'nb_m2_hab', QVariant.Double, len=10, prec=2))
 
+    # Aggrégation de statistiques dans des fichiers CSV
     params = {
         'INPUT': bati_inter_grid,
         'VALUES_FIELD_NAME': 'pop_cell',
         'CATEGORIES_FIELD_NAME': 'id_2',
-        'OUTPUT': 'data/' + mode + '/stat_pop_grid.csv'
-    }
+        'OUTPUT': 'data/' + mode + '/stat_pop_grid.csv'}
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
     params = {
         'INPUT': bati_inter_grid,
         'VALUES_FIELD_NAME': 'planch_g',
         'CATEGORIES_FIELD_NAME': 'id_2',
-        'OUTPUT': 'data/' + mode + '/stat_planch_grid.csv'
-    }
+        'OUTPUT': 'data/' + mode + '/stat_planch_grid.csv'}
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
     params = {
         'INPUT': bati_inter_grid,
         'VALUES_FIELD_NAME': 'nb_m2_hab',
         'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-        'OUTPUT': 'data/' + mode + '/stat_nb_m2_iris.csv'
-    }
+        'OUTPUT': 'data/' + mode + '/stat_nb_m2_iris.csv'}
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
     params = {
@@ -591,6 +607,7 @@ if not os.path.exists('data/' + mode):
     to_shp(bati_inter_grid, 'data/' + mode + '/bati_inter_grid.shp')
     del bati_inter_grid
 
+    # Correction et changement de nom pour jointure des stat sur la grille et le IRIS
     csvPopG = QgsVectorLayer(
         'data/' + mode + '/stat_pop_grid.csv', 'delimitedtext')
     csvPopG.addExpressionField(
@@ -604,15 +621,17 @@ if not os.path.exists('data/' + mode):
     csvM2I = QgsVectorLayer(
         'data/' + mode + '/stat_nb_m2_iris.csv', 'delimitedtext')
     csvM2I.addExpressionField(
-        'to_real("mean")', QgsField('nb_m2_hab', QVariant.Double))
+        'to_real("mean")', QgsField('NB_M2_HAB', QVariant.Double))
 
     csvPlanchI = QgsVectorLayer(
         'data/' + mode + '/stat_planch_iris.csv', 'delimitedtext')
     csvPlanchI.addExpressionField(
-        'to_real("q3")', QgsField('planch_q3', QVariant.Double))
+        'to_real("q3")', QgsField('PLANCH_Q3', QVariant.Double))
 
-    statBlackList = ['count','unique','min','max','range','sum','mean','median','stddev','minority','majority','q1','q3','iqr']
+    statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum',
+                     'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
+    grid = QgsVectorLayer('data/' + mode + '/grid.shp', 'grid')
     join(grid, 'id', csvPopG, 'id_2', statBlackList)
     join(grid, 'id', csvPlanchG, 'id_2', statBlackList)
     to_shp(grid, 'data/' + mode + '/grid_stat.shp')
@@ -621,23 +640,25 @@ if not os.path.exists('data/' + mode):
     iris = QgsVectorLayer('data/iris.shp', 'iris')
     join(iris, 'CODE_IRIS', csvPlanchI, 'CODE_IRIS', statBlackList)
     join(iris, 'CODE_IRIS', csvM2I, 'CODE_IRIS', statBlackList)
-    iris.addExpressionField('$id + 1', QgsField('id', QVariant.Int, len=4))
+    iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
     to_shp(iris, 'data/' + mode + '/iris_stat.shp')
     del csvPlanchI, csvM2I, statBlackList
 
+    # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
     iris = QgsVectorLayer('data/' + mode + '/iris_stat.shp')
-    irisDF = pandas.DataFrame(None,[i for i in range(iris.featureCount())],['id','code','nom','population','contiguite'])
+    irisDf = pandas.DataFrame(None, [i for i in range(iris.featureCount())], [
+                              'id', 'code', 'nom', 'population', 'contiguite'])
     for i in range(iris.featureCount()):
         feat = iris.getFeature(i)
-        irisDF.id[i] = feat.attribute(13)
-        irisDF.code[i] = feat.attribute(3)
-        irisDF.nom[i] = feat.attribute(4)
-        irisDF.population[i] = feat.attribute(7)
-        irisDF.contiguite[i] = []
+        irisDf.id[i] = feat.attribute('ID')
+        irisDf.code[i] = feat.attribute('CODE_IRIS')
+        irisDf.nom[i] = feat.attribute('NOM_IRIS')
+        irisDf.population[i] = feat.attribute('POP14')
+        irisDf.contiguite[i] = []
         for poly in iris.getFeatures():
             if feat.geometry().touches(poly.geometry()):
-                irisDF.contiguite[i].append(poly.attribute(13))
-    irisDF.to_csv('data/' + mode + '/iris_id.csv', index=0)
+                irisDf.contiguite[i].append(poly.attribute('ID'))
+    irisDf.to_csv('data/' + mode + '/iris_id.csv', index=0)
 
     # Objet pour transformation de coordonées
     l93 = QgsCoordinateReferenceSystem()
@@ -648,10 +669,11 @@ if not os.path.exists('data/' + mode):
     coordTr = QgsCoordinateTransform(l93, laea, trCxt)
 
     # BBOX pour extraction du MNT
-    extent3035 = grid.extent()
-    extent2154 = coordTr.transform(extent3035, coordTr.ReverseTransform)
+    grid = QgsVectorLayer('data/' + mode + '/grid_stat.shp', 'grid')
+    extent = grid.extent()
+    extentL93 = coordTr.transform(extent, coordTr.ReverseTransform)
 
-    # Préparation du MNT
+    # Préparation du MNT - extraction des tuiles dans la zone d'étude
     tileList = []
     for tile in os.listdir('../global_data/rge/' + dept + '/bdalti/'):
         if os.path.splitext(tile)[1] == '.asc':
@@ -668,14 +690,15 @@ if not os.path.exists('data/' + mode):
             xMax = xMin + 5000
             yMax = yMin + 5000
             tileExtent = QgsRectangle(xMin, yMin, xMax, yMax)
-            if extent2154.intersects(tileExtent):
+            if extentL93.intersects(tileExtent):
                 tileList.append(path)
 
-    xMin = extent3035.xMinimum()
-    yMin = extent3035.yMinimum()
-    xMax = extent3035.xMaximum()
-    yMax = extent3035.yMaximum()
+    xMin = extent.xMinimum()
+    yMin = extent.yMinimum()
+    xMax = extent.xMaximum()
+    yMax = extent.yMaximum()
 
+    # Fusion des tuiles MNT dans la zone d'étude
     gdal.Warp(
         'data/' + mode + '/mnt.tif', tileList,
         format='GTiff', outputType=gdal.GDT_Float32,
@@ -683,18 +706,33 @@ if not os.path.exists('data/' + mode):
         resampleAlg='cubicspline',
         srcSRS='EPSG:2154', dstSRS='EPSG:3035',
         outputBounds=(xMin, yMin, xMax, yMax),
-        srcNodata=-99999
-    )
+        srcNodata=-99999)
     del tileList
 
+    # Calcul de pente en %
     gdal.DEMProcessing(
         'data/' + mode + '/slope.tif',
         'data/' + mode + '/mnt.tif',
-        'slope',
-        format='GTiff',
-        slopeFormat='percent'
-    )
+        'slope', format='GTiff',
+        slopeFormat='percent')
+
+    # Mise en forme finale des données pour le modèle
+    if not os.path.exists(mode):
+        os.mkdir(mode)
+    extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
+    rasterizeParams = {
+        'INPUT': 'data/' + mode + '/grid_stat.shp',
+        'FIELD': 'pop',
+        'UNITS': 1,
+        'WIDTH': int(gridSize),
+        'HEIGHT': int(gridSize),
+        'EXTENT': extentStr,
+        'NODATA': 65535,
+        'DATA_TYPE': 2,
+        'INIT': 0,
+        'INVERT': False,
+        'OUTPUT': mode + '/population.tif'}
+    processing.run('gdal:rasterize', rasterizeParams, feedback=feedback)
 
 qgs.exitQgis()
-
 print('Terminé à  ' + time.strftime('%H:%M:%S'))
