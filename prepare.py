@@ -40,8 +40,10 @@ QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
 feedback = QgsProcessingFeedback()
 
 # Vérification des paramètres d'entrée
-if(len(sys.argv) < 3):
-    print('Le scipt prend au moins 2 paramètres en entrée : dossier de travail (spécifique à la zone) et le numéro du département.')
+if(len(sys.argv) < 4):
+    print("""Le scipt prend au moins 3 paramètres en entrée :
+    dossier de travail (spécifique à la zone), le numéro du département
+    et le taux d'accroissement démograpique.""")
     sys.exit()
 workspace = sys.argv[1]
 dept = sys.argv[2]
@@ -52,17 +54,18 @@ if not os.path.exists('../global_data'):
 if not os.path.exists('zone.shp'):
     print('Le shapefile de la zone d''étude (zone.shp) doit être placé dans le répertoire de travail.')
     sys.exit()
-if(len(sys.argv) > 3):
-    mode = sys.argv[3]
-    if mode == 'hard':
+tauxEvo = sys.argv[3]
+if(len(sys.argv) > 4):
+    mode = sys.argv[4]
+    if mode == 'strict':
         gridSize = '20'
-    elif mode == 'soft':
+    elif mode == 'simple':
         gridSize = '50'
     else:
-        print('Deux valeurs possibles pour le mode de seuillage : hard - soft')
+        print('Deux valeurs possibles pour le mode de seuillage : simple - strict ')
         sys.exit()
-else:
-    mode = 'soft'
+else :
+    mode = 'simple'
     gridSize = '50'
 
 # Découpe un ensemble de layers avec gestion de l'encodage
@@ -608,7 +611,7 @@ if not os.path.exists('data/' + mode):
     csvPlanchI.addExpressionField(
         'to_real("q3")', QgsField('planch_q3', QVariant.Double))
 
-    statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum', 'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
+    statBlackList = ['count','unique','min','max','range','sum','mean','median','stddev','minority','majority','q1','q3','iqr']
 
     join(grid, 'id', csvPopG, 'id_2', statBlackList)
     join(grid, 'id', csvPlanchG, 'id_2', statBlackList)
@@ -616,11 +619,25 @@ if not os.path.exists('data/' + mode):
     del csvPopG, csvPlanchG
 
     iris = QgsVectorLayer('data/iris.shp', 'iris')
-    iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=3))
     join(iris, 'CODE_IRIS', csvPlanchI, 'CODE_IRIS', statBlackList)
     join(iris, 'CODE_IRIS', csvM2I, 'CODE_IRIS', statBlackList)
+    iris.addExpressionField('$id + 1', QgsField('id', QVariant.Int, len=4))
     to_shp(iris, 'data/' + mode + '/iris_stat.shp')
     del csvPlanchI, csvM2I, statBlackList
+
+    iris = QgsVectorLayer('data/' + mode + '/iris_stat.shp')
+    irisDF = pandas.DataFrame(None,[i for i in range(iris.featureCount())],['id','code','nom','population','contiguite'])
+    for i in range(iris.featureCount()):
+        feat = iris.getFeature(i)
+        irisDF.id[i] = feat.attribute(13)
+        irisDF.code[i] = feat.attribute(3)
+        irisDF.nom[i] = feat.attribute(4)
+        irisDF.population[i] = feat.attribute(7)
+        irisDF.contiguite[i] = []
+        for poly in iris.getFeatures():
+            if feat.geometry().touches(poly.geometry()):
+                irisDF.contiguite[i].append(poly.attribute(13))
+    irisDF.to_csv('data/' + mode + '/iris_id.csv', index=0)
 
     # Objet pour transformation de coordonées
     l93 = QgsCoordinateReferenceSystem()
