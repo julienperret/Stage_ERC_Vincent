@@ -5,7 +5,7 @@ import sys
 import re
 import time
 import gdal
-import numpy
+import numpy as np
 import pandas
 import csv
 
@@ -266,16 +266,16 @@ if not os.path.exists('data'):
 
     # Préparation de la couche transport
     transports = []
-    if os.path.exists('transport_commun.shp'):
-        reproj(clip('transport_commun.shp', zone_buffer), '/data/transport/')
-        layer = QgsVectorLayer(
-            '/data/transport/transport_commun.shp', 'transport_commun')
+    if os.path.exists('bus.shp'):
+        reproj(clip('bus.shp', zone_buffer), '/data/transport/')
+        layer = QgsVectorLayer('/data/transport/bus.shp', 'bus')
         transports.append(layer)
+        del layer
 
     params = {
         'INPUT': 'data/pai/transport.shp',
         'EXPRESSION': """ "NATURE" = 'Station de métro' """,
-        'OUTPUT': 'memory:transport_commun_pai',
+        'OUTPUT': 'data/transport/transport_pai.shp',
         'FAIL_OUTPUT': 'memory:fail'
     }
     res = processing.run('native:extractbyexpression',
@@ -674,6 +674,7 @@ if not os.path.exists('data/' + mode):
     extentL93 = coordTr.transform(extent, coordTr.ReverseTransform)
 
     # Préparation du MNT - extraction des tuiles dans la zone d'étude
+    os.mkdir('data/' + mode + '/tif')
     tileList = []
     for tile in os.listdir('../global_data/rge/' + dept + '/bdalti/'):
         if os.path.splitext(tile)[1] == '.asc':
@@ -700,7 +701,7 @@ if not os.path.exists('data/' + mode):
 
     # Fusion des tuiles MNT dans la zone d'étude
     gdal.Warp(
-        'data/' + mode + '/mnt.tif', tileList,
+        'data/' + mode + '/tif/mnt.tif', tileList,
         format='GTiff', outputType=gdal.GDT_Float32,
         xRes=int(gridSize), yRes=int(gridSize),
         resampleAlg='cubicspline',
@@ -711,28 +712,67 @@ if not os.path.exists('data/' + mode):
 
     # Calcul de pente en %
     gdal.DEMProcessing(
-        'data/' + mode + '/slope.tif',
-        'data/' + mode + '/mnt.tif',
+        'data/' + mode + '/tif/slope.tif',
+        'data/' + mode + '/tif/mnt.tif',
         'slope', format='GTiff',
         slopeFormat='percent')
 
-    # Mise en forme finale des données pour le modèle
+    # Mise en forme finale des données raster pour le modèle
     if not os.path.exists(mode):
         os.mkdir(mode)
     extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
     rasterizeParams = {
         'INPUT': 'data/' + mode + '/grid_stat.shp',
         'FIELD': 'pop',
+        'BURN': None,
         'UNITS': 1,
         'WIDTH': int(gridSize),
         'HEIGHT': int(gridSize),
         'EXTENT': extentStr,
-        'NODATA': 65535,
         'DATA_TYPE': 2,
         'INIT': 0,
         'INVERT': False,
         'OUTPUT': mode + '/population.tif'}
     processing.run('gdal:rasterize', rasterizeParams, feedback=feedback)
+
+    rasterizeParams['DATA_TYPE'] = 5
+    rasterizeParams['FIELD'] = 's_planch'
+    rasterizeParams['OUTPUT'] = 'data/' + mode + '/tif/s_planch_grid.tif'
+    processing.run('gdal:rasterize', rasterizeParams, feedback=feedback)
+
+    rasterizeParams['INPUT'] = 'data/' + mode + '/iris_stat.shp'
+    rasterizeParams['FIELD'] = 'ID'
+    rasterizeParams['DATA_TYPE'] = 2
+    rasterizeParams['OUTPUT'] = mode + '/iris_id.tif'
+    processing.run('gdal:rasterize', rasterizeParams, feedback=feedback)
+
+    rasterizeParams['FIELD'] = 'PLANCH_Q3'
+    rasterizeParams['DATA_TYPE'] = 5
+    rasterizeParams['OUTPUT'] = 'data/' + mode + '/tif/seuil_q3_iris.tif'
+    processing.run('gdal:rasterize', rasterizeParams, feedback=feedback)
+
+    rasterizeParams['FIELD'] = 'NB_M2_HAB'
+    rasterizeParams['OUTPUT'] = 'data/' + mode + '/tif/nb_m2_iris.tif'
+    processing.run('gdal:rasterize', rasterizeParams, feedback=feedback)
+
+    rasterizeParams['BURN'] = 1
+    rasterizeParams['DATA_TYPE'] = 0
+    rasterizeParams['FIELD'] = None
+    rasterizeParams['INVERT'] = True
+    rasterizeParams['OUTPUT'] = mode + '/masque.tif'
+    processing.run('gdal:rasterize', rasterizeParams, feedback=feedback)
+
+    ds = gdal.Open(mode + '/population.tif')
+    cols = ds.RasterXSize
+    rows = ds.RasterYSize
+    proj = ds.GetProjection()
+    geot = ds.GetGeoTransform()
+    driver = gdal.GetDriverByName('GTiff')
+
+    ds = gdal.Open('data/' + mode + '/tif/slope.tif')
+    slope = ds.ReadAsArray()
+    slopeMask = np.where(slope >= 30, 1, 0)
+    ds = None
 
 qgs.exitQgis()
 print('Terminé à  ' + time.strftime('%H:%M:%S'))

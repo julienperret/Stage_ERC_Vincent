@@ -29,8 +29,6 @@ if seuil not in {'max', 'mean', 'q3'}:
     sys.exit()
 
 # écrit un fichier .tif à partir d'un array et de variables GDAL stockée au préalable
-
-
 def to_tif(array, path, dtype):
     ds_out = driver.Create(path, cols, rows, 1, dtype)
     ds_out.SetProjection(projection)
@@ -39,8 +37,6 @@ def to_tif(array, path, dtype):
     ds_out = None
 
 # algorithme de tirage pour répartition de la population
-
-
 def peupler(id, pop):
     # création d'arrays d'intérêt et de capacité masqués autour de l'IRIS
     weight = numpy.where((iris == id) & (capacite > 0), interet, 0)
