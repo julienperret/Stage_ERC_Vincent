@@ -69,10 +69,11 @@ else:
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
     if type(file) == QgsVectorLayer:
+        name = file.name()
         params = {
             'INPUT': file,
             'OVERLAY': overlay,
-            'OUTPUT': outdir + file.name()
+            'OUTPUT': outdir + name
         }
     elif type(file) == str:
         name = os.path.basename(file).split('.')[0].lower()
@@ -117,13 +118,19 @@ def rasterize(file, outfile, field=None, dtype=5, init=0, invert=False):
 def reproj(file, outdir='memory:', crs='EPSG:3035'):
     if type(file) == QgsVectorLayer:
         name = file.name()
+        params = {
+            'INPUT': file,
+            'TARGET_CRS': crs,
+            'OUTPUT': outdir + name
+        }
     elif type(file) == str:
         name = os.path.basename(file).split('.')[0].lower()
-    params = {
-        'INPUT': file,
-        'TARGET_CRS': crs,
-        'OUTPUT': outdir + name
-    }
+        layer = QgsVectorLayer(file, name)
+        params = {
+            'INPUT': layer,
+            'TARGET_CRS': crs,
+            'OUTPUT': outdir + name
+        }
     if outdir != 'memory:':
         params['OUTPUT'] += '.shp'
     res = processing.run('native:reprojectlayer', params, feedback=feedback)
@@ -205,7 +212,7 @@ def buildingCleaner(buildings, polygons, points, outpath, surfMin=50, surfMax=10
     del buildings, polygons, points, layer, surfMin, surfMax, outpath
 
 # Génère un csv contenant la matrice de contiguïté par ID et la population de départ
-def contiguityMatrix(iris, outcsv):
+def contiguityMatrix(iris, outcsv=None):
     irisDf = pd.DataFrame(None, [i for i in range(iris.featureCount())], [
                               'id', 'code', 'nom', 'population', 'contiguite'])
     for i in range(iris.featureCount()):
@@ -218,7 +225,8 @@ def contiguityMatrix(iris, outcsv):
         for poly in iris.getFeatures():
             if feat.geometry().touches(poly.geometry()):
                 irisDf.contiguite[i].append(poly.attribute('ID'))
-    irisDf.to_csv(outcsv, index=0)
+    if outcsv:
+        irisDf.to_csv(outcsv, index=0)
     return irisDf
 
 # Selection des tuiles MNT dans la zone d'étude sous forme de liste
@@ -243,11 +251,48 @@ def demExtractor(directory, bbox):
                 tileList.append(path)
     return tileList
 
+# Traitement des zonages reglementaires pour la couche de restrictions
+def envRestrict(layerList, overlay, outdir):
+    mergeList = []
+    for file in layerList :
+        intersects = False
+        name = os.path.basename(file).split('.')[0].lower()
+        if '_OCCITANIE_L93' in file:
+            name = name.replace('_occitanie_l93', '')
+            layer = QgsVectorLayer(file, name)
+            layer.setProviderEncoding('ISO-8859-14')
+        if '_OCC_L93' in file:
+            name = name.replace('_occ_l93', '')
+            layer = QgsVectorLayer(file, name)
+            layer.setProviderEncoding('ISO-8859-14')
+        if '_s_r76' in file:
+            name = name.replace('_s_r76', '')
+            layer = QgsVectorLayer(file, name)
+            layer.setProviderEncoding('UTF-8')
+        if '_r73' in file:
+            name = name.replace('_r73', '')
+            layer = QgsVectorLayer(file, name)
+            layer.setProviderEncoding('ISO-8859-14')
+
+        layer.dataProvider().createSpatialIndex()
+        for feat in layer.getFeatures():
+            if feat.geometry().intersects(overlay.getFeature(0).geometry()):
+                intersects = True
+        if intersects :
+            if 'PARCS_NATIONAUX_OCCITANIE_L93.shp' in file:
+                params = {
+                    'INPUT': layer,
+                    'EXPRESSION': """ "CODE_R_ENP" = 'CPN' """,
+                    'OUTPUT': 'memory:coeur_parcs_nationaux',
+                    'FAIL_OUTPUT':'memory:'
+                }
+                res = processing.run('native:extractbyexpression', params, feedback=feedback)
+                reproj(clip(res['OUTPUT'], overlay), outdir)
+            else :
+                reproj(clip(layer, overlay), outdir)
+
 # Intersection entre la couche de bâti nettoyée jointe aux iris et la grille avec calcul et jointure des statistiques
 def popGrid(buildings, grid, iris, outdir):
-    if not os.path.exists(outdir + 'csv'):
-        os.mkdir(outdir + 'csv')
-
     buildings.dataProvider().createSpatialIndex()
     grid.dataProvider().createSpatialIndex()
     buildings.addExpressionField('$area', QgsField(
@@ -285,28 +330,28 @@ def popGrid(buildings, grid, iris, outdir):
         'INPUT': buildings,
         'VALUES_FIELD_NAME': 'pop_cell',
         'CATEGORIES_FIELD_NAME': 'id_2',
-        'OUTPUT': outdir + '/csv/stat_pop_grid.csv'}
+        'OUTPUT': outdir + '/stat_pop_grid.csv'}
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
     params = {
         'INPUT': buildings,
         'VALUES_FIELD_NAME': 'planch_g',
         'CATEGORIES_FIELD_NAME': 'id_2',
-        'OUTPUT': outdir + '/csv/stat_planch_grid.csv'}
+        'OUTPUT': outdir + '/stat_planch_grid.csv'}
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
     params = {
         'INPUT': buildings,
         'VALUES_FIELD_NAME': 'nb_m2_hab',
         'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-        'OUTPUT': outdir + '/csv/stat_nb_m2_iris.csv'}
+        'OUTPUT': outdir + '/stat_nb_m2_iris.csv'}
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
     params = {
         'INPUT': buildings,
         'VALUES_FIELD_NAME': 'planch_g',
         'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-        'OUTPUT': outdir + '/csv/stat_planch_iris.csv'
+        'OUTPUT': outdir + '/stat_planch_iris.csv'
     }
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
@@ -315,22 +360,22 @@ def popGrid(buildings, grid, iris, outdir):
 
     # Correction et changement de nom pour jointure des stat sur la grille et le IRIS
     csvPopG = QgsVectorLayer(
-        outdir + '/csv/stat_pop_grid.csv', 'delimitedtext')
+        outdir + '/stat_pop_grid.csv', 'delimitedtext')
     csvPopG.addExpressionField(
         'to_real("sum")', QgsField('pop', QVariant.Double))
 
     csvPlanchG = QgsVectorLayer(
-        outdir + '/csv/stat_planch_grid.csv', 'delimitedtext')
+        outdir + '/stat_planch_grid.csv', 'delimitedtext')
     csvPlanchG.addExpressionField(
         'to_real("sum")', QgsField('s_planch', QVariant.Double))
 
     csvM2I = QgsVectorLayer(
-        outdir + '/csv/stat_nb_m2_iris.csv', 'delimitedtext')
+        outdir + '/stat_nb_m2_iris.csv', 'delimitedtext')
     csvM2I.addExpressionField(
         'to_real("mean")', QgsField('NB_M2_HAB', QVariant.Double))
 
     csvPlanchI = QgsVectorLayer(
-        outdir + '/csv/stat_planch_iris.csv', 'delimitedtext')
+        outdir + '/stat_planch_iris.csv', 'delimitedtext')
     csvPlanchI.addExpressionField(
         'to_real("q3")', QgsField('PLANCH_Q3', QVariant.Double))
 
@@ -339,27 +384,26 @@ def popGrid(buildings, grid, iris, outdir):
 
     join(grid, 'id', csvPopG, 'id_2', statBlackList)
     join(grid, 'id', csvPlanchG, 'id_2', statBlackList)
-    to_shp(grid, outdir + '/grid_stat.shp')
+    to_shp(grid, outdir + '/stat_grid.shp')
     del csvPopG, csvPlanchG
 
     join(iris, 'CODE_IRIS', csvPlanchI, 'CODE_IRIS', statBlackList)
     join(iris, 'CODE_IRIS', csvM2I, 'CODE_IRIS', statBlackList)
     iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
-    to_shp(iris, outdir + '/iris_stat.shp')
+    to_shp(iris, outdir + '/stat_iris.shp')
     del csvPlanchI, csvM2I, statBlackList
 
 # Intersection entre la couche de bâti nettoyée jointe aux iris et la grille avec calcul et jointure des statistiques
-def restrictGrid(list, grid, outdir):
-    if not os.path.exists(outdir + 'csv'):
-        os.mkdir(outdir + 'csv')
-
+def restrictGrid(layerList, grid, outdir):
     grid.dataProvider().createSpatialIndex()
+    csvList = []
+    fieldList = []
     statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum',
                      'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
-    csvList = []
 
-    for layer in list:
+    for layer in layerList:
         name = layer.name()
+        fieldList.append(name)
         layer.dataProvider().createSpatialIndex()
 
         params = {
@@ -371,50 +415,38 @@ def restrictGrid(list, grid, outdir):
         res = processing.run('qgis:intersection', params, feedback=feedback)
         layer = res['OUTPUT']
 
-        # Calcul de stat sur la bâti dans la grille
         layer.addExpressionField('$area', QgsField(
             'area_g', QVariant.Double, len=10, prec=2))
 
-        # Aggrégation de statistiques dans des fichiers CSV
         params = {
             'INPUT': layer,
             'VALUES_FIELD_NAME': 'area_g',
             'CATEGORIES_FIELD_NAME': 'id_2',
-            'OUTPUT': outdir + 'csv/stat_restriction_' + name + '.csv'}
+            'OUTPUT': outdir + 'restriction_' + name + '.csv'}
         processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
         csv = QgsVectorLayer(
-            outdir + 'csv/stat_restriction_' + name + '.csv', 'delimitedtext')
+            outdir + 'restriction_' + name + '.csv', 'delimitedtext')
         csv.addExpressionField(
-            'to_real("sum")', QgsField('s_' + name, QVariant.Double))
+            'to_real("sum")', QgsField(name, QVariant.Double))
         csvList.append(csv)
 
-    for layer in csvList :
-        join(grid, 'id', layer, 'id_2', statBlackList)
-    to_shp(grid, outdir + 'restrict_grid.shp')
-    del list, csvList, layer
+    for csv in csvList :
+        join(grid, 'id', csv, 'id_2', statBlackList)
 
-# Création d'un tampon de 100m autour des autouroutes pour restriction
-def highwayBuffer(roads, outfile, distance=100):
-    params = {
-        'INPUT': roads,
-        'EXPRESSION': """ "NATURE" = 'Autoroute' """,
-        'OUTPUT': 'memory:autoroutes',
-        'FAIL_OUTPUT': 'memory:'
-    }
-    res = processing.run('native:extractbyexpression', params, feedback=feedback)
-    params = {
-        'INPUT': res['OUTPUT'],
-        'DISTANCE': distance,
-        'SEGMENTS': 5,
-        'END_CAP_STYLE': 0,
-        'JOIN_STYLE': 0,
-        'MITER_LIMIT': 2,
-        'DISSOLVE': True,
-        'OUTPUT': outfile
-    }
-    res = processing.run('native:buffer', params, feedback=feedback)
-    return res['OUTPUT']
+    cpt = len(fieldList)
+    expr = 'IF ('
+    for field in fieldList :
+        cpt -= 1
+        if cpt != 0 :
+            expr += '"' + field + '" IS NOT NULL OR '
+        else :
+            expr += '"' + field + '" IS NOT NULL, 1, 0)'
+
+    grid.addExpressionField(expr, QgsField('restrict', QVariant.Int))
+
+    to_shp(grid, outdir + 'restrict_grid.shp')
+    del fieldList, csvList, layer
 
 # Jointure avec données INSEE et extraction des IRIS dans la zone
 def irisExtractor(iris, overlay, csvdir, outdir):
@@ -456,7 +488,7 @@ def irisExtractor(iris, overlay, csvdir, outdir):
     del csvPop09, csvPop14, csvLog14, iris
 
 # Corrige les géometries et reclasse un PLU
-def pluFixer(plu, overlay, outdir, encoding='windows-1258'):
+def pluFixer(plu, overlay, outdir, encoding='utf-8'):
     plu.setProviderEncoding(encoding)
     plu.dataProvider().createSpatialIndex()
     expr = """ CASE
@@ -530,7 +562,7 @@ if not os.path.exists('../global_data/insee/csv'):
 if not os.path.exists('data'):
     os.mkdir('data')
 
-    # Tampon de 1000m autour de la zone pour extrations des quartiers et des PAI
+    # Tampon de 1000m autour de la zone pour extractions des quartiers et des PAI
     zone = QgsVectorLayer('zone.shp', 'zone')
     zone.dataProvider().createSpatialIndex()
     params = {
@@ -630,7 +662,7 @@ if not os.path.exists('data'):
     # Traitement du PLU
     if os.path.exists('plu.shp'):
         plu = QgsVectorLayer('plu.shp', 'plu')
-        pluFixer(plu, zone, 'data/')
+        pluFixer(plu, zone, 'data/', 'windows-1258')
         del plu
 
     # Extraction et classification des points geosirene
@@ -639,19 +671,35 @@ if not os.path.exists('data'):
     sireneSplitter(sirene, 'data/geosirene/')
 
     # Correction de l'OCS ou extraction de l'OSO CESBIO si besoin
-    if os.path.exists('ocsol.shp'):
-        params = {
-            'INPUT': 'ocsol.shp',
-            'OUTPUT': 'memory:ocsol'
-        }
-        res = processing.run('native:fixgeometries', params, feedback=feedback)
-        reproj(clip(res['OUTPUT'], zone), 'data/')
-    else:
+    if not os.path.exists('ocsol.shp'):
         oso = QgsVectorLayer(
             '../global_data/oso/departement_' + dept + '.shp', 'oso')
         oso.dataProvider().createSpatialIndex()
         reproj(clip(oso, zone), 'data/')
         del oso
+
+    else:
+        params = {
+            'INPUT': 'ocsol.shp',
+            'OUTPUT': 'memory:ocsol'
+        }
+        res = processing.run('native:fixgeometries', params, feedback=feedback)
+        ocsol = res['OUTPUT']
+        expr = """
+            CASE
+                WHEN  "lib15_niv1" = 'EAU' THEN 0
+                WHEN  "lib15_niv1" = 'ESPACES AGRICOLES'  THEN 0.9
+                WHEN  "lib15_niv1" = 'ESPACES BOISES'  THEN 0.3
+                WHEN  "lib15_niv1" = 'ESPACES NATURELS NON BOISES'  THEN 0.6
+                WHEN  "lib15_niv1" = 'ESPACES RECREATIFS'  THEN 0.1
+                WHEN  "lib15_niv1" = 'ESPACES URBANISES'  THEN 1
+                WHEN  "lib15_niv1" = 'EXTRACTION DE MATERIAUX, DECHARGES, CHANTIERS'  THEN 0
+                WHEN  "lib15_niv1" = 'SURFACES  INDUSTRIELLES OU COMMERCIALES ET INFRASTRUCTURES DE COMMUNICATION'  THEN 0
+                ELSE NULL END """
+
+        ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
+        reproj(clip(ocsol, zone), 'data/')
+        del ocsol
 
     # Traitement du shape de l'intérêt écologique
     if os.path.exists('ecologie.shp'):
@@ -676,8 +724,44 @@ if not os.path.exists('data'):
     if os.path.exists('exclusion.shp'):
         reproj(clip('exclusion.shp', zone), 'data/restriction/')
 
+    # Traitement des couches de zonage de protection
+    zonages = []
+    os.mkdir('data/zonages')
+    for file in os.listdir('../global_data/zonages/interdiction/') :
+        if os.path.splitext(file)[1] == '.shp':
+            zonages.append('../global_data/zonages/interdiction/' + file)
+    envRestrict(zonages, zone, 'data/zonages/')
+
+    zonages = []
+    for file in os.listdir('data/zonages/') :
+        if os.path.splitext(file)[1] == '.shp':
+            zonages.append('data/zonages/' + file)
+    params = {
+        'LAYERS': zonages,
+        'CRS': 'EPSG:3035',
+        'OUTPUT': 'data/restriction/zonages_protection.shp'
+    }
+    processing.run('native:mergevectorlayers', params, feedback=feedback)
+
     # Traitement des autoroutes
-    highwayBuffer('data/transport/route_primaire.shp', 'data/restriction/tampon_autoroutes.shp')
+    params = {
+        'INPUT': 'data/transport/route_primaire.shp',
+        'EXPRESSION': """ "NATURE" = 'Autoroute' """,
+        'OUTPUT': 'memory:autoroutes',
+        'FAIL_OUTPUT': 'memory:'
+    }
+    res = processing.run('native:extractbyexpression', params, feedback=feedback)
+    params = {
+        'INPUT': res['OUTPUT'],
+        'DISTANCE': 100,
+        'SEGMENTS': 5,
+        'END_CAP_STYLE': 0,
+        'JOIN_STYLE': 0,
+        'MITER_LIMIT': 2,
+        'DISSOLVE': True,
+        'OUTPUT': 'data/restriction/tampon_autoroutes.shp'
+    }
+    processing.run('native:buffer', params, feedback=feedback)
 
     # Reprojection en LAEA
     reproj(zone, 'data/')
@@ -788,19 +872,42 @@ if not os.path.exists('data/' + mode):
     del zone_buffer, extent, extentStr
 
     # Intersection entre le couche de bâti nettoyée et la grille
-    buildings = QgsVectorLayer('data/bati/bati_inter_iris.shp', 'bati_inter_iris')
+    bati = QgsVectorLayer('data/bati/bati_inter_iris.shp', 'bati_inter_iris')
     grid = QgsVectorLayer('data/' + mode + '/grid.shp', 'grid')
     iris = QgsVectorLayer('data/iris.shp')
-    popGrid(buildings, grid, iris, 'data/' + mode + '/')
+    popGrid(bati, grid, iris, 'data/' + mode + '/')
+    del bati, iris
 
     bati_industriel = QgsVectorLayer('data/bati/bati_industriel.shp', 'indus')
-    bati_remarquable = QgsVectorLayer('data/bati/bati_industriel.shp', 'remarq')
-    listeBati = [bati_industriel, bati_remarquable]
-    restrictGrid(listeBati, grid, 'data/' + mode + '/')
-    del listeBati, bati_industriel, bati_remarquable,
+    bati_remarquable = QgsVectorLayer('data/bati/bati_remarquable.shp', 'remarq')
+    if os.path.exists('data/ocsol.shp'):
+        ocsol = True
+        params = {
+            'INPUT': 'data/ocsol.shp',
+            'EXPRESSION': """ "lib15_niv1" = 'EAU' """,
+            'OUTPUT': 'memory:eau',
+            'FAIL_OUTPUT': 'memory:'}
+        res = processing.run('native:extractbyexpression', params, feedback=feedback)
+        eau = res['OUTPUT']
+
+
+    elif os.path.exists('data/oso.shp'):
+        oso = True
+        pass
+
+    restrictList = [bati_industriel, bati_remarquable, eau]
+    for layer in restrictList :
+        fields = []
+        for field in layer.fields():
+            fields.append(field.name())
+    if 'id' not in fields :
+        layer.addExpressionField('$id', QgsField('id', QVariant.Int))
+
+    restrictGrid(restrictList, grid, 'data/' + mode + '/')
+    del restrictList, bati_industriel, bati_remarquable, eau
 
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
-    iris = QgsVectorLayer('data/' + mode + '/iris_stat.shp')
+    iris = QgsVectorLayer('data/' + mode + '/stat_iris.shp')
     contiguityMatrix(iris, 'data/' + mode + '/iris_id.csv')
 
     # Objet pour transformation de coordonées
@@ -812,7 +919,7 @@ if not os.path.exists('data/' + mode):
     coordTr = QgsCoordinateTransform(l93, laea, trCxt)
 
     # BBOX pour extraction du MNT
-    grid = QgsVectorLayer('data/' + mode + '/grid_stat.shp', 'grid')
+    grid = QgsVectorLayer('data/' + mode + '/stat_grid.shp', 'grid')
     extent = grid.extent()
     extentL93 = coordTr.transform(extent, coordTr.ReverseTransform)
 
@@ -845,14 +952,29 @@ if not os.path.exists('data/' + mode):
         os.mkdir(mode)
     extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
+    # Raster de distances
+
+
     # Rasterisations
-    rasterize('data/' + mode + '/grid_stat.shp', mode + '/population.tif', 'pop', 'uint16')
-    rasterize('data/' + mode + '/grid_stat.shp', 'data/' + mode + '/tif/s_planch_grid.tif', 's_planch')
-    rasterize('data/' + mode + '/iris_stat.shp', mode + '/iris_id.tif', 'ID', 'uint16')
-    rasterize('data/' + mode + '/iris_stat.shp', 'data/' + mode + '/tif/seuil_q3_iris.tif', 'PLANCH_Q3')
-    rasterize('data/' + mode + '/iris_stat.shp', 'data/' + mode + '/tif/nb_m2_iris.tif', 'NB_M2_HAB')
-    rasterize('data/' + mode + '/iris_stat.shp', mode + '/masque.tif', dtype='byte', invert=True)
+    rasterize('data/' + mode + '/stat_grid.shp', mode + '/population.tif', 'pop', 'uint16')
+    rasterize('data/' + mode + '/stat_grid.shp', 'data/' + mode + '/tif/s_planch_grid.tif', 's_planch')
+
+    rasterize('data/' + mode + '/stat_iris.shp', mode + '/iris_id.tif', 'ID', 'uint16')
+    rasterize('data/' + mode + '/stat_iris.shp', 'data/' + mode + '/tif/seuil_q3_iris.tif', 'PLANCH_Q3')
+    rasterize('data/' + mode + '/stat_iris.shp', 'data/' + mode + '/tif/nb_m2_iris.tif', 'NB_M2_HAB')
+    rasterize('data/' + mode + '/stat_iris.shp', 'data/' + mode + '/tif/masque.tif', dtype='byte', invert=True)
+
     rasterize('data/ecologie.shp', mode + '/ecologie.tif', 'interet')
+    if ocsol :
+        rasterize('data/ocsol.shp', mode + '/ocsol.tif', 'interet')
+    elif oso :
+        rasterize('data/oso.shp', mode + '/ocsol.tif', 'interet')
+
+    rasterize('data/' + mode + '/restrict_grid.shp', 'data/' + mode + '/tif/restrict_grid.tif', 'restrict', 'byte')
+    rasterize('data/restriction/zonages_protection.shp', 'data/' + mode + '/tif/zonages_protection.tif', dtype='byte')
+    rasterize('data/restriction/tampon_autoroutes.shp', 'data/' + mode + '/tif/tampon_autoroutes.tif', dtype='byte')
+    rasterize('data/restriction/exclusion.shp', 'data/' + mode + '/tif/exclusion.tif', dtype='byte')
+    rasterize('data/restriction/surf_activ_non_com.shp', 'data/' + mode + '/tif/surf_activ_non_com.tif', dtype='byte')
 
     ds = gdal.Open(mode + '/population.tif')
     cols = ds.RasterXSize
@@ -861,11 +983,21 @@ if not os.path.exists('data/' + mode):
     geot = ds.GetGeoTransform()
     driver = gdal.GetDriverByName('GTiff')
 
-    ds = gdal.Open( mode + '/masque.tif')
+    ds = gdal.Open('data/' + mode + '/tif/masque.tif')
     irisMask = ds.ReadAsArray()
+    ds = gdal.Open('data/' + mode + '/tif/exclusion.tif')
+    exclusionMask = ds.ReadAsArray()
+    ds = gdal.Open('data/' + mode + '/tif/restrict_grid.tif')
+    gridMask = ds.ReadAsArray()
+    ds = gdal.Open('data/' + mode + '/tif/zonages_protection.tif')
+    zonagesMask = ds.ReadAsArray()
+    ds = gdal.Open('data/' + mode + '/tif/tampon_autoroutes.tif')
+    highwayMask = ds.ReadAsArray()
     ds = gdal.Open('data/' + mode + '/tif/slope.tif')
     slope = ds.ReadAsArray()
-    slopeMask = np.where(slope >= 30, 1, 0)
+    slopeMask = np.where(slope > 30, 1, 0)
+    restriction = np.where( (irisMask == 1)|(exclusionMask == 1)|(gridMask == 1)|(zonagesMask == 1)|(highwayMask == 1)|(slopeMask == 1), 1, 0 )
+    to_tif(restriction, gdal.GDT_UInt16, mode + '/restriction.tif')
 
     ds = None
 
