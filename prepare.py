@@ -49,20 +49,25 @@ if not os.path.exists('../global_data'):
 if not os.path.exists('zone.shp'):
     print('Le shapefile de la zone d''étude (zone.shp) doit être placé dans le répertoire de travail.')
     sys.exit()
-mode = sys.argv[3]
-if mode not in ['strict', 'souple']:
-    print('Deux valeurs possibles pour le mode de seuillage : souple - strict ')
-    sys.exit()
-gridSize = sys.argv[4]
-if not 100 > int(gridSize) > 10:
-    print('La taille de la grille doit être comprise entre 10m et 100m')
-    sys.exit()
+if len(sys.argv) > 4:
+    mode = sys.argv[3]
+    if mode not in ['strict', 'souple']:
+        print('Deux valeurs possibles pour le mode de seuillage : souple - strict ')
+        sys.exit()
+else :
+    mode = 'souple'
+if len(sys.argv) > 5:
+    gridSize = sys.argv[4]
+    if not 100 > int(gridSize) > 10:
+        print('La taille de la grille doit être comprise entre 10m et 100m')
+        sys.exit()
+else :
+    gridSize = '50'
 
 projectStr = mode + '_' + gridSize + 'm'
+print('Projet : ' + projectStr)
 
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
-
-
 def clip(file, overlay, outdir='memory:'):
     if type(file) == QgsVectorLayer:
         name = file.name()
