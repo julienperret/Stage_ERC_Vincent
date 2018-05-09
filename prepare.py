@@ -397,7 +397,7 @@ def popGrid(buildings, grid, iris, outdir):
     to_shp(iris, outdir + '/stat_iris.shp')
     del csvPlanchI, csvM2I, statBlackList
 
-# Crée une grille avec un champ booléen pour correspondant à l'intersects avec chaque couche en entrée
+# Crée une grille avec des statistiques par cellule sur la surface couverte pour chaque couche en entrée
 def restrictGrid(layerList, grid, outdir):
     grid.dataProvider().createSpatialIndex()
     csvList = []
