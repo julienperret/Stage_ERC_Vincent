@@ -37,12 +37,7 @@ Processing.initialize()
 QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
 feedback = QgsProcessingFeedback()
 
-# Vérification des paramètres d'entrée
-if(len(sys.argv) < 4):
-    print("""Le scipt prend au moins 3 paramètres en entrée :
-    dossier de travail (spécifique à la zone), le numéro du département
-    et le taux d'accroissement démograpique.""")
-    sys.exit()
+# Import des paramètres d'entrée
 workspace = sys.argv[1]
 dept = sys.argv[2]
 os.chdir(workspace)
@@ -52,19 +47,16 @@ if not os.path.exists('../global_data'):
 if not os.path.exists('zone.shp'):
     print('Le shapefile de la zone d''étude (zone.shp) doit être placé dans le répertoire de travail.')
     sys.exit()
-tauxEvo = sys.argv[3]
-if(len(sys.argv) > 4):
-    mode = sys.argv[4]
-    if mode == 'strict':
-        gridSize = '20'
-    elif mode == 'souple':
-        gridSize = '50'
-    else:
-        print('Deux valeurs possibles pour le mode de seuillage : souple - strict ')
-        sys.exit()
-else:
-    mode = 'souple'
-    gridSize = '50'
+mode = sys.argv[3]
+if mode not in ['strict', 'souple']:
+    print('Deux valeurs possibles pour le mode de seuillage : souple - strict ')
+    sys.exit()
+gridSize = sys.argv[4]
+if not 100 > int(gridSize) > 10 :
+    print('La taille de la grille doit être comprise entre 10 et 100m')
+    sys.exit()
+
+#tauxEvo = sys.argv[5]
 
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
@@ -851,8 +843,8 @@ if not os.path.exists('data'):
     }
     processing.run('qgis:intersection', params, feedback=feedback)
 
-if not os.path.exists('data/' + mode):
-    os.mkdir('data/' + mode)
+if not os.path.exists('data/' + gridSize + 'm/') :
+    os.mkdir('data/' + gridSize + 'm/')
 
     # Création d'une grille régulière
     zone_buffer = QgsVectorLayer('data/zone_buffer.shp', 'zone_buffer')
@@ -867,15 +859,15 @@ if not os.path.exists('data/' + mode):
         'HOVERLAY': 0,
         'VOVERLAY': 0,
         'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/' + mode + '/grid.shp'}
+        'OUTPUT': 'data/' + gridSize + 'm/grid.shp'}
     processing.run('qgis:creategrid', params, feedback=feedback)
     del zone_buffer, extent, extentStr
 
     # Intersection entre le couche de bâti nettoyée et la grille
     bati = QgsVectorLayer('data/bati/bati_inter_iris.shp', 'bati_inter_iris')
-    grid = QgsVectorLayer('data/' + mode + '/grid.shp', 'grid')
+    grid = QgsVectorLayer('data/' + gridSize + 'm/grid.shp', 'grid')
     iris = QgsVectorLayer('data/iris.shp')
-    popGrid(bati, grid, iris, 'data/' + mode + '/')
+    popGrid(bati, grid, iris, 'data/' + gridSize + 'm/')
     del bati, iris
 
     bati_industriel = QgsVectorLayer('data/bati/bati_industriel.shp', 'indus')
@@ -890,7 +882,6 @@ if not os.path.exists('data/' + mode):
         res = processing.run('native:extractbyexpression', params, feedback=feedback)
         eau = res['OUTPUT']
 
-
     elif os.path.exists('data/oso.shp'):
         oso = True
         pass
@@ -903,12 +894,12 @@ if not os.path.exists('data/' + mode):
     if 'id' not in fields :
         layer.addExpressionField('$id', QgsField('id', QVariant.Int))
 
-    restrictGrid(restrictList, grid, 'data/' + mode + '/')
+    restrictGrid(restrictList, grid, 'data/' + gridSize + 'm/')
     del restrictList, bati_industriel, bati_remarquable, eau
 
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
-    iris = QgsVectorLayer('data/' + mode + '/stat_iris.shp')
-    contiguityMatrix(iris, 'data/' + mode + '/iris_id.csv')
+    iris = QgsVectorLayer('data/' + gridSize + 'm/stat_iris.shp')
+    contiguityMatrix(iris, 'data/' + gridSize + 'm/iris_id.csv')
 
     # Objet pour transformation de coordonées
     l93 = QgsCoordinateReferenceSystem()
@@ -919,12 +910,12 @@ if not os.path.exists('data/' + mode):
     coordTr = QgsCoordinateTransform(l93, laea, trCxt)
 
     # BBOX pour extraction du MNT
-    grid = QgsVectorLayer('data/' + mode + '/stat_grid.shp', 'grid')
+    grid = QgsVectorLayer('data/' + gridSize + 'm/stat_grid.shp', 'grid')
     extent = grid.extent()
     extentL93 = coordTr.transform(extent, coordTr.ReverseTransform)
 
     # Fusion des tuiles MNT dans la zone d'étude
-    os.mkdir('data/' + mode + '/tif')
+    os.mkdir('data/' + gridSize + 'm/tif')
     demList = demExtractor('../global_data/rge/' + dept + '/bdalti/', extentL93)
 
     xMin = extent.xMinimum()
@@ -932,7 +923,7 @@ if not os.path.exists('data/' + mode):
     xMax = extent.xMaximum()
     yMax = extent.yMaximum()
     gdal.Warp(
-        'data/' + mode + '/tif/mnt.tif', demList,
+        'data/' + gridSize + 'm/tif/mnt.tif', demList,
         format='GTiff', outputType=gdal.GDT_Float32,
         xRes=int(gridSize), yRes=int(gridSize),
         resampleAlg='cubicspline',
@@ -942,62 +933,63 @@ if not os.path.exists('data/' + mode):
 
     # Calcul de pente en %
     gdal.DEMProcessing(
-        'data/' + mode + '/tif/slope.tif',
-        'data/' + mode + '/tif/mnt.tif',
+        'data/' + gridSize + 'm/tif/slope.tif',
+        'data/' + gridSize + 'm/tif/mnt.tif',
         'slope', format='GTiff',
         slopeFormat='percent')
 
-    # Mise en forme finale des données raster pour le modèle
-    if not os.path.exists(mode):
-        os.mkdir(mode)
+# Mise en forme finale des données raster pour le modèle
+projectStr = mode + '_' + gridSize + 'm'
+if not os.path.exists(projectStr):
+    os.mkdir(projectStr)
     extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
     # Raster de distances
 
 
     # Rasterisations
-    rasterize('data/' + mode + '/stat_grid.shp', mode + '/population.tif', 'pop', 'uint16')
-    rasterize('data/' + mode + '/stat_grid.shp', 'data/' + mode + '/tif/s_planch_grid.tif', 's_planch')
+    rasterize('data/' + gridSize + 'm/stat_grid.shp', projectStr + '/population.tif', 'pop', 'uint16')
+    rasterize('data/' + gridSize + 'm/stat_grid.shp', 'data/' + gridSize + 'm/tif/s_planch_grid.tif', 's_planch')
 
-    rasterize('data/' + mode + '/stat_iris.shp', mode + '/iris_id.tif', 'ID', 'uint16')
-    rasterize('data/' + mode + '/stat_iris.shp', 'data/' + mode + '/tif/seuil_q3_iris.tif', 'PLANCH_Q3')
-    rasterize('data/' + mode + '/stat_iris.shp', 'data/' + mode + '/tif/nb_m2_iris.tif', 'NB_M2_HAB')
-    rasterize('data/' + mode + '/stat_iris.shp', 'data/' + mode + '/tif/masque.tif', dtype='byte', invert=True)
+    rasterize('data/' + gridSize + 'm/stat_iris.shp', projectStr + '/iris_id.tif', 'ID', 'uint16')
+    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif', 'PLANCH_Q3')
+    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/nb_m2_iris.tif', 'NB_M2_HAB')
+    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/masque.tif', dtype='byte', invert=True)
 
-    rasterize('data/ecologie.shp', mode + '/ecologie.tif', 'interet')
+    rasterize('data/ecologie.shp', projectStr + '/ecologie.tif', 'interet')
     if ocsol :
-        rasterize('data/ocsol.shp', mode + '/ocsol.tif', 'interet')
+        rasterize('data/ocsol.shp', projectStr + '/ocsol.tif', 'interet')
     elif oso :
-        rasterize('data/oso.shp', mode + '/ocsol.tif', 'interet')
+        rasterize('data/oso.shp', projectStr + '/ocsol.tif', 'interet')
 
-    rasterize('data/' + mode + '/restrict_grid.shp', 'data/' + mode + '/tif/restrict_grid.tif', 'restrict', 'byte')
-    rasterize('data/restriction/zonages_protection.shp', 'data/' + mode + '/tif/zonages_protection.tif', dtype='byte')
-    rasterize('data/restriction/tampon_autoroutes.shp', 'data/' + mode + '/tif/tampon_autoroutes.tif', dtype='byte')
-    rasterize('data/restriction/exclusion.shp', 'data/' + mode + '/tif/exclusion.tif', dtype='byte')
-    rasterize('data/restriction/surf_activ_non_com.shp', 'data/' + mode + '/tif/surf_activ_non_com.tif', dtype='byte')
+    rasterize('data/' + gridSize + 'm/restrict_grid.shp', 'data/' + gridSize + 'm/tif/restrict_grid.tif', 'restrict', 'byte')
+    rasterize('data/restriction/zonages_protection.shp', 'data/' + gridSize + 'm/tif/zonages_protection.tif', dtype='byte')
+    rasterize('data/restriction/tampon_autoroutes.shp', 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif', dtype='byte')
+    rasterize('data/restriction/exclusion.shp', 'data/' + gridSize + 'm/tif/exclusion.tif', dtype='byte')
+    rasterize('data/restriction/surf_activ_non_com.shp', 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif', dtype='byte')
 
-    ds = gdal.Open(mode + '/population.tif')
+    ds = gdal.Open(projectStr + '/population.tif')
     cols = ds.RasterXSize
     rows = ds.RasterYSize
     proj = ds.GetProjection()
     geot = ds.GetGeoTransform()
     driver = gdal.GetDriverByName('GTiff')
 
-    ds = gdal.Open('data/' + mode + '/tif/masque.tif')
+    ds = gdal.Open('data/' + gridSize + 'm/tif/masque.tif')
     irisMask = ds.ReadAsArray()
-    ds = gdal.Open('data/' + mode + '/tif/exclusion.tif')
+    ds = gdal.Open('data/' + gridSize + 'm/tif/exclusion.tif')
     exclusionMask = ds.ReadAsArray()
-    ds = gdal.Open('data/' + mode + '/tif/restrict_grid.tif')
+    ds = gdal.Open('data/' + gridSize + 'm/tif/restrict_grid.tif')
     gridMask = ds.ReadAsArray()
-    ds = gdal.Open('data/' + mode + '/tif/zonages_protection.tif')
+    ds = gdal.Open('data/' + gridSize + 'm/tif/zonages_protection.tif')
     zonagesMask = ds.ReadAsArray()
-    ds = gdal.Open('data/' + mode + '/tif/tampon_autoroutes.tif')
+    ds = gdal.Open('data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
     highwayMask = ds.ReadAsArray()
-    ds = gdal.Open('data/' + mode + '/tif/slope.tif')
+    ds = gdal.Open('data/' + gridSize + 'm/tif/slope.tif')
     slope = ds.ReadAsArray()
     slopeMask = np.where(slope > 30, 1, 0)
     restriction = np.where( (irisMask == 1)|(exclusionMask == 1)|(gridMask == 1)|(zonagesMask == 1)|(highwayMask == 1)|(slopeMask == 1), 1, 0 )
-    to_tif(restriction, gdal.GDT_UInt16, mode + '/restriction.tif')
+    to_tif(restriction, gdal.GDT_UInt16, projectStr + '/restriction.tif')
 
     ds = None
 
