@@ -9,7 +9,9 @@ import gdal
 import numpy as np
 import pandas as pd
 
-# sys.path.append('/usr/share/qgis/python')
+# Ignorer les erreurs de numpy lors d'une division par 0
+np.seterr(divide='ignore', invalid='ignore')
+
 from qgis.core import (
     QgsApplication,
     QgsCoordinateTransform,
@@ -1023,7 +1025,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
             'OUTPUT': 'data/' + gridSize + 'm/tif/densite_' + key + '.tif'}
         processing.run('gdal:cliprasterbyextent', params, feedback=feedback)
     del projwin, dicSirene
-    
+
 # Mise en forme finale des données raster pour le modèle
 if not os.path.exists(projectStr):
     os.mkdir(projectStr)
@@ -1056,12 +1058,6 @@ if not os.path.exists(projectStr):
     geot = ds.GetGeoTransform()
     driver = gdal.GetDriverByName('GTiff')
     population = ds.ReadAsArray()
-
-    # Ajouter le mode de seuillage -> raster de capacité
-    if mode == 'souple':
-        pass
-    elif mode == 'strict':
-        pass
 
     # Conversion des raster de distance
     ds = gdal.Open('data/' + gridSize + 'm/tif/distance_routes.tif')
@@ -1103,7 +1099,7 @@ if not os.path.exists(projectStr):
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (gridMask == 1) | (
         zonagesMask == 1) | (highwayMask == 1) | (slopeMask == 1), 1, 0)
     to_tif(restriction, gdal.GDT_UInt16, projectStr + '/restriction.tif')
-    del exclusionMask, gridMask, zonagesMask, highwayMask, slope, slopeMask, restriction
+    del exclusionMask, gridMask, zonagesMask, highwayMask, slope, slopeMask
 
     ds = gdal.Open('data/' + gridSize + 'm/tif/ecologie.tif')
     eco = ds.ReadAsArray()
@@ -1111,6 +1107,21 @@ if not os.path.exists(projectStr):
     to_tif(ecologie, gdal.GDT_Float32, projectStr + '/ecologie.tif')
     del eco, ecologie, irisMask
 
+    # Mode de seuillage souple = capacité en fonction de la surface restante
+    if mode == 'souple':
+        ds = gdal.Open('data/' + gridSize + 'm/tif/nb_m2_iris.tif')
+        nb_m2 = ds.ReadAsArray()
+        ds = gdal.Open('data/' + gridSize + 'm/tif/s_planch_grid.tif')
+        s_planch = ds.ReadAsArray()
+        ds = gdal.Open('data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
+        seuil = ds.ReadAsArray()
+        capa_m2 = np.where( seuil - s_planch >= 0, seuil - s_planch, 0)
+        capacite = np.where( restriction != 1, capa_m2 / nb_m2, 0)
+        to_tif(capacite, gdal.GDT_Float32, projectStr + '/capacite.tif')
+    elif mode == 'strict':
+        pass
+
+    del restriction
     ds = None
 
 print('Terminé  à ' + time.strftime('%H:%M:%S'))
