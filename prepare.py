@@ -49,14 +49,14 @@ if not os.path.exists('../global_data'):
 if not os.path.exists('zone.shp'):
     print('Le shapefile de la zone d''étude (zone.shp) doit être placé dans le répertoire de travail.')
     sys.exit()
-if len(sys.argv) > 4:
+if len(sys.argv) > 3:
     mode = sys.argv[3]
     if mode not in ['strict', 'souple']:
         print('Deux valeurs possibles pour le mode de seuillage : souple - strict ')
         sys.exit()
 else :
     mode = 'souple'
-if len(sys.argv) > 5:
+if len(sys.argv) > 4:
     gridSize = sys.argv[4]
     if not 100 > int(gridSize) > 10:
         print('La taille de la grille doit être comprise entre 10m et 100m')
