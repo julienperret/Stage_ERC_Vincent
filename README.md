@@ -6,3 +6,6 @@ Ce script doit être lancé en ligne de commande au moins 2 arguments :
 
 Exemple :  
 ./prepare.py ~/workspace/mtp 34 souple 50
+
+Dépendances pour python3 :
+gdal, numpy, pandas, xlrd (pour manipuler les XLS de l'INSEE)
