@@ -175,6 +175,7 @@ interet = np.where((restriction != 1), ((ecologie * dicCoef['ecologie']) + (ocso
 to_tif(interet, gdal.GDT_Float32, 'output/interet.tif')
 del restriction, ecologie, ocsol, routes, transport, administratif, commercial, recreatif, medical, enseignement
 
+filledIris = []
 # Itération au pas de temps annuel sur toute la période
 for year in range(2015, finalYear + 1):
     print(str(year) + '/' + str(finalYear))
@@ -191,8 +192,9 @@ for year in range(2015, finalYear + 1):
                 popRestante = peupler(contigId, popRestante)
                 if contigId not in testedId :
                     testedId.append(contigId)
-                print(str(len(testedId)) + '/' + str(len(contigList)))
             while popRestante > 0 :
+                if irisId not in filledIris :
+                    filledIris.append(irisId)
                 anyId = np.random.choice([i+1 for i in range(nbIris)], 1)[0]
                 popRestante = peupler(anyId, popRestante)
 
