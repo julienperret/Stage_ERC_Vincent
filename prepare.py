@@ -1124,7 +1124,6 @@ if not os.path.exists(projectStr):
         nb_m2 = to_array('data/' + gridSize + 'm/tif/nb_m2_iris.tif')
         s_planch = to_array('data/' + gridSize + 'm/tif/s_planch_grid.tif')
         seuil = to_array('data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
-
         capa_m2 = np.where( seuil - s_planch >= 0, seuil - s_planch, 0)
         capacite = np.where( (restriction != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
         to_tif(capacite, gdal.GDT_Float32, projectStr + '/capacite.tif')
