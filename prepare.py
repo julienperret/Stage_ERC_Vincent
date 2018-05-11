@@ -63,9 +63,12 @@ if len(sys.argv) > 4:
         sys.exit()
 else :
     gridSize = '50'
-
 projectStr = mode + '_' + gridSize + 'm'
-print('Projet : ' + projectStr)
+# Taux maximum de chevauchement des cellules de la grille avec des couches à exclure (ex: bati industriel)
+cellExcluRatio = 0.1
+# Paramètres variables pour la création des rasters de distance
+roadDist = 200
+transDist = 500
 
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
@@ -398,7 +401,7 @@ def popGrid(buildings, grid, iris, outdir):
     del csvPlanchI, csvM2I, statBlackList
 
 # Crée une grille avec des statistiques par cellule sur la surface couverte pour chaque couche en entrée
-def restrictGrid(layerList, grid, outdir):
+def restrictGrid(layerList, grid, ratio, outdir):
     grid.dataProvider().createSpatialIndex()
     csvList = []
     fieldList = []
@@ -440,23 +443,25 @@ def restrictGrid(layerList, grid, outdir):
         join(grid, 'id', csv, 'id_2', statBlackList)
 
     cpt = len(fieldList)
-    # Expression pour écarter complètement les cellules qui intersectent
-    # expr = 'IF ('
-    # for field in fieldList :
-    #     cpt -= 1
-    #     if cpt != 0 :
-    #         expr += '"' + field + '" IS NOT NULL OR '
-    #     else :
-    #         expr += '"' + field + '" IS NOT NULL, 1, 0)'
 
-    # Expression pour écarter les cellules à partir d'un certain seuil de chevauchement
-    expr = 'IF ('
-    for field in fieldList:
-        cpt -= 1
-        if cpt != 0:
-            expr += '"' + field + '" >= ($area / 10)  OR '
-        else:
-            expr += '"' + field + '" >= ($area / 10), 1, 0)'
+    if ratio == 0:
+    # Expression pour écarter complètement les cellules qui intersectent
+        expr = 'IF ('
+        for field in fieldList :
+            cpt -= 1
+            if cpt != 0 :
+                expr += '"' + field + '" IS NOT NULL OR '
+            else :
+                expr += '"' + field + '" IS NOT NULL, 1, 0)'
+    else:
+        # Expression pour écarter les cellules à partir d'un certain seuil de chevauchement
+        expr = 'IF ('
+        for field in fieldList:
+            cpt -= 1
+            if cpt != 0:
+                expr += '"' + field + '" >= ($area / 10)  OR '
+            else:
+                expr += '"' + field + '" >= ($area * ' + ratio + '), 1, 0)'
 
     grid.addExpressionField(expr, QgsField('restrict', QVariant.Int))
 
@@ -551,6 +556,7 @@ def sireneSplitter(geosirene, outpath):
     }
     processing.run('qgis:splitvectorlayer', params, feedback=feedback)
 
+print('Projet : ' + projectStr)
 print('Commencé à ' + time.strftime('%H:%M:%S'))
 
 # Gestion des XLS de l'INSEE, à faire une seule fois
@@ -734,8 +740,8 @@ if not os.path.exists('data'):
         reproj(clip(res['OUTPUT'], zone), 'data/')
         del ecologie, ecoFields, field
     # Autrement déterminer l'intérêt écologique grâce à l'ocsol ?
-    # else :
-    #    pass
+    else :
+        pass
 
     os.mkdir('data/restriction')
     reproj(clip('../global_data/rge/' + dept +
@@ -911,7 +917,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     t_sport = QgsVectorLayer('data/bati/terrain_sport.shp', 't_sport')
 
     restrictList = [b_indus, b_remarq, c_surfa, p_aero, s_eau, t_sport]
-    restrictGrid(restrictList, grid, 'data/' + gridSize + 'm/')
+    restrictGrid(restrictList, grid, cellExcluRatio, 'data/' + gridSize + 'm/')
     del b_indus, b_remarq, c_surfa, p_aero, s_eau, t_sport, restrictList, grid
 
     # Objet pour transformation de coordonées
@@ -990,7 +996,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
         'VALUES': 1,
         'UNITS': 0,
         'NODATA': -1,
-        'MAX_DISTANCE': 200,
+        'MAX_DISTANCE': roadDist,
         'DATA_TYPE': 5,
         'OUTPUT': 'data/' + gridSize + 'm/tif/distance_routes.tif'}
     processing.run('gdal:proximity', params, feedback=feedback)
@@ -998,7 +1004,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     rasterize('data/transport/arrets_transport.shp', 'data/' +
               gridSize + 'm/tif/arrets_transport.tif', dtype='byte')
     params['INPUT'] = 'data/' + gridSize + 'm/tif/arrets_transport.tif'
-    params['MAX_DISTANCE'] = 500
+    params['MAX_DISTANCE'] = transDist
     params['OUTPUT'] = 'data/' + gridSize + \
         'm/tif/distance_arrets_transport.tif'
     processing.run('gdal:proximity', params, feedback=feedback)
