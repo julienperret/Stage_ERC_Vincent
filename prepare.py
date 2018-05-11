@@ -166,6 +166,17 @@ def to_tif(array, dtype, path):
     ds_out.GetRasterBand(1).WriteArray(array)
     ds_out = None
 
+# Convertit un tif en numpy array
+def to_array(tif, dtype=None):
+    ds = gdal.Open(tif)
+    if dtype == 'float32':
+        return ds.ReadAsArray().astype(np.float32)
+    elif dtype == 'uint16':
+        return ds.ReadAsArray().astype(np.uint16)
+    else :
+        return ds.ReadAsArray()
+    ds = None
+
 # Nettoye une couche de bâtiments et génère les champs utiles à l'estimation de population
 def buildingCleaner(buildings, polygons, points, outpath, surfMin=50, surfMax=10000):
     # Selection des bâtiments situés dans polygones
@@ -1043,7 +1054,7 @@ if not os.path.exists(projectStr):
 
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
     iris = QgsVectorLayer('data/' + gridSize + 'm/stat_iris.shp')
-    contiguityMatrix(iris, projectStr + '/iris_id.csv')
+    contiguityMatrix(iris, projectStr + '/iris.csv')
     del iris
 
     grid = QgsVectorLayer('data/' + gridSize + 'm/stat_grid.shp', 'grid')
@@ -1069,42 +1080,33 @@ if not os.path.exists(projectStr):
     geot = ds.GetGeoTransform()
     driver = gdal.GetDriverByName('GTiff')
     population = ds.ReadAsArray()
+    ds = None
 
     # Conversion des raster de distance
-    ds = gdal.Open('data/' + gridSize + 'm/tif/distance_routes.tif')
-    distance_routes = ds.ReadAsArray()
+    distance_routes = to_array('data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
     routes = np.where(distance_routes > -1, 1 -
                       (distance_routes / np.amax(distance_routes)), 0)
     to_tif(routes, gdal.GDT_Float32, projectStr + '/routes.tif')
 
-    ds = gdal.Open('data/' + gridSize + 'm/tif/distance_arrets_transport.tif')
-    distance_transport = ds.ReadAsArray()
+    distance_transport = to_array('data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
     transport = np.where(distance_transport > -1, 1 -
                          (distance_transport / np.amax(distance_transport)), 0)
     to_tif(transport, gdal.GDT_Float32, projectStr + '/transport.tif')
 
     # Conversion des rasters de densité
     for theme in ['administratif', 'commercial', 'enseignement', 'medical', 'recreatif']:
-        ds = gdal.Open('data/' + gridSize +
-                       'm/tif/densite_' + theme + '.tif')
-        array = ds.ReadAsArray()
+        array = to_array('data/' + gridSize +
+                       'm/tif/densite_' + theme + '.tif', 'float32')
         newArray = np.where(array != -9999, array / np.amax(array), 0)
         to_tif(newArray, gdal.GDT_Float32,
                projectStr + '/' + theme + '.tif')
-        ds = None
 
-    ds = gdal.Open('data/' + gridSize + 'm/tif/masque.tif')
-    irisMask = ds.ReadAsArray()
-    ds = gdal.Open('data/' + gridSize + 'm/tif/exclusion.tif')
-    exclusionMask = ds.ReadAsArray()
-    ds = gdal.Open('data/' + gridSize + 'm/tif/restrict_grid.tif')
-    gridMask = ds.ReadAsArray()
-    ds = gdal.Open('data/' + gridSize + 'm/tif/zonages_protection.tif')
-    zonagesMask = ds.ReadAsArray()
-    ds = gdal.Open('data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
-    highwayMask = ds.ReadAsArray()
-    ds = gdal.Open('data/' + gridSize + 'm/tif/slope.tif')
-    slope = ds.ReadAsArray()
+    irisMask = to_array('data/' + gridSize + 'm/tif/masque.tif')
+    exclusionMask = to_array('data/' + gridSize + 'm/tif/exclusion.tif')
+    gridMask = to_array('data/' + gridSize + 'm/tif/restrict_grid.tif')
+    zonagesMask = to_array('data/' + gridSize + 'm/tif/zonages_protection.tif')
+    highwayMask = to_array('data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
+    slope = to_array('data/' + gridSize + 'm/tif/slope.tif')
     slopeMask = np.where(slope > 30, 1, 0)
 
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (gridMask == 1) | (
@@ -1112,20 +1114,17 @@ if not os.path.exists(projectStr):
     to_tif(restriction, gdal.GDT_UInt16, projectStr + '/restriction.tif')
     del exclusionMask, gridMask, zonagesMask, highwayMask, slope, slopeMask
 
-    ds = gdal.Open('data/' + gridSize + 'm/tif/ecologie.tif')
-    eco = ds.ReadAsArray()
+    eco = to_array('data/' + gridSize + 'm/tif/ecologie.tif')
     ecologie = np.where((eco == 0) & (irisMask != 1), 1, eco)
     to_tif(ecologie, gdal.GDT_Float32, projectStr + '/ecologie.tif')
     del eco, ecologie, irisMask
 
     # Mode de seuillage souple = capacité en fonction de la surface restante
     if mode == 'souple':
-        ds = gdal.Open('data/' + gridSize + 'm/tif/nb_m2_iris.tif')
-        nb_m2 = ds.ReadAsArray()
-        ds = gdal.Open('data/' + gridSize + 'm/tif/s_planch_grid.tif')
-        s_planch = ds.ReadAsArray()
-        ds = gdal.Open('data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
-        seuil = ds.ReadAsArray()
+        nb_m2 = to_array('data/' + gridSize + 'm/tif/nb_m2_iris.tif')
+        s_planch = to_array('data/' + gridSize + 'm/tif/s_planch_grid.tif')
+        seuil = to_array('data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
+
         capa_m2 = np.where( seuil - s_planch >= 0, seuil - s_planch, 0)
         capacite = np.where( (restriction != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
         to_tif(capacite, gdal.GDT_Float32, projectStr + '/capacite.tif')
@@ -1133,7 +1132,6 @@ if not os.path.exists(projectStr):
         pass
 
     del restriction
-    ds = None
 
 print('Terminé  à ' + time.strftime('%H:%M:%S'))
 qgs.exitQgis()

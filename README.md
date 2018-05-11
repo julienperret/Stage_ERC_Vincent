@@ -1,3 +1,4 @@
+./prepare.py  
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  
 1 : répertoire des données locales (situé au même niveau que la donnée régionale)  
 2 : n° de département dans lequel la zone d'étude est située  
