@@ -459,9 +459,9 @@ def restrictGrid(layerList, grid, ratio, outdir):
         for field in fieldList:
             cpt -= 1
             if cpt != 0:
-                expr += '"' + field + '" >= ($area / 10)  OR '
+                expr += '"' + field + '" >= ($area * ' + str(ratio) + ')  OR '
             else:
-                expr += '"' + field + '" >= ($area * ' + ratio + '), 1, 0)'
+                expr += '"' + field + '" >= ($area * ' + str(ratio) + '), 1, 0)'
 
     grid.addExpressionField(expr, QgsField('restrict', QVariant.Int))
 
