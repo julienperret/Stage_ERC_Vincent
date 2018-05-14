@@ -76,14 +76,12 @@ def peupler(irisId, popALoger, mode, saturateFirst=True):
                     row = row[np.random.choice([i for i in range(row.size)], 1)[0]]
                 else :
                     row = row[0]
-
                 col = np.where(weight[row] == np.random.choice(
                     weight[row], p=weight[row] / sum(weight[row])))[0]
                 if col.size > 1 :
                     col = col[np.random.choice([i for i in range(col.size)], 1)[0]]
                 else :
                     col = col[0]
-
                 if capaIris[row][col] > 0 and (row != 0 and col != 0):
                     # Peuplement de la cellule tirée + mise à jour des arrays population et capacité
                     population[row][col] += 1
@@ -104,9 +102,17 @@ def peupler(irisId, popALoger, mode, saturateFirst=True):
             if np.sum(weight) > 0:
                 while popLogee < popALoger:
                     row = np.where(weightRowSum == np.random.choice(
-                        weightRowSum, p=weightRowSum / sum(weightRowSum)))[0][0]
+                        weightRowSum, p=weightRowSum / sum(weightRowSum)))[0]
+                    if row.size > 1 :
+                        row = row[np.random.choice([i for i in range(row.size)], 1)[0]]
+                    else :
+                        row = row[0]
                     col = np.where(weight[row] == np.random.choice(
-                        weight[row], p=weight[row] / sum(weight[row])))[0][0]
+                        weight[row], p=weight[row] / sum(weight[row])))[0]
+                    if col.size > 1 :
+                        col = col[np.random.choice([i for i in range(col.size)], 1)[0]]
+                    else :
+                        col = col[0]
                     if capaIris[row][col] > 0 and (row != 0 and col != 0):
                         population[row][col] += 1
                         capacite[row][col] -= 1
@@ -125,9 +131,17 @@ def peupler(irisId, popALoger, mode, saturateFirst=True):
         if np.sum(weight) > 0:
             while popLogee < popALoger:
                 row = np.where(weightRowSum == np.random.choice(
-                    weightRowSum, p=weightRowSum / sum(weightRowSum)))[0][0]
+                    weightRowSum, p=weightRowSum / sum(weightRowSum)))[0]
+                if row.size > 1 :
+                    row = row[np.random.choice([i for i in range(row.size)], 1)[0]]
+                else :
+                    row = row[0]
                 col = np.where(weight[row] == np.random.choice(
-                    weight[row], p=weight[row] / sum(weight[row])))[0][0]
+                    weight[row], p=weight[row] / sum(weight[row])))[0]
+                if col.size > 1 :
+                    col = col[np.random.choice([i for i in range(col.size)], 1)[0]]
+                else :
+                    col = col[0]
                 if capaIris[row][col] > 0 and (row != 0 and col != 0):
                     cellCapa = capaIris[row][col]
                     if cellCapa <= popALoger - popLogee :
