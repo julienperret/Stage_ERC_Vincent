@@ -184,7 +184,7 @@ for year in range(2015, finalYear + 1):
         contigList = ast.literal_eval(dicContig[irisId])
         popALoger = dicPop[irisId]
         popRestante = peupler(irisId, popALoger)
-        # Si population restante, tirage aléatoire trouver un quartier contigu
+        # Si population restante, tirage aléatoire trouver un quartier contigu, sinon aléatoire
         if popRestante > 0 :
             testedId = []
             while len(testedId) < len(contigList):
@@ -197,6 +197,8 @@ for year in range(2015, finalYear + 1):
                     filledIris.append(irisId)
                 anyId = np.random.choice([i+1 for i in range(nbIris)], 1)[0]
                 popRestante = peupler(anyId, popRestante)
+
+print(str(len(filledIris)) + ' IRIS saturés : \n' + str(filledIris))
 
 capaciteDepart = to_array('capacite.tif')
 populationDepart = to_array('population.tif')
