@@ -10,10 +10,6 @@ Exemple :
 Dépendances pour python3 :  
     PyQt5.QtCore.QVariant, qgis, gdal, numpy, pandas + xlrd (pour manipuler les .xls)  
 
-*  
-*  
-*  
-
 ./simulation.py  
 Deux paramètre au minimum :  
     1 : le dossier contenant la donnée  
