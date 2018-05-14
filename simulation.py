@@ -26,12 +26,12 @@ else:
 
 finalYear = 2040
 
-projectStr = mode + '_' + str(taux) + 'pct'
-if os.path.exists(projectStr):
-    rmtree(projectStr)
-os.mkdir(projectStr)
+projectPath = mode + '_' + str(taux) + 'pct/'
+if os.path.exists(projectPath):
+    rmtree(projectPath)
+os.mkdir(projectPath)
 
-log = open(projectStr + '/log.txt', 'x')
+log = open(projectPath + 'log.txt', 'x')
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
@@ -67,7 +67,7 @@ def peupler(irisId, popALoger, saturateFirst=True):
     popIris = np.zeros([rows, cols], dtype=np.uint16)
     popLogee = 0
     # Boucle de réparition de la population, en priorité dans des cellules où population > 0
-    if sum(sum(capaIris)) > 0:
+    if np.sum(weight) > 0:
         while popLogee < popALoger:
             # Tirage pondéré selon l'intérêt à urbaniser
             row = np.where(weightRowSum == np.random.choice(
@@ -84,14 +84,14 @@ def peupler(irisId, popALoger, saturateFirst=True):
                 if capaIris[row][col] == 0:
                     weight[row][col] = 0
                     weightRowSum = np.sum(weight, 1)
-            if sum(sum(capaIris)) == 0:
+            if np.sum(weight) == 0:
                 break
     # Si on a pas pu loger tout le monde dans des cellules déjà urbanisées => expansion
     if saturateFirst and popALoger - popLogee > 0:
         capaIris = np.where((iris == irisId) & (population == 0), capacite, 0)
         weight = np.where(capaIris > 0, interet, 0)
         weightRowSum = np.sum(weight, 1)
-        if sum(sum(capaIris)) > 0:
+        if np.sum(weight) > 0:
             while popLogee < popALoger:
                 row = np.where(weightRowSum == np.random.choice(
                     weightRowSum, p=weightRowSum / sum(weightRowSum)))[0][0]
@@ -106,7 +106,7 @@ def peupler(irisId, popALoger, saturateFirst=True):
                         weight[row][col] = 0
                         weightRowSum = np.sum(weight, 1)
                 # Condition de sortie en cas de saturation du quartier
-                if sum(sum(capaIris)) == 0:
+                if np.sum(weight) == 0:
                     break
     return popALoger - popLogee
 
@@ -132,7 +132,7 @@ for irisId in range(nbIris):
         popDf[year][irisId] = pop * (taux / 100)
         pop += pop * (taux / 100)
         year += 1
-popDf.to_csv(projectStr + '/demographie.csv', index=0)
+popDf.to_csv(projectPath + 'demographie.csv', index=0)
 
 # Nombre total de personnes à loger - permet de vérifier si le raster capacité pourra tout contenir
 sumPopALoger = sum(popDf.sum()) - sum(range(nbIris + 1)) - sum(popDf[2014])
@@ -143,11 +143,11 @@ log.write('Population à loger d\'ici à ' +
 if not os.path.exists('poids.csv') :
     poids = pd.read_csv('../../poids.csv')
 poids['coef'] = poids['poids'] / sum(poids['poids'])
-poids.to_csv(projectStr + '/coefficients.csv',
+poids.to_csv(projectPath + '/coefficients.csv',
              index=0, columns=['raster', 'coef'])
 del poids
 dicCoef = {row[0]: row[1]
-           for _, row in pd.read_csv(projectStr + '/coefficients.csv').iterrows()}
+           for _, row in pd.read_csv(projectPath + 'coefficients.csv').iterrows()}
 
 # Création des variables GDAL pour écriture de raster
 ds = gdal.Open('population.tif')
@@ -183,7 +183,7 @@ if capaciteAccueil < sumPopALoger:
 # Création du raster final d'intérêt avec pondération
 interet = np.where((restriction != 1), ((ecologie * dicCoef['ecologie']) + (ocsol * dicCoef['ocsol']) + (routes * dicCoef['routes']) + (transport * dicCoef['transport']) + (
     administratif * dicCoef['administratif']) + (commercial * dicCoef['commercial']) + (recreatif * dicCoef['recreatif']) + (medical * dicCoef['medical']) + (enseignement * dicCoef['enseignement'])), 0)
-to_tif(interet, gdal.GDT_Float32, projectStr + '/interet.tif')
+to_tif(interet, gdal.GDT_Float32, projectPath + '/interet.tif')
 del restriction, ecologie, ocsol, routes, transport, administratif, commercial, recreatif, medical, enseignement
 
 filledIris = []
@@ -195,7 +195,7 @@ for year in range(2015, finalYear + 1):
         contigList = literal_eval(dicContig[irisId])
         popALoger = dicPop[irisId]
         popRestante = peupler(irisId, popALoger)
-        # Si population restante, tirage aléatoire trouver un quartier contigu, sinon aléatoire
+        # Si population restante, tirage pour loger dans un quartier contigu, sinon aléatoire
         if popRestante > 0:
             testedId = []
             while len(testedId) < len(contigList):
@@ -215,12 +215,12 @@ capaciteDepart = to_array('capacite.tif')
 populationDepart = to_array('population.tif')
 popNouvelle = population - populationDepart
 
-to_tif(capacite, gdal.GDT_UInt16, projectStr + '/capacite_future.tif')
-to_tif(population, gdal.GDT_UInt16, projectStr + '/population_future.tif')
-to_tif(popNouvelle, gdal.GDT_UInt16, projectStr + '/population_nouvelle.tif')
+to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite_future.tif')
+to_tif(population, gdal.GDT_UInt16, projectPath + 'population_future.tif')
+to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
 expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
-to_tif(expansion, gdal.GDT_Byte, projectStr + '/expansion.tif')
+to_tif(expansion, gdal.GDT_Byte, projectPath + 'expansion.tif')
 capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
-to_tif(capaSaturee, gdal.GDT_Byte, projectStr + '/capacite_saturee')
+to_tif(capaSaturee, gdal.GDT_Byte, projectPath + 'capacite_saturee')
 
 log.write('Terminé  à ' + strftime('%H:%M:%S') + '\n')

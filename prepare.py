@@ -1127,7 +1127,7 @@ if not os.path.exists(projectPath):
     seuil = to_array('data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
     capa_m2 = np.where( seuil - s_planch >= 0, seuil - s_planch, 0)
     capacite = np.where( (restriction != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
-    to_tif(capacite, gdal.GDT_Float32, projectPath + 'capacite.tif')
+    to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite.tif')
     del restriction
 
 print('Terminé  à ' + strftime('%H:%M:%S'))
