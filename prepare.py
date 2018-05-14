@@ -3,11 +3,10 @@
 import os
 import re
 import sys
-import csv
-import time
 import gdal
 import numpy as np
 import pandas as pd
+from time import strftime
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
@@ -40,8 +39,8 @@ QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
 feedback = QgsProcessingFeedback()
 
 # Import des paramètres d'entrée
-workspace = sys.argv[1]
-dept = sys.argv[2]
+dept = sys.argv[1]
+workspace = sys.argv[2]
 os.chdir(workspace)
 if not os.path.exists('../global_data'):
     print('La donnée régionale est manquante ou n''est pas dans le dossier approprié -> ../global_data)')
@@ -50,25 +49,22 @@ if not os.path.exists('zone.shp'):
     print('Le shapefile de la zone d''étude (zone.shp) doit être placé dans le répertoire de travail.')
     sys.exit()
 if len(sys.argv) > 3:
-    mode = sys.argv[3]
-    if mode not in ['strict', 'souple']:
-        print('Deux valeurs possibles pour le mode de seuillage : souple - strict ')
-        sys.exit()
-else :
-    mode = 'souple'
-if len(sys.argv) > 4:
-    gridSize = sys.argv[4]
-    if not 100 > int(gridSize) > 10:
+    gridSize = sys.argv[3]
+    if not 100 >= int(gridSize) >= 10:
         print('La taille de la grille doit être comprise entre 10m et 100m')
         sys.exit()
 else :
     gridSize = '50'
-projectStr = mode + '_' + gridSize + 'm'
-# Taux maximum de chevauchement des cellules de la grille avec des couches à exclure (ex: bati industriel)
-cellExcluRatio = 0.1
+
 # Paramètres variables pour la création des rasters de distance
 roadDist = 200
 transDist = 500
+# Taux maximum de chevauchement entre les cellules et des couches à exclure (ex: bati industriel)
+cellExcluRatio = 0.1
+
+if not os.path.exists('simulation') :
+    os.mkdir('simulation')
+projectPath = 'simulation/' + gridSize + 'm/'
 
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
@@ -292,9 +288,13 @@ def envRestrict(layerList, overlay, outdir):
             layer.setProviderEncoding('ISO-8859-14')
 
         layer.dataProvider().createSpatialIndex()
-        for feat in layer.getFeatures():
-            if feat.geometry().intersects(overlay.getFeature(0).geometry()):
+        i = 0
+        while i < layer.featureCount() :
+            if layer.getFeature(i).geometry().intersects(overlay.getFeature(0).geometry()):
                 intersects = True
+                break
+            i += 1
+
         if intersects:
             if 'PARCS_NATIONAUX_OCCITANIE_L93.shp' in file:
                 params = {
@@ -396,6 +396,8 @@ def popGrid(buildings, grid, iris, outdir):
         outdir + '/stat_planch_iris.csv', 'delimitedtext')
     csvPlanchI.addExpressionField(
         'to_real("q3")', QgsField('PLANCH_Q3', QVariant.Double))
+    csvPlanchI.addExpressionField(
+        'to_real("max")', QgsField('PLANCH_MAX', QVariant.Double))
 
     statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum',
                      'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
@@ -567,8 +569,7 @@ def sireneSplitter(geosirene, outpath):
     }
     processing.run('qgis:splitvectorlayer', params, feedback=feedback)
 
-print('Projet : ' + projectStr)
-print('Commencé à ' + time.strftime('%H:%M:%S'))
+print('Commencé à ' + strftime('%H:%M:%S'))
 
 # Gestion des XLS de l'INSEE, à faire une seule fois
 if not os.path.exists('../global_data/insee/csv'):
@@ -985,6 +986,8 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
               gridSize + 'm/tif/seuil_q3_iris.tif', 'PLANCH_Q3')
     rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
+              gridSize + 'm/tif/seuil_max_iris.tif', 'PLANCH_MAX')
+    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
               gridSize + 'm/tif/nb_m2_iris.tif', 'NB_M2_HAB')
     rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
               gridSize + 'm/tif/masque.tif', dtype='byte', invert=True)
@@ -1049,12 +1052,12 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     del projwin, dicSirene
 
 # Mise en forme finale des données raster pour le modèle
-if not os.path.exists(projectStr):
-    os.mkdir(projectStr)
+if not os.path.exists(projectPath):
+    os.mkdir(projectPath)
 
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
     iris = QgsVectorLayer('data/' + gridSize + 'm/stat_iris.shp')
-    contiguityMatrix(iris, projectStr + '/iris.csv')
+    contiguityMatrix(iris, projectPath + 'iris.csv')
     del iris
 
     grid = QgsVectorLayer('data/' + gridSize + 'm/stat_grid.shp', 'grid')
@@ -1068,12 +1071,12 @@ if not os.path.exists(projectStr):
 
     # Rasterisations
     rasterize('data/' + gridSize + 'm/stat_grid.shp',
-              projectStr + '/population.tif', 'pop', 'uint16')
+              projectPath + 'population.tif', 'pop', 'uint16')
     rasterize('data/' + gridSize + 'm/stat_iris.shp',
-              projectStr + '/iris_id.tif', 'ID', 'uint16')
-    rasterize('data/ocsol.shp', projectStr + '/ocsol.tif', 'interet')
+              projectPath + 'iris_id.tif', 'ID', 'uint16')
+    rasterize('data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
 
-    ds = gdal.Open(projectStr + '/population.tif')
+    ds = gdal.Open(projectPath + 'population.tif')
     cols = ds.RasterXSize
     rows = ds.RasterYSize
     proj = ds.GetProjection()
@@ -1086,12 +1089,12 @@ if not os.path.exists(projectStr):
     distance_routes = to_array('data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
     routes = np.where(distance_routes > -1, 1 -
                       (distance_routes / np.amax(distance_routes)), 0)
-    to_tif(routes, gdal.GDT_Float32, projectStr + '/routes.tif')
+    to_tif(routes, gdal.GDT_Float32, projectPath + 'routes.tif')
 
     distance_transport = to_array('data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
     transport = np.where(distance_transport > -1, 1 -
                          (distance_transport / np.amax(distance_transport)), 0)
-    to_tif(transport, gdal.GDT_Float32, projectStr + '/transport.tif')
+    to_tif(transport, gdal.GDT_Float32, projectPath + 'transport.tif')
 
     # Conversion des rasters de densité
     for theme in ['administratif', 'commercial', 'enseignement', 'medical', 'recreatif']:
@@ -1099,7 +1102,7 @@ if not os.path.exists(projectStr):
                        'm/tif/densite_' + theme + '.tif', 'float32')
         newArray = np.where(array != -9999, array / np.amax(array), 0)
         to_tif(newArray, gdal.GDT_Float32,
-               projectStr + '/' + theme + '.tif')
+               projectPath + theme + '.tif')
 
     irisMask = to_array('data/' + gridSize + 'm/tif/masque.tif')
     exclusionMask = to_array('data/' + gridSize + 'm/tif/exclusion.tif')
@@ -1111,26 +1114,21 @@ if not os.path.exists(projectStr):
 
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (gridMask == 1) | (
         zonagesMask == 1) | (highwayMask == 1) | (slopeMask == 1), 1, 0)
-    to_tif(restriction, gdal.GDT_UInt16, projectStr + '/restriction.tif')
+    to_tif(restriction, gdal.GDT_UInt16, projectPath + 'restriction.tif')
     del exclusionMask, gridMask, zonagesMask, highwayMask, slope, slopeMask
 
     eco = to_array('data/' + gridSize + 'm/tif/ecologie.tif')
     ecologie = np.where((eco == 0) & (irisMask != 1), 1, eco)
-    to_tif(ecologie, gdal.GDT_Float32, projectStr + '/ecologie.tif')
+    to_tif(ecologie, gdal.GDT_Float32, projectPath + 'ecologie.tif')
     del eco, ecologie, irisMask
 
-    # Mode de seuillage souple = capacité en fonction de la surface restante
-    if mode == 'souple':
-        nb_m2 = to_array('data/' + gridSize + 'm/tif/nb_m2_iris.tif')
-        s_planch = to_array('data/' + gridSize + 'm/tif/s_planch_grid.tif')
-        seuil = to_array('data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
-        capa_m2 = np.where( seuil - s_planch >= 0, seuil - s_planch, 0)
-        capacite = np.where( (restriction != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
-        to_tif(capacite, gdal.GDT_Float32, projectStr + '/capacite.tif')
-    elif mode == 'strict':
-        pass
-
+    nb_m2 = to_array('data/' + gridSize + 'm/tif/nb_m2_iris.tif')
+    s_planch = to_array('data/' + gridSize + 'm/tif/s_planch_grid.tif')
+    seuil = to_array('data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
+    capa_m2 = np.where( seuil - s_planch >= 0, seuil - s_planch, 0)
+    capacite = np.where( (restriction != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
+    to_tif(capacite, gdal.GDT_Float32, projectPath + 'capacite.tif')
     del restriction
 
-print('Terminé  à ' + time.strftime('%H:%M:%S'))
+print('Terminé  à ' + strftime('%H:%M:%S'))
 qgs.exitQgis()

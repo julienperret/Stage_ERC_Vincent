@@ -1,12 +1,37 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import os
-import ast
 import sys
 import gdal
-import time
 import numpy as np
 import pandas as pd
+from time import strftime
+from shutil import rmtree
+from ast import literal_eval
+
+# Stockage et contrôle de la validité des paramètres utilisateur
+workspace = sys.argv[1]
+os.chdir(workspace)
+taux = float(sys.argv[2])
+if taux > 3:
+    print('Taux d''évolution trop élevé, valeur max acceptée : 3 %')
+    sys.exit()
+if len(sys.argv) > 3:
+    mode = sys.argv[3]
+    if mode not in {'souple', 'strict'}:
+        print('Mode de seuillage invalide\nValeurs possibles : souple ou strict')
+        sys.exit()
+else:
+    mode = 'souple'
+
+finalYear = 2040
+
+projectStr = mode + '_' + str(taux) + 'pct'
+if os.path.exists(projectStr):
+    rmtree(projectStr)
+os.mkdir(projectStr)
+
+log = open(projectStr + '/log.txt', 'x')
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
@@ -31,77 +56,61 @@ def to_tif(array, dtype, path):
     ds_out = None
 
 # Fonction de répartition de la population
-def peupler(irisId, pop):
+def peupler(irisId, popALoger, saturateFirst=True):
     # Création d'arrays d'intérêt et de capacité masqués autour de l'IRIS
-    capaIris = np.where((iris == irisId) & (population > 0), capacite, 0)
+    if saturateFirst:
+        capaIris = np.where((iris == irisId) & (population > 0), capacite, 0)
+    else:
+        capaIris = np.where(iris == irisId, capacite, 0)
     weight = np.where(capaIris > 0, interet, 0)
     weightRowSum = np.sum(weight, 1)
     popIris = np.zeros([rows, cols], dtype=np.uint16)
     popLogee = 0
     # Boucle de réparition de la population, en priorité dans des cellules où population > 0
     if sum(sum(capaIris)) > 0:
-        while popLogee < pop:
+        while popLogee < popALoger:
             # Tirage pondéré selon l'intérêt à urbaniser
             row = np.where(weightRowSum == np.random.choice(
                 weightRowSum, p=weightRowSum / sum(weightRowSum)))[0][0]
             col = np.where(weight[row] == np.random.choice(
                 weight[row], p=weight[row] / sum(weight[row])))[0][0]
-            if row != 0 and col != 0:
+            if capaIris[row][col] > 0 and (row != 0 and col != 0):
                 # Peuplement de la cellule tirée + mise à jour des arrays population et capacité
                 popLogee += 1
                 population[row][col] += 1
                 capacite[row][col] -= 1
                 capaIris[row][col] -= 1
                 # Mise à jour de l'intérêt à zéro quand la capcité d'accueil est dépasée
-                if capaIris[row][col] == 0 :
+                if capaIris[row][col] == 0:
                     weight[row][col] = 0
                     weightRowSum = np.sum(weight, 1)
             if sum(sum(capaIris)) == 0:
                 break
     # Si on a pas pu loger tout le monde dans des cellules déjà urbanisées => expansion
-    if pop - popLogee > 0:
+    if saturateFirst and popALoger - popLogee > 0:
         capaIris = np.where((iris == irisId) & (population == 0), capacite, 0)
         weight = np.where(capaIris > 0, interet, 0)
         weightRowSum = np.sum(weight, 1)
-        if sum(sum(capaIris)) > 0 :
-            while popLogee < pop:
+        if sum(sum(capaIris)) > 0:
+            while popLogee < popALoger:
                 row = np.where(weightRowSum == np.random.choice(
                     weightRowSum, p=weightRowSum / sum(weightRowSum)))[0][0]
                 col = np.where(weight[row] == np.random.choice(
                     weight[row], p=weight[row] / sum(weight[row])))[0][0]
-                if row != 0 and col != 0:
+                if capaIris[row][col] > 0 and (row != 0 and col != 0):
                     popLogee += 1
                     population[row][col] += 1
                     capacite[row][col] -= 1
                     capaIris[row][col] -= 1
-                    if capaIris[row][col] == 0 :
+                    if capaIris[row][col] == 0:
                         weight[row][col] = 0
                         weightRowSum = np.sum(weight, 1)
                 # Condition de sortie en cas de saturation du quartier
                 if sum(sum(capaIris)) == 0:
                     break
-    return pop - popLogee
+    return popALoger - popLogee
 
-# Stockage et contrôle de la validité des paramètres utilisateur
-workspace = sys.argv[1]
-os.chdir(workspace)
-if not os.path.exists('output'):
-    os.mkdir('output')
-taux = float(sys.argv[2])
-if taux > 3:
-    print('Taux d''évolution trop élevé, valeur max acceptée : 3 %')
-    sys.exit()
-if len(sys.argv) > 3:
-    mode = sys.argv[3]
-    if mode not in {'souple', 'strict'}:
-        print('Mode de seuillage invalide\nValeurs possibles : souple ou strict')
-        sys.exit()
-else:
-    mode = 'souple'
-
-finalYear = 2040
-
-print('Commencé à ' + time.strftime('%H:%M:%S'))
+log.write('Commencé à ' + strftime('%H:%M:%S') + '\n')
 
 # Création des dataframes contenant les informations par IRIS
 irisDf = pd.read_csv('iris.csv')
@@ -123,20 +132,22 @@ for irisId in range(nbIris):
         popDf[year][irisId] = pop * (taux / 100)
         pop += pop * (taux / 100)
         year += 1
-popDf.to_csv('output/demographie.csv', index=0)
+popDf.to_csv(projectStr + '/demographie.csv', index=0)
 
 # Nombre total de personnes à loger - permet de vérifier si le raster capacité pourra tout contenir
 sumPopALoger = sum(popDf.sum()) - sum(range(nbIris + 1)) - sum(popDf[2014])
-print('Population à loger d\'ici à ' +
-      str(finalYear) + ' : ' + str(sumPopALoger))
+log.write('Population à loger d\'ici à ' +
+          str(finalYear) + ' : ' + str(sumPopALoger) + '\n')
 
 # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
-poids = pd.read_csv('../poids.csv')
+if not os.path.exists('poids.csv') :
+    poids = pd.read_csv('../../poids.csv')
 poids['coef'] = poids['poids'] / sum(poids['poids'])
-poids.to_csv('output/coefficients.csv', index=0, columns=['raster', 'coef'])
+poids.to_csv(projectStr + '/coefficients.csv',
+             index=0, columns=['raster', 'coef'])
 del poids
 dicCoef = {row[0]: row[1]
-           for _, row in pd.read_csv('output/coefficients.csv').iterrows()}
+           for _, row in pd.read_csv(projectStr + '/coefficients.csv').iterrows()}
 
 # Création des variables GDAL pour écriture de raster
 ds = gdal.Open('population.tif')
@@ -164,7 +175,7 @@ enseignement = to_array('enseignement.tif', 'float32')
 
 # On vérifie que la capcité d'accueil est suffisante, ici on pourrait modifier la couche de restriction pour augmenter la capacité
 capaciteAccueil = sum(sum(capacite))
-print("Capacité d'accueil du territoire : " + str(capaciteAccueil))
+log.write("Capacité d'accueil du territoire : " + str(capaciteAccueil) + '\n')
 if capaciteAccueil < sumPopALoger:
     print("La capacité d'accueil ne suffit pas pour de telles projections démographiques !")
     sys.exit()
@@ -172,44 +183,44 @@ if capaciteAccueil < sumPopALoger:
 # Création du raster final d'intérêt avec pondération
 interet = np.where((restriction != 1), ((ecologie * dicCoef['ecologie']) + (ocsol * dicCoef['ocsol']) + (routes * dicCoef['routes']) + (transport * dicCoef['transport']) + (
     administratif * dicCoef['administratif']) + (commercial * dicCoef['commercial']) + (recreatif * dicCoef['recreatif']) + (medical * dicCoef['medical']) + (enseignement * dicCoef['enseignement'])), 0)
-to_tif(interet, gdal.GDT_Float32, 'output/interet.tif')
+to_tif(interet, gdal.GDT_Float32, projectStr + '/interet.tif')
 del restriction, ecologie, ocsol, routes, transport, administratif, commercial, recreatif, medical, enseignement
 
 filledIris = []
 # Itération au pas de temps annuel sur toute la période
 for year in range(2015, finalYear + 1):
-    print(str(year) + '/' + str(finalYear))
+    print(str(year))
     dicPop = {row[0]: row[year] for _, row in popDf.iterrows()}
-    for irisId in dicPop.keys() :
-        contigList = ast.literal_eval(dicContig[irisId])
+    for irisId in dicPop.keys():
+        contigList = literal_eval(dicContig[irisId])
         popALoger = dicPop[irisId]
         popRestante = peupler(irisId, popALoger)
         # Si population restante, tirage aléatoire trouver un quartier contigu, sinon aléatoire
-        if popRestante > 0 :
+        if popRestante > 0:
             testedId = []
             while len(testedId) < len(contigList):
                 contigId = int(np.random.choice(contigList, 1)[0])
                 popRestante = peupler(contigId, popRestante)
-                if contigId not in testedId :
+                if contigId not in testedId:
                     testedId.append(contigId)
-            while popRestante > 0 :
-                if irisId not in filledIris :
+            while popRestante > 0:
+                if irisId not in filledIris:
                     filledIris.append(irisId)
-                anyId = np.random.choice([i+1 for i in range(nbIris)], 1)[0]
+                anyId = np.random.choice([i + 1 for i in range(nbIris)], 1)[0]
                 popRestante = peupler(anyId, popRestante)
 
-print(str(len(filledIris)) + ' IRIS saturés : \n' + str(filledIris))
+log.write(str(len(filledIris)) + ' IRIS saturés : \n' + str(filledIris) + '\n')
 
 capaciteDepart = to_array('capacite.tif')
 populationDepart = to_array('population.tif')
 popNouvelle = population - populationDepart
 
-to_tif(capacite, gdal.GDT_UInt16, 'output/capacite_future.tif')
-to_tif(population, gdal.GDT_UInt16, 'output/population_future.tif')
-to_tif(popNouvelle, gdal.GDT_UInt16, 'output/population_nouvelle.tif')
+to_tif(capacite, gdal.GDT_UInt16, projectStr + '/capacite_future.tif')
+to_tif(population, gdal.GDT_UInt16, projectStr + '/population_future.tif')
+to_tif(popNouvelle, gdal.GDT_UInt16, projectStr + '/population_nouvelle.tif')
 expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
-to_tif(expansion, gdal.GDT_Byte, 'output/expansion.tif')
+to_tif(expansion, gdal.GDT_Byte, projectStr + '/expansion.tif')
 capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
-to_tif(capaSaturee, gdal.GDT_Byte, 'output/capacite_saturee')
+to_tif(capaSaturee, gdal.GDT_Byte, projectStr + '/capacite_saturee')
 
-print('Terminé  à ' + time.strftime('%H:%M:%S'))
+log.write('Terminé  à ' + strftime('%H:%M:%S') + '\n')
