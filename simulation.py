@@ -195,11 +195,10 @@ log.write('Population à loger d\'ici à ' +
 if not os.path.exists('poids.csv') :
     poids = pd.read_csv('../../poids.csv')
 poids['coef'] = poids['poids'] / sum(poids['poids'])
-poids.to_csv(projectPath + '/coefficients.csv',
+poids.to_csv(projectPath + 'coefficients.csv',
              index=0, columns=['raster', 'coef'])
+dicCoef = {row[0]: row[2] for _, row in poids.iterrows()}
 del poids
-dicCoef = {row[0]: row[1]
-           for _, row in pd.read_csv(projectPath + 'coefficients.csv').iterrows()}
 
 # Création des variables GDAL pour écriture de raster
 ds = gdal.Open('population.tif')
@@ -237,8 +236,9 @@ if capaciteAccueil < sumPopALoger:
 # Création du raster final d'intérêt avec pondération
 interet = np.where((restriction != 1), ((ecologie * dicCoef['ecologie']) + (ocsol * dicCoef['ocsol']) + (routes * dicCoef['routes']) + (transport * dicCoef['transport']) + (
     administratif * dicCoef['administratif']) + (commercial * dicCoef['commercial']) + (recreatif * dicCoef['recreatif']) + (medical * dicCoef['medical']) + (enseignement * dicCoef['enseignement'])), 0)
-to_tif(interet, gdal.GDT_Float32, projectPath + '/interet.tif')
-del restriction, ecologie, ocsol, routes, transport, administratif, commercial, recreatif, medical, enseignement
+
+to_tif(interet, gdal.GDT_Float32, projectPath + 'interet.tif')
+del dicCoef, restriction, ecologie, ocsol, routes, transport, administratif, commercial, recreatif, medical, enseignement
 
 filledIris = []
 # Itération au pas de temps annuel sur toute la période
@@ -246,11 +246,13 @@ for year in range(2015, finalYear + 1):
     print(str(year))
     dicPop = {row[0]: row[year] for _, row in popDf.iterrows()}
     for irisId in dicPop.keys():
-        contigList = literal_eval(dicContig[irisId])
         popALoger = dicPop[irisId]
         popRestante = peupler(irisId, popALoger, mode)
         # Si population restante, tirage pour loger dans un quartier contigu, sinon aléatoire
         if popRestante > 0:
+            if irisId not in filledIris:
+                filledIris.append(irisId)
+            contigList = literal_eval(dicContig[irisId])
             testedId = []
             while len(testedId) < len(contigList):
                 contigId = int(np.random.choice(contigList, 1)[0])
@@ -258,8 +260,6 @@ for year in range(2015, finalYear + 1):
                 if contigId not in testedId:
                     testedId.append(contigId)
             while popRestante > 0:
-                if irisId not in filledIris:
-                    filledIris.append(irisId)
                 anyId = np.random.choice([i + 1 for i in range(nbIris)], 1)[0]
                 popRestante = peupler(anyId, popRestante, mode)
 
@@ -274,8 +274,8 @@ capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
 
 to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite_future.tif')
 to_tif(population, gdal.GDT_UInt16, projectPath + 'population_future.tif')
-to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
 to_tif(expansion, gdal.GDT_Byte, projectPath + 'expansion.tif')
+to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
 to_tif(capaSaturee, gdal.GDT_Byte, projectPath + 'capacite_saturee')
 
 log.write('Terminé  à ' + strftime('%H:%M:%S') + '\n')
