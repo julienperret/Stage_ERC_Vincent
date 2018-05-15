@@ -53,7 +53,7 @@ if len(sys.argv) > 3:
     if not 100 >= int(gridSize) >= 10:
         print('La taille de la grille doit être comprise entre 10m et 100m')
         sys.exit()
-else :
+else:
     gridSize = '50'
 
 # Paramètres variables pour la création des rasters de distance
@@ -62,7 +62,7 @@ transDist = 500
 # Taux maximum de chevauchement entre les cellules et des couches à exclure (ex: bati industriel)
 cellExcluRatio = 0.1
 
-if not os.path.exists('simulation') :
+if not os.path.exists('simulation'):
     os.mkdir('simulation')
 projectPath = 'simulation/' + gridSize + 'm/'
 
@@ -169,7 +169,8 @@ def to_array(tif, dtype=None):
         return ds.ReadAsArray().astype(np.float32)
     elif dtype == 'uint16':
         return ds.ReadAsArray().astype(np.uint16)
-    else :
+    else:
+
         return ds.ReadAsArray()
     ds = None
 
@@ -289,7 +290,7 @@ def envRestrict(layerList, overlay, outdir):
 
         layer.dataProvider().createSpatialIndex()
         i = 0
-        while i < layer.featureCount() :
+        while i < layer.featureCount():
             if layer.getFeature(i).geometry().intersects(overlay.getFeature(0).geometry()):
                 intersects = True
                 break
@@ -374,7 +375,7 @@ def popGrid(buildings, grid, iris, outdir):
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
     to_shp(buildings, outdir + 'bati_inter_grid.shp')
-    del buildings
+    del buildings, res
 
     # Correction et changement de nom pour jointure des stat sur la grille et le IRIS
     csvPopG = QgsVectorLayer(
@@ -433,8 +434,8 @@ def restrictGrid(layerList, grid, ratio, outdir):
             'OVERLAY_FIELDS': ['id'],
             'OUTPUT': 'memory:' + name}
         res = processing.run('qgis:intersection', params, feedback=feedback)
-        layer = res['OUTPUT']
 
+        layer = res['OUTPUT']
         layer.addExpressionField('$area', QgsField(
             'area_g', QVariant.Double, len=10, prec=2))
 
@@ -445,6 +446,7 @@ def restrictGrid(layerList, grid, ratio, outdir):
             'OUTPUT': outdir + 'restriction_' + name + '.csv'}
         processing.run('qgis:statisticsbycategories',
                        params, feedback=feedback)
+        del layer, res
 
         csv = QgsVectorLayer(
             outdir + 'restriction_' + name + '.csv', 'delimitedtext')
@@ -455,31 +457,31 @@ def restrictGrid(layerList, grid, ratio, outdir):
     for csv in csvList:
         join(grid, 'id', csv, 'id_2', statBlackList)
 
-    cpt = len(fieldList)
-
-    if ratio == 0:
+    cpt = 0
     # Expression pour écarter complètement les cellules qui intersectent
-        expr = 'IF ('
-        for field in fieldList :
-            cpt -= 1
-            if cpt != 0 :
-                expr += '"' + field + '" IS NOT NULL OR '
-            else :
-                expr += '"' + field + '" IS NOT NULL, 1, 0)'
-    else:
-        # Expression pour écarter les cellules à partir d'un certain seuil de chevauchement
+    if ratio == 0:
         expr = 'IF ('
         for field in fieldList:
-            cpt -= 1
-            if cpt != 0:
+            cpt += 1
+            if cpt != len(fieldList):
+                expr += '"' + field + '" IS NOT NULL OR '
+            else:
+                expr += '"' + field + '" IS NOT NULL, 1, 0)'
+    # Expression pour écarter les cellules à partir d'un certain seuil de chevauchement
+    else:
+        expr = 'IF ('
+        for field in fieldList:
+            cpt += 1
+            if cpt != len(fieldList):
                 expr += '"' + field + '" >= ($area * ' + str(ratio) + ')  OR '
             else:
-                expr += '"' + field + '" >= ($area * ' + str(ratio) + '), 1, 0)'
+                expr += '"' + field + \
+                    '" >= ($area * ' + str(ratio) + '), 1, 0)'
 
     grid.addExpressionField(expr, QgsField('restrict', QVariant.Int))
 
     to_shp(grid, outdir + 'restrict_grid.shp')
-    del fieldList, csvList, layer
+    del fieldList, csvList
 
 # Jointure avec données INSEE et extraction des IRIS dans la zone
 def irisExtractor(iris, overlay, csvdir, outdir):
@@ -524,16 +526,30 @@ def irisExtractor(iris, overlay, csvdir, outdir):
 def pluFixer(plu, overlay, outdir, encoding='utf-8'):
     plu.setProviderEncoding(encoding)
     plu.dataProvider().createSpatialIndex()
-    expr = """ CASE
-        WHEN "type" LIKE '%AU%' THEN 'AU'
-        WHEN "type" LIKE '%N%' THEN 'N'
-        WHEN "type" LIKE '%U%' AND "type" NOT LIKE '%AU%' THEN 'U'
-        WHEN "type" LIKE 'A%' AND "type" NOT LIKE 'AU%' THEN 'A'
-        WHEN "type" = 'ZAC' THEN 'ZAC'
-        ELSE '0' END
-    """
-    plu.addExpressionField(expr, QgsField(
-        'classe', QVariant.String, len=3))
+    fields = []
+    for f in plu.fields():
+        fields.append(f.name())
+    if 'type' in fields:
+        expr = """ CASE
+            WHEN "type" LIKE '%AU%' THEN 'AU'
+            WHEN "type" LIKE '%N%' THEN 'N'
+            WHEN "type" LIKE '%U%' AND "type" NOT LIKE '%AU%' THEN 'U'
+            WHEN "type" LIKE 'A%' AND "type" NOT LIKE 'AU%' THEN 'A'
+            WHEN "type" = 'ZAC' THEN 'ZAC'
+            ELSE '0' END
+        """
+        plu.addExpressionField(expr, QgsField(
+            'classe', QVariant.String, len=3))
+    if 'coment' in fields and 'coment' in fields:
+        expr = """IF ("coment" LIKE '%à protéger%' OR "coment" LIKE 'Coupures%' OR "coment" LIKE 'périmètre protection %' OR "coment" LIKE 'protection forte %' or "coment" LIKE 'sauvegarde de sites naturels, paysages ou écosystèmes' or "coment" LIKE '% terrains réservés %' OR "coment" LIKE '% protégée' OR "coment" LIKE '% construction nouvelle est interdite %', 1, 0) """
+        plu.addExpressionField(expr, QgsField(
+            'restrict', QVariant.Int, len=1))
+        expr = """ IF ("type" LIKE '%AU%' OR "coment" LIKE '%urbanisation future%' OR "coment" LIKE '%ouvert_ à l_urbanisation%' OR "coment" LIKE '% destinée à l_urbanisation%', 1, 0) """
+        plu.addExpressionField(expr, QgsField(
+            'priority', QVariant.Int, len=1))
+        expr = """ IF ("coment" LIKE '% protection contre risques naturels', 1, 0) """
+        plu.addExpressionField(expr, QgsField(
+            'ppr', QVariant.Int, len=1))
     params = {
         'INPUT': plu,
         'OUTPUT': 'memory:plu'
@@ -568,6 +584,7 @@ def sireneSplitter(geosirene, outpath):
         'OUTPUT': outpath
     }
     processing.run('qgis:splitvectorlayer', params, feedback=feedback)
+
 
 print('Commencé à ' + strftime('%H:%M:%S'))
 
@@ -673,7 +690,7 @@ if not os.path.exists('data'):
         'INPUT': 'data/pai/transport.shp',
         'EXPRESSION': """ "NATURE" = 'Station de métro' """,
         'OUTPUT': 'data/transport/transport_pai.shp',
-        'FAIL_OUTPUT': 'memory:fail'
+        'FAIL_OUTPUT': 'memory:'
     }
     res = processing.run('native:extractbyexpression',
                          params, feedback=feedback)
@@ -718,15 +735,15 @@ if not os.path.exists('data'):
         ocsol = res['OUTPUT']
         expr = """
             CASE
-                WHEN  "lib15_niv1" = 'EAU' THEN 0
-                WHEN  "lib15_niv1" = 'ESPACES AGRICOLES'  THEN 0.9
-                WHEN  "lib15_niv1" = 'ESPACES BOISES'  THEN 0.3
-                WHEN  "lib15_niv1" = 'ESPACES NATURELS NON BOISES'  THEN 0.6
-                WHEN  "lib15_niv1" = 'ESPACES RECREATIFS'  THEN 0.1
-                WHEN  "lib15_niv1" = 'ESPACES URBANISES'  THEN 1
-                WHEN  "lib15_niv1" = 'EXTRACTION DE MATERIAUX, DECHARGES, CHANTIERS'  THEN 0
-                WHEN  "lib15_niv1" = 'SURFACES  INDUSTRIELLES OU COMMERCIALES ET INFRASTRUCTURES DE COMMUNICATION'  THEN 0
-                ELSE NULL END """
+                WHEN "lib15_niv1" = 'EAU' THEN 0
+                WHEN "lib15_niv1" = 'ESPACES AGRICOLES' THEN 0.9
+                WHEN "lib15_niv1" = 'ESPACES BOISES' THEN 0.3
+                WHEN "lib15_niv1" = 'ESPACES NATURELS NON BOISES' THEN 0.6
+                WHEN "lib15_niv1" = 'ESPACES RECREATIFS' THEN 0.1
+                WHEN "lib15_niv1" = 'ESPACES URBANISES' THEN 1
+                WHEN "lib15_niv1" = 'EXTRACTION DE MATERIAUX, DECHARGES, CHANTIERS' THEN 0
+                WHEN "lib15_niv1" = 'SURFACES INDUSTRIELLES OU COMMERCIALES ET INFRASTRUCTURES DE COMMUNICATION' THEN 0
+                ELSE 0 END """
 
         ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
         reproj(clip(ocsol, zone), 'data/')
@@ -752,12 +769,16 @@ if not os.path.exists('data'):
         reproj(clip(res['OUTPUT'], zone), 'data/')
         del ecologie, ecoFields, field
     # Autrement déterminer l'intérêt écologique grâce à l'ocsol ?
-    else :
+    else:
         pass
 
     os.mkdir('data/restriction')
     reproj(clip('../global_data/rge/' + dept +
                 '/bdtopo/SURFACE_EAU.SHP', zone), 'data/restriction/')
+
+    # Traitement d'une couche facultative du PPR
+    if os.path.exists('ppr.shp'):
+        reproj(clip('ppr.shp', zone), 'data/restriction')
 
     # Traitement d'une couche facultative pour exclusion de zones bâties lors du calcul de densité
     if os.path.exists('exclusion.shp'):
@@ -1001,6 +1022,19 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     rasterize('data/restriction/surf_activ_non_com.shp', 'data/' +
               gridSize + 'm/tif/surf_activ_non_com.tif', dtype='byte')
 
+    if os.path.exists('data/plu.shp'):
+        rasterize('data/plu.shp', 'data/' + gridSize +
+                  'm/tif/plu_rest.tif', 'restrict', dtype='byte')
+        rasterize('data/plu.shp', 'data/' + gridSize +
+                  'm/tif/plu_prio.tif', 'priority', dtype='byte')
+
+    if os.path.exists('data/plu.shp') and not os.path.exists('data/restriction/ppr.shp'):
+        rasterize('data/plu.shp', 'data/' + gridSize +
+                  'm/tif/ppr.tif', 'ppr', dtype='byte')
+    elif os.path.exists('data/restriction/ppr.shp'):
+        rasterize('data/restriction/ppr.shp', 'data/' +
+                  gridSize + 'm/tif/ppr.tif', dtype='byte')
+
     # Calcul des rasters de distance
     rasterize('data/transport/routes.shp', 'data/' +
               gridSize + 'm/tif/routes.tif', dtype='byte')
@@ -1024,7 +1058,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     processing.run('gdal:proximity', params, feedback=feedback)
 
     # Calcul des rasters de densité
-    os.mkdir('data/' + gridSize + 'm/tif/dump')
+    os.mkdir('data/' + gridSize + 'm/tif/tmp')
     projwin = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax)
     dicSirene = {row[0]: row[1] for _, row in pd.read_csv(
         '../global_data/sirene/distances_max.csv').iterrows()}
@@ -1038,12 +1072,12 @@ if not os.path.exists('data/' + gridSize + 'm/'):
             'PIXEL_SIZE': int(gridSize),
             'KERNEL': 0,
             'OUTPUT_VALUE': 0,
-            'OUTPUT': 'data/' + gridSize + 'm/tif/dump/densite_' + key + '.tif'}
+            'OUTPUT': 'data/' + gridSize + 'm/tif/tmp/densite_' + key + '.tif'}
         processing.run('qgis:heatmapkerneldensityestimation',
                        params, feedback=feedback)
 
         params = {
-            'INPUT': 'data/' + gridSize + 'm/tif/dump/densite_' + key + '.tif',
+            'INPUT': 'data/' + gridSize + 'm/tif/tmp/densite_' + key + '.tif',
             'PROJWIN': projwin,
             'NODATA': -9999,
             'DATA_TYPE': 5,
@@ -1086,12 +1120,14 @@ if not os.path.exists(projectPath):
     ds = None
 
     # Conversion des raster de distance
-    distance_routes = to_array('data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
+    distance_routes = to_array(
+        'data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
     routes = np.where(distance_routes > -1, 1 -
                       (distance_routes / np.amax(distance_routes)), 0)
     to_tif(routes, gdal.GDT_Float32, projectPath + 'routes.tif')
 
-    distance_transport = to_array('data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
+    distance_transport = to_array(
+        'data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
     transport = np.where(distance_transport > -1, 1 -
                          (distance_transport / np.amax(distance_transport)), 0)
     to_tif(transport, gdal.GDT_Float32, projectPath + 'transport.tif')
@@ -1099,7 +1135,7 @@ if not os.path.exists(projectPath):
     # Conversion des rasters de densité
     for theme in ['administratif', 'commercial', 'enseignement', 'medical', 'recreatif']:
         array = to_array('data/' + gridSize +
-                       'm/tif/densite_' + theme + '.tif', 'float32')
+                         'm/tif/densite_' + theme + '.tif', 'float32')
         newArray = np.where(array != -9999, array / np.amax(array), 0)
         to_tif(newArray, gdal.GDT_Float32,
                projectPath + theme + '.tif')
@@ -1107,28 +1143,35 @@ if not os.path.exists(projectPath):
     irisMask = to_array('data/' + gridSize + 'm/tif/masque.tif')
     exclusionMask = to_array('data/' + gridSize + 'm/tif/exclusion.tif')
     gridMask = to_array('data/' + gridSize + 'm/tif/restrict_grid.tif')
-    zonagesMask = to_array('data/' + gridSize + 'm/tif/zonages_protection.tif')
+    zonageMask = to_array('data/' + gridSize + 'm/tif/zonages_protection.tif')
     highwayMask = to_array('data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
+    pprMask = to_array('data/' + gridSize + 'm/tif/ppr.tif')
     slope = to_array('data/' + gridSize + 'm/tif/slope.tif')
     slopeMask = np.where(slope > 30, 1, 0)
 
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (gridMask == 1) | (
-        zonagesMask == 1) | (highwayMask == 1) | (slopeMask == 1), 1, 0)
-    to_tif(restriction, gdal.GDT_UInt16, projectPath + 'restriction.tif')
-    del exclusionMask, gridMask, zonagesMask, highwayMask, slope, slopeMask
+        zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
+    to_tif(restriction, gdal.GDT_Byte, projectPath + 'restriction.tif')
+    del exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
 
-    eco = to_array('data/' + gridSize + 'm/tif/ecologie.tif')
-    ecologie = np.where((eco == 0) & (irisMask != 1), 1, eco)
+    if os.path.exists('data/plu.shp'):
+        pluRestrict = to_array('data/' + gridSize + 'm/tif/plu_rest.tif')
+        pluPriority = to_array('data/' + gridSize + 'm/tif/plu_prio.tif')
+        to_tif(pluRestrict, gdal.GDT_Byte, projectPath + 'plu_restriction.tif')
+        to_tif(pluPriority, gdal.GDT_Byte, projectPath + 'plu_priorite.tif')
+        del pluRestrict, pluPriority
+
+    ecologie = to_array('data/' + gridSize + 'm/tif/ecologie.tif')
+    ecologie = np.where((ecologie == 0) & (irisMask != 1), 1, ecologie)
     to_tif(ecologie, gdal.GDT_Float32, projectPath + 'ecologie.tif')
-    del eco, ecologie, irisMask
+    del ecologie
 
     nb_m2 = to_array('data/' + gridSize + 'm/tif/nb_m2_iris.tif')
     s_planch = to_array('data/' + gridSize + 'm/tif/s_planch_grid.tif')
     seuil = to_array('data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
-    capa_m2 = np.where( seuil - s_planch >= 0, seuil - s_planch, 0)
-    capacite = np.where( (restriction != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
+    capa_m2 = np.where(seuil - s_planch >= 0, seuil - s_planch, 0)
+    capacite = np.where((irisMask != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
     to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite.tif')
-    del restriction
 
 print('Terminé  à ' + strftime('%H:%M:%S'))
 qgs.exitQgis()

@@ -56,14 +56,15 @@ def to_tif(array, dtype, path):
     ds_out = None
 
 # Fonction de répartition de la population
-def peupler(irisId, popALoger, mode, saturateFirst=True):
+def peupler(mode, irisId, popALoger, saturateFirst=True, pluPriority=False):
     popLogee = 0
+    capaIris = np.where(iris == irisId, capacite, 0)
+    if pluPriority:
+        capaIris = np.where(plu_priorite == 1, capaIris, 0)
     if mode == 'souple':
     # Création d'arrays d'intérêt et de capacité masqués autour de l'IRIS
         if saturateFirst:
-            capaIris = np.where((iris == irisId) & (population > 0), capacite, 0)
-        else:
-            capaIris = np.where(iris == irisId, capacite, 0)
+            capaIris = np.where(population > 0, capaIris, 0)
         weight = np.where(capaIris > 0, interet, 0)
         weightRowSum = np.sum(weight, 1)
         # Boucle de réparition de la population, en priorité dans des cellules où population > 0
@@ -87,7 +88,7 @@ def peupler(irisId, popALoger, mode, saturateFirst=True):
                     population[row][col] += 1
                     capacite[row][col] -= 1
                     capaIris[row][col] -= 1
-                    # Mise à jour de l'intérêt à zéro quand la capcité d'accueil est dépasée
+                    # Actualisation de la couche de poids si certaines cellules ne sont plus disponibles
                     if capaIris[row][col] == 0:
                         weight[row][col] = 0
                         weightRowSum = np.sum(weight, 1)
@@ -96,7 +97,7 @@ def peupler(irisId, popALoger, mode, saturateFirst=True):
                     break
         # Si on a pas pu loger tout le monde dans des cellules déjà urbanisées => expansion
         if saturateFirst and popALoger - popLogee > 0:
-            capaIris = np.where((iris == irisId) & (population == 0), capacite, 0)
+            capaIris = np.where(population == 0, capaIris, 0)
             weight = np.where(capaIris > 0, interet, 0)
             weightRowSum = np.sum(weight, 1)
             if np.sum(weight) > 0:
@@ -125,7 +126,7 @@ def peupler(irisId, popALoger, mode, saturateFirst=True):
                     if np.sum(weight) == 0:
                         break
     elif mode == 'strict' :
-        capaIris = np.where((iris == irisId) & (population == 0), capacite, 0)
+        capaIris = np.where(population == 0, capaIris, 0)
         weight = np.where(capaIris > 0, interet, 0)
         weightRowSum = np.sum(weight, 1)
         if np.sum(weight) > 0:
@@ -224,14 +225,34 @@ recreatif = to_array('recreatif.tif', 'float32')
 medical = to_array('medical.tif', 'float32')
 enseignement = to_array('enseignement.tif', 'float32')
 
+capacite = np.where(restriction != 1, capacite, 0)
+
+if os.path.exists('plu_restriction.tif') and os.path.exists('plu_priorite.tif') :
+    hasPlu = True
+    plu_priorite = to_array('plu_priorite.tif')
+    plu_restriction = to_array('plu_restriction.tif')
+    capacite = np.where(plu_restriction != 1, capacite, 0)
+else :
+    hasPlu = False
+
 # On vérifie que la capcité d'accueil est suffisante, ici on pourrait modifier la couche de restriction pour augmenter la capacité
 capaciteAccueil = np.sum(capacite)
 log.write("Capacité d'accueil du territoire : " + str(capaciteAccueil) + '\n')
 if capaciteAccueil < sumPopALoger:
-    # Ici on peut éventuellement augmenter les valeurs du raster de capacité
-    print("La capacité d'accueil ne suffit pas pour de telles projections démographiques !")
-    rmtree(projectPath)
-    sys.exit()
+    if hasPlu:
+        print("La capacité d'accueil étant insuffisante, on retire les restrictions issues du PLU.")
+        capacite = to_array('capacite.tif', 'uint16')
+        capacite = np.where(restriction != 1, capacite, 0)
+        capaciteAccueil = np.sum(capacite)
+        if capaciteAccueil < sumPopALoger:
+            print("La capacité d'accueil ne suffit pas pour de telles projections démographiques.")
+            rmtree(projectPath)
+            sys.exit()
+    else:
+        # Ici on peut éventuellement augmenter les valeurs du raster de capacité
+        print("La capacité d'accueil ne suffit pas pour de telles projections démographiques.")
+        rmtree(projectPath)
+        sys.exit()
 
 # Création du raster final d'intérêt avec pondération
 interet = np.where((restriction != 1), ((ecologie * dicCoef['ecologie']) + (ocsol * dicCoef['ocsol']) + (routes * dicCoef['routes']) + (transport * dicCoef['transport']) + (
@@ -247,7 +268,12 @@ for year in range(2015, finalYear + 1):
     dicPop = {row[0]: row[year] for _, row in popDf.iterrows()}
     for irisId in dicPop.keys():
         popALoger = dicPop[irisId]
-        popRestante = peupler(irisId, popALoger, mode)
+        if hasPlu:
+            popRestante = peupler(mode, irisId, popALoger, pluPriority=True)
+            if popRestante > 0:
+                popRestante = peupler(mode, irisId, popRestante)
+        else:
+            popRestante = peupler(mode, irisId, popALoger)
         # Si population restante, tirage pour loger dans un quartier contigu, sinon aléatoire
         if popRestante > 0:
             if irisId not in filledIris:
@@ -256,13 +282,27 @@ for year in range(2015, finalYear + 1):
             testedId = []
             while len(testedId) < len(contigList):
                 contigId = int(np.random.choice(contigList, 1)[0])
-                popRestante = peupler(contigId, popRestante, mode)
                 if contigId not in testedId:
                     testedId.append(contigId)
+                    if hasPlu:
+                        popRestante = peupler(mode, contigId, popRestante, pluPriority=True)
+                        if popRestante > 0:
+                            popRestante = peupler(mode, contigId, popRestante)
+                    else:
+                        popRestante = peupler(mode, contigId, popRestante)
+            testedId = []
             while popRestante > 0:
                 anyId = np.random.choice([i + 1 for i in range(nbIris)], 1)[0]
-                popRestante = peupler(anyId, popRestante, mode)
+                if anyId not in testedId:
+                    testedId.append(anyId)
+                    if hasPlu:
+                        popRestante = peupler(mode, anyId, popRestante, pluPriority=True)
+                        if popRestante > 0:
+                            popRestante = peupler(mode, anyId, popRestante)
+                    else:
+                        popRestante = peupler(mode, anyId, popRestante)
 
+log.write('Population impossible à loger : ' + str(popALaRue) + '\n')
 log.write(str(len(filledIris)) + ' IRIS saturés : \n' + str(filledIris) + '\n')
 
 capaciteDepart = to_array('capacite.tif')
