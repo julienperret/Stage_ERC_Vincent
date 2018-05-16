@@ -61,6 +61,8 @@ roadDist = 200
 transDist = 500
 # Taux maximum de chevauchement entre les cellules et des couches à exclure (ex: bati industriel)
 cellExcluRatio = 0.1
+# Seuil de pente en % pour interdiction à la construction
+maxSlope = 30
 
 if not os.path.exists('simulation'):
     os.mkdir('simulation')
@@ -1022,12 +1024,6 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     rasterize('data/restriction/surf_activ_non_com.shp', 'data/' +
               gridSize + 'm/tif/surf_activ_non_com.tif', dtype='byte')
 
-    if os.path.exists('data/plu.shp'):
-        rasterize('data/plu.shp', 'data/' + gridSize +
-                  'm/tif/plu_rest.tif', 'restrict', dtype='byte')
-        rasterize('data/plu.shp', 'data/' + gridSize +
-                  'm/tif/plu_prio.tif', 'priority', dtype='byte')
-
     if os.path.exists('data/plu.shp') and not os.path.exists('data/restriction/ppr.shp'):
         rasterize('data/plu.shp', 'data/' + gridSize +
                   'm/tif/ppr.tif', 'ppr', dtype='byte')
@@ -1061,7 +1057,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     os.mkdir('data/' + gridSize + 'm/tif/tmp')
     projwin = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax)
     dicSirene = {row[0]: row[1] for _, row in pd.read_csv(
-        '../global_data/sirene/distances_max.csv').iterrows()}
+        '../global_data/sirene/distances.csv').iterrows()}
 
     for key in dicSirene.keys():
         layer = QgsVectorLayer('data/geosirene/type_' + key + '.shp', key)
@@ -1132,14 +1128,34 @@ if not os.path.exists(projectPath):
                          (distance_transport / np.amax(distance_transport)), 0)
     to_tif(transport, gdal.GDT_Float32, projectPath + 'transport.tif')
 
-    # Conversion des rasters de densité
-    for theme in ['administratif', 'commercial', 'enseignement', 'medical', 'recreatif']:
-        array = to_array('data/' + gridSize +
-                         'm/tif/densite_' + theme + '.tif', 'float32')
-        newArray = np.where(array != -9999, array / np.amax(array), 0)
-        to_tif(newArray, gdal.GDT_Float32,
-               projectPath + theme + '.tif')
+    # Conversion et aggrégation des rasters de densité SIRENE
+    dicSirene = {row[0]: row[1] for _, row in pd.read_csv(
+        '../global_data/sirene/poids.csv').iterrows()}
 
+    administratif = to_array('data/' + gridSize +
+                     'm/tif/densite_administratif.tif', 'float32')
+    commercial = to_array('data/' + gridSize +
+                     'm/tif/densite_commercial.tif', 'float32')
+    enseignement = to_array('data/' + gridSize +
+                     'm/tif/densite_enseignement.tif', 'float32')
+    medical = to_array('data/' + gridSize +
+                     'm/tif/densite_medical.tif', 'float32')
+    recreatif = to_array('data/' + gridSize +
+                     'm/tif/densite_recreatif.tif', 'float32')
+
+    administratif = np.where(administratif != -9999, administratif / np.amax(administratif), 0)
+    commercial = np.where(commercial != -9999, commercial / np.amax(commercial), 0)
+    enseignement = np.where(enseignement != -9999, enseignement / np.amax(enseignement), 0)
+    medical = np.where(medical != -9999, medical / np.amax(medical), 0)
+    recreatif = np.where(recreatif != -9999, recreatif / np.amax(recreatif), 0)
+
+    sirene = ((administratif * dicSirene['administratif']) + (commercial * dicSirene['commercial']) + (
+        enseignement * dicSirene['enseignement']) + (medical * dicSirene['medical']) + (recreatif * dicSirene['recreatif'])) / sum(dicSirene.values())
+    sirene = sirene / np.amax(sirene)
+    to_tif(sirene, gdal.GDT_Float32, projectPath + 'sirene.tif')
+    del dicSirene, administratif, commercial, enseignement, medical, recreatif, sirene
+
+    # Création du raster de restriction (sans PLU)
     irisMask = to_array('data/' + gridSize + 'm/tif/masque.tif')
     exclusionMask = to_array('data/' + gridSize + 'm/tif/exclusion.tif')
     gridMask = to_array('data/' + gridSize + 'm/tif/restrict_grid.tif')
@@ -1147,7 +1163,7 @@ if not os.path.exists(projectPath):
     highwayMask = to_array('data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
     pprMask = to_array('data/' + gridSize + 'm/tif/ppr.tif')
     slope = to_array('data/' + gridSize + 'm/tif/slope.tif')
-    slopeMask = np.where(slope > 30, 1, 0)
+    slopeMask = np.where(slope > maxSlope, 1, 0)
 
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (gridMask == 1) | (
         zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)

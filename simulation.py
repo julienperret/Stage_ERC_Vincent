@@ -73,7 +73,7 @@ def weightedChoice(weight):
     return row, col
 
 # Fonction de peuplement d'une cellule avec mise à jour des variables globales
-def populate(row, col, nb):
+def populate(row, col, nb=1):
     global capacite, population, capaIris, popLogee, weight
     if capaIris[row][col] > 0 and (row != 0 and col != 0):
         population[row][col] += nb
@@ -90,6 +90,7 @@ def urbanize(mode, irisId, popALoger, saturateFirst=True, pluPriority=False):
     capaIris = np.where(iris == irisId, capacite, 0)
     if pluPriority:
         capaIris = np.where(plu_priorite == 1, capaIris, 0)
+
     if mode == 'souple':
         if saturateFirst:
             capaIris = np.where(population > 0, capaIris, 0)
@@ -97,7 +98,7 @@ def urbanize(mode, irisId, popALoger, saturateFirst=True, pluPriority=False):
         if np.sum(weight) > 0:
             while popLogee < popALoger:
                 row, col = weightedChoice(weight)
-                populate(row, col, 1)
+                populate(row, col)
                 if np.sum(weight) == 0:
                     break
 
@@ -110,8 +111,7 @@ def urbanize(mode, irisId, popALoger, saturateFirst=True, pluPriority=False):
             if np.sum(weight) > 0:
                 while popLogee < popALoger:
                     row, col = weightedChoice(weight)
-                    populate(row, col, 1)
-                    # Condition de sortie en cas de saturation du quartier
+                    populate(row, col)
                     if np.sum(weight) == 0:
                         break
 
@@ -128,7 +128,6 @@ def urbanize(mode, irisId, popALoger, saturateFirst=True, pluPriority=False):
                     else :
                         cellCapa = cellCapa - (cellCapa - (popALoger - popLogee))
                         populate(row, col, cellCapa)
-                # Condition de sortie en cas de saturation du quartier
                 if np.sum(weight) == 0:
                     break
 
@@ -158,7 +157,7 @@ for irisId in range(nbIris):
         year += 1
 popDf.to_csv(projectPath + 'demographie.csv', index=0)
 
-# Nombre total de personnes à loger - permet de vérifier si le raster capacité pourra tout contenir
+# Nombre total de personnes à loger - permet de vérifier si le raster capacité permet d'accueillir tout le monde
 sumPopALoger = sum(popDf.sum()) - sum(range(nbIris + 1)) - sum(popDf[2014])
 log.write('Population à loger d\'ici à ' +
           str(finalYear) + ' : ' + str(sumPopALoger) + '\n')
@@ -167,12 +166,11 @@ log.write('Population à loger d\'ici à ' +
 if not os.path.exists('poids.csv') :
     poids = pd.read_csv('../../poids.csv')
 poids['coef'] = poids['poids'] / sum(poids['poids'])
-poids.to_csv(projectPath + 'coefficients.csv',
-             index=0, columns=['raster', 'coef'])
+poids.to_csv(projectPath + 'coefficients.csv', index=0)
 dicCoef = {row[0]: row[2] for _, row in poids.iterrows()}
 del poids
 
-# Création des variables GDAL pour écriture de raster
+# Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
 ds = gdal.Open('population.tif')
 population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
 cols = ds.RasterXSize
@@ -182,21 +180,8 @@ geot = ds.GetGeoTransform()
 driver = gdal.GetDriverByName('GTiff')
 ds = None
 
-# Conversion des autres raster d'entrée en numpy array
-capacite = to_array('capacite.tif', 'uint16')
-iris = to_array('iris_id.tif', 'uint16')
-restriction = to_array('restriction.tif')
-ecologie = to_array('ecologie.tif', 'float32')
-ocsol = to_array('ocsol.tif', 'float32')
-routes = to_array('routes.tif', 'float32')
-transport = to_array('transport.tif', 'float32')
-administratif = to_array('administratif.tif', 'float32')
-commercial = to_array('commercial.tif', 'float32')
-recreatif = to_array('recreatif.tif', 'float32')
-medical = to_array('medical.tif', 'float32')
-enseignement = to_array('enseignement.tif', 'float32')
-
 # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
+capacite = to_array('capacite.tif', 'uint16')
 capacite = np.where(restriction != 1, capacite, 0)
 if os.path.exists('plu_restriction.tif') and os.path.exists('plu_priorite.tif') :
     hasPlu = True
@@ -229,9 +214,18 @@ if capaciteAccueil < sumPopALoger:
 capaciteDepart = capacite.copy()
 populationDepart = population.copy()
 
+# Conversion des autres raster d'entrée en numpy array
+iris = to_array('iris_id.tif', 'uint16')
+restriction = to_array('restriction.tif')
+ecologie = to_array('ecologie.tif', 'float32')
+ocsol = to_array('ocsol.tif', 'float32')
+routes = to_array('routes.tif', 'float32')
+transport = to_array('transport.tif', 'float32')
+sirene = to_array('sirene.tif', 'float32')
+
 # Création du raster final d'intérêt avec pondération
 interet = np.where((restriction != 1), ((ecologie * dicCoef['ecologie']) + (ocsol * dicCoef['ocsol']) + (routes * dicCoef['routes']) + (transport * dicCoef['transport']) + (
-    administratif * dicCoef['administratif']) + (commercial * dicCoef['commercial']) + (recreatif * dicCoef['recreatif']) + (medical * dicCoef['medical']) + (enseignement * dicCoef['enseignement'])), 0)
+    sirene * dicCoef['sirene'])), 0)
 
 to_tif(interet, gdal.GDT_Float32, projectPath + 'interet.tif')
 del dicCoef, restriction, ecologie, ocsol, routes, transport, administratif, commercial, recreatif, medical, enseignement
