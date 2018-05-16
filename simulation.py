@@ -55,112 +55,83 @@ def to_tif(array, dtype, path):
     ds_out.GetRasterBand(1).WriteArray(array)
     ds_out = None
 
+# Fonction de tirage pondéré avec gestion des résultats multiples
+def weightedChoice(weight):
+    weightRowSum = np.sum(weight, 1)
+    row = np.where(weightRowSum == np.random.choice(
+        weightRowSum, p=weightRowSum / sum(weightRowSum)))[0]
+    if row.size > 1 :
+        row = row[np.random.choice([i for i in range(row.size)], 1)[0]]
+    else :
+        row = row[0]
+    col = np.where(weight[row] == np.random.choice(
+        weight[row], p=weight[row] / sum(weight[row])))[0]
+    if col.size > 1 :
+        col = col[np.random.choice([i for i in range(col.size)], 1)[0]]
+    else :
+        col = col[0]
+    return row, col
+
+# Fonction de peuplement d'une cellule avec mise à jour des variables globales
+def populate(row, col, nb):
+    global capacite, population, capaIris, popLogee, weight
+    if capaIris[row][col] > 0 and (row != 0 and col != 0):
+        population[row][col] += nb
+        capacite[row][col] -= nb
+        capaIris[row][col] -= nb
+        if capaIris[row][col] == 0:
+            weight[row][col] = 0
+        popLogee += nb
+
 # Fonction de répartition de la population
-def peupler(mode, irisId, popALoger, saturateFirst=True, pluPriority=False):
+def urbanize(mode, irisId, popALoger, saturateFirst=True, pluPriority=False):
+    global capaIris, popLogee, weight
     popLogee = 0
     capaIris = np.where(iris == irisId, capacite, 0)
     if pluPriority:
         capaIris = np.where(plu_priorite == 1, capaIris, 0)
     if mode == 'souple':
-    # Création d'arrays d'intérêt et de capacité masqués autour de l'IRIS
         if saturateFirst:
             capaIris = np.where(population > 0, capaIris, 0)
         weight = np.where(capaIris > 0, interet, 0)
-        weightRowSum = np.sum(weight, 1)
-        # Boucle de réparition de la population, en priorité dans des cellules où population > 0
         if np.sum(weight) > 0:
             while popLogee < popALoger:
-                # Tirage pondéré selon l'intérêt à urbaniser, avec gestion des résultats de tirage en double
-                row = np.where(weightRowSum == np.random.choice(
-                    weightRowSum, p=weightRowSum / sum(weightRowSum)))[0]
-                if row.size > 1 :
-                    row = row[np.random.choice([i for i in range(row.size)], 1)[0]]
-                else :
-                    row = row[0]
-                col = np.where(weight[row] == np.random.choice(
-                    weight[row], p=weight[row] / sum(weight[row])))[0]
-                if col.size > 1 :
-                    col = col[np.random.choice([i for i in range(col.size)], 1)[0]]
-                else :
-                    col = col[0]
-                if capaIris[row][col] > 0 and (row != 0 and col != 0):
-                    # Peuplement de la cellule tirée + mise à jour des arrays population et capacité
-                    population[row][col] += 1
-                    capacite[row][col] -= 1
-                    capaIris[row][col] -= 1
-                    # Actualisation de la couche de poids si certaines cellules ne sont plus disponibles
-                    if capaIris[row][col] == 0:
-                        weight[row][col] = 0
-                        weightRowSum = np.sum(weight, 1)
-                    popLogee += 1
+                row, col = weightedChoice(weight)
+                populate(row, col, 1)
                 if np.sum(weight) == 0:
                     break
+
         # Si on a pas pu loger tout le monde dans des cellules déjà urbanisées => expansion
         if saturateFirst and popALoger - popLogee > 0:
-            capaIris = np.where(population == 0, capaIris, 0)
+            capaIris = np.where( (iris == irisId) & (population == 0), capacite, 0)
+            if pluPriority:
+                capaIris = np.where(plu_priorite == 1, capaIris, 0)
             weight = np.where(capaIris > 0, interet, 0)
-            weightRowSum = np.sum(weight, 1)
             if np.sum(weight) > 0:
                 while popLogee < popALoger:
-                    row = np.where(weightRowSum == np.random.choice(
-                        weightRowSum, p=weightRowSum / sum(weightRowSum)))[0]
-                    if row.size > 1 :
-                        row = row[np.random.choice([i for i in range(row.size)], 1)[0]]
-                    else :
-                        row = row[0]
-                    col = np.where(weight[row] == np.random.choice(
-                        weight[row], p=weight[row] / sum(weight[row])))[0]
-                    if col.size > 1 :
-                        col = col[np.random.choice([i for i in range(col.size)], 1)[0]]
-                    else :
-                        col = col[0]
-                    if capaIris[row][col] > 0 and (row != 0 and col != 0):
-                        population[row][col] += 1
-                        capacite[row][col] -= 1
-                        capaIris[row][col] -= 1
-                        if capaIris[row][col] == 0:
-                            weight[row][col] = 0
-                            weightRowSum = np.sum(weight, 1)
-                        popLogee += 1
+                    row, col = weightedChoice(weight)
+                    populate(row, col, 1)
                     # Condition de sortie en cas de saturation du quartier
                     if np.sum(weight) == 0:
                         break
+
     elif mode == 'strict' :
         capaIris = np.where(population == 0, capaIris, 0)
         weight = np.where(capaIris > 0, interet, 0)
-        weightRowSum = np.sum(weight, 1)
         if np.sum(weight) > 0:
             while popLogee < popALoger:
-                row = np.where(weightRowSum == np.random.choice(
-                    weightRowSum, p=weightRowSum / sum(weightRowSum)))[0]
-                if row.size > 1 :
-                    row = row[np.random.choice([i for i in range(row.size)], 1)[0]]
-                else :
-                    row = row[0]
-                col = np.where(weight[row] == np.random.choice(
-                    weight[row], p=weight[row] / sum(weight[row])))[0]
-                if col.size > 1 :
-                    col = col[np.random.choice([i for i in range(col.size)], 1)[0]]
-                else :
-                    col = col[0]
+                row, col = weightedChoice(weight)
                 if capaIris[row][col] > 0 and (row != 0 and col != 0):
                     cellCapa = capaIris[row][col]
                     if cellCapa <= popALoger - popLogee :
-                        population[row][col] += cellCapa
-                        capacite[row][col] -= cellCapa
-                        capaIris[row][col] -= cellCapa
-                        weight[row][col] = 0
-                        weightRowSum = np.sum(weight, 1)
-                        popLogee += cellCapa
+                        populate(row, col, cellCapa)
                     else :
                         cellCapa = cellCapa - (cellCapa - (popALoger - popLogee))
-                        population[row][col] += cellCapa
-                        capacite[row][col] -= cellCapa
-                        capaIris[row][col] -= cellCapa
-                        popLogee += cellCapa
+                        populate(row, col, cellCapa)
                 # Condition de sortie en cas de saturation du quartier
                 if np.sum(weight) == 0:
                     break
+
     return popALoger - popLogee
 
 log.write('Commencé à ' + strftime('%H:%M:%S') + '\n')
@@ -225,8 +196,8 @@ recreatif = to_array('recreatif.tif', 'float32')
 medical = to_array('medical.tif', 'float32')
 enseignement = to_array('enseignement.tif', 'float32')
 
+# Préparation du raster de capacité, nettoyage des cellules interdites à la construction
 capacite = np.where(restriction != 1, capacite, 0)
-
 if os.path.exists('plu_restriction.tif') and os.path.exists('plu_priorite.tif') :
     hasPlu = True
     plu_priorite = to_array('plu_priorite.tif')
@@ -244,6 +215,7 @@ if capaciteAccueil < sumPopALoger:
         capacite = to_array('capacite.tif', 'uint16')
         capacite = np.where(restriction != 1, capacite, 0)
         capaciteAccueil = np.sum(capacite)
+        log.write("Capacité d'accueil du territoire sans la restriction PLU : " + str(capaciteAccueil) + '\n')
         if capaciteAccueil < sumPopALoger:
             print("La capacité d'accueil ne suffit pas pour de telles projections démographiques.")
             rmtree(projectPath)
@@ -254,6 +226,9 @@ if capaciteAccueil < sumPopALoger:
         rmtree(projectPath)
         sys.exit()
 
+capaciteDepart = capacite.copy()
+populationDepart = population.copy()
+
 # Création du raster final d'intérêt avec pondération
 interet = np.where((restriction != 1), ((ecologie * dicCoef['ecologie']) + (ocsol * dicCoef['ocsol']) + (routes * dicCoef['routes']) + (transport * dicCoef['transport']) + (
     administratif * dicCoef['administratif']) + (commercial * dicCoef['commercial']) + (recreatif * dicCoef['recreatif']) + (medical * dicCoef['medical']) + (enseignement * dicCoef['enseignement'])), 0)
@@ -261,52 +236,53 @@ interet = np.where((restriction != 1), ((ecologie * dicCoef['ecologie']) + (ocso
 to_tif(interet, gdal.GDT_Float32, projectPath + 'interet.tif')
 del dicCoef, restriction, ecologie, ocsol, routes, transport, administratif, commercial, recreatif, medical, enseignement
 
-filledIris = []
-# Itération au pas de temps annuel sur toute la période
+filledList = []
 for year in range(2015, finalYear + 1):
     print(str(year))
     dicPop = {row[0]: row[year] for _, row in popDf.iterrows()}
     for irisId in dicPop.keys():
         popALoger = dicPop[irisId]
-        if hasPlu:
-            popRestante = peupler(mode, irisId, popALoger, pluPriority=True)
-            if popRestante > 0:
-                popRestante = peupler(mode, irisId, popRestante)
+        if irisId not in filledList:
+            if hasPlu:
+                popRestante = urbanize(mode, irisId, popALoger, pluPriority=True)
+                if popRestante > 0:
+                    popRestante = urbanize(mode, irisId, popRestante)
+            else:
+                popRestante = urbanize(mode, irisId, popALoger)
         else:
-            popRestante = peupler(mode, irisId, popALoger)
-        # Si population restante, tirage pour loger dans un quartier contigu, sinon aléatoire
+            popRestante = popALoger
+        # Si population restante, tirage pour peupler un quartier contigu
         if popRestante > 0:
-            if irisId not in filledIris:
-                filledIris.append(irisId)
+            if irisId not in filledList:
+                filledList.append(irisId)
             contigList = literal_eval(dicContig[irisId])
-            testedId = []
-            while len(testedId) < len(contigList):
+            testedList = []
+            while len(testedList) < len(contigList):
                 contigId = int(np.random.choice(contigList, 1)[0])
-                if contigId not in testedId:
-                    testedId.append(contigId)
-                    if hasPlu:
-                        popRestante = peupler(mode, contigId, popRestante, pluPriority=True)
-                        if popRestante > 0:
-                            popRestante = peupler(mode, contigId, popRestante)
-                    else:
-                        popRestante = peupler(mode, contigId, popRestante)
-            testedId = []
+                if contigId not in testedList:
+                    testedList.append(contigId)
+                    if contigId not in filledList:
+                        if hasPlu:
+                            popRestante = urbanize(mode, contigId, popRestante, pluPriority=True)
+                            if popRestante > 0:
+                                popRestante = urbanize(mode, contigId, popRestante)
+                        else:
+                            popRestante = urbanize(mode, contigId, popRestante)
+            # Si capacité des IRIS voisins insuffisante, tirage pour peupler n'importe quel quartier
+            testedList = []
             while popRestante > 0:
                 anyId = np.random.choice([i + 1 for i in range(nbIris)], 1)[0]
-                if anyId not in testedId:
-                    testedId.append(anyId)
-                    if hasPlu:
-                        popRestante = peupler(mode, anyId, popRestante, pluPriority=True)
-                        if popRestante > 0:
-                            popRestante = peupler(mode, anyId, popRestante)
-                    else:
-                        popRestante = peupler(mode, anyId, popRestante)
+                if anyId not in testedList:
+                    testedList.append(anyId)
+                    if anyId not in filledList:
+                        if hasPlu:
+                            popRestante = urbanize(mode, anyId, popRestante, pluPriority=True)
+                            if popRestante > 0:
+                                popRestante = urbanize(mode, anyId, popRestante)
+                        else:
+                            popRestante = urbanize(mode, anyId, popRestante)
 
-log.write('Population impossible à loger : ' + str(popALaRue) + '\n')
-log.write(str(len(filledIris)) + ' IRIS saturés : \n' + str(filledIris) + '\n')
-
-capaciteDepart = to_array('capacite.tif')
-populationDepart = to_array('population.tif')
+log.write(str(len(filledList)) + ' IRIS saturés : \n' + str(filledList) + '\n')
 
 popNouvelle = population - populationDepart
 expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
