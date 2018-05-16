@@ -1140,12 +1140,18 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     rasterize('data/pai_2016/surf_activ_non_com.shp', 'data/' +
               gridSize + 'm/tif/surf_activ_non_com.tif', dtype='byte')
 
-    if os.path.exists('data/plu.shp') and not os.path.exists('data/restriction/ppr.shp'):
-        rasterize('data/plu.shp', 'data/' + gridSize +
-                  'm/tif/ppr.tif', 'ppr', dtype='byte')
-    elif os.path.exists('data/restriction/ppr.shp'):
+    if os.path.exists('data/restriction/ppr.shp'):
         rasterize('data/restriction/ppr.shp', 'data/' +
                   gridSize + 'm/tif/ppr.tif', dtype='byte')
+    elif os.path.exists('data/plu.shp'):
+        rasterize('data/plu.shp', 'data/' + gridSize +
+                  'm/tif/ppr.tif', 'ppr', dtype='byte')
+
+    if os.path.exists('data/plu.shp'):
+        rasterize('data/plu.shp', 'data/' + gridSize +
+                  'm/tif/plu_rest.tif', 'restrict', dtype='byte')
+        rasterize('data/plu.shp', 'data/' + gridSize +
+                  'm/tif/plu_prio.tif', 'priority', dtype='byte')
 
     # Calcul des rasters de distance
     rasterize('data/transport/routes.shp', 'data/' +
