@@ -252,6 +252,7 @@ for year in range(2015, finalYear + 1):
                 popRestante = urbanize(mode, irisId, popALoger)
         else:
             popRestante = popALoger
+
         # Si population restante, tirage pour peupler un quartier contigu
         if popRestante > 0:
             if irisId not in filledList:
@@ -271,6 +272,7 @@ for year in range(2015, finalYear + 1):
                                     mode, contigId, popRestante)
                         else:
                             popRestante = urbanize(mode, contigId, popRestante)
+                            
             # Si capacité des IRIS voisins insuffisante, tirage pour peupler n'importe quel quartier
             testedList = []
             while popRestante > 0:
@@ -288,7 +290,6 @@ for year in range(2015, finalYear + 1):
                             popRestante = urbanize(mode, anyId, popRestante)
 
 log.write(str(len(filledList)) + ' IRIS saturés : \n' + str(filledList) + '\n')
-
 
 # Calcul et export des résultats
 popNouvelle = population - populationDepart
