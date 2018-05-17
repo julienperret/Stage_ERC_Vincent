@@ -160,7 +160,6 @@ popDf.to_csv(projectPath + 'demographie.csv', index=0)
 
 # Nombre total de personnes à loger - permet de vérifier si le raster capacité permet d'accueillir tout le monde
 sumPopALoger = sum(popDf.sum()) - sum(popDf['id'])
-
 log.write("Population à loger d'ici à " +
           str(finalYear) + " : " + str(sumPopALoger) + "\n")
 
@@ -290,7 +289,8 @@ for year in range(2015, finalYear + 1):
                         else:
                             popRestante = urbanize(mode, anyId, popRestante)
 
-log.write(str(len(irisSatures)) + " IRIS saturés : \n" + str(irisSatures) + "\n")
+log.write(str(len(irisSatures)) +
+          " IRIS saturés : \n" + str(irisSatures) + "\n")
 
 # Calcul et export des résultats
 popNouvelle = population - populationDepart
@@ -300,7 +300,8 @@ expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
 peuplementMoyen = np.nanmean(np.where(popNouvelle == 0, np.nan, popNouvelle))
 log.write("Peuplement moyen des cellules : " + str(peuplementMoyen) + "\n")
 impactEnvironnemental = np.sum(np.where(expansion == 1, 1 - ecologie, 0))
-log.write("Impact environnemental cumulé : " + str(impactEnvironnemental) + "\n")
+log.write("Impact environnemental cumulé : " +
+          str(impactEnvironnemental) + "\n")
 
 to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite_future.tif')
 to_tif(population, gdal.GDT_UInt16, projectPath + 'population_future.tif')
