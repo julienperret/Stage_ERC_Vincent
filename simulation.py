@@ -12,21 +12,22 @@ from ast import literal_eval
 # Stockage et contrôle de la validité des paramètres utilisateur
 workspace = sys.argv[1]
 os.chdir(workspace)
-taux = float(sys.argv[2])
-if taux > 3:
-    print('Taux d''évolution trop élevé, valeur max acceptée : 3 %')
+rate = float(sys.argv[2])
+if rate > 3:
+    print("Taux d'évolution trop élevé, valeur max acceptée : 3 %")
     sys.exit()
 if len(sys.argv) > 3:
     mode = sys.argv[3]
     if mode not in {'souple', 'strict'}:
-        print('Mode de seuillage invalide\nValeurs possibles : souple ou strict')
+        print("Mode de seuillage invalide \nValeurs possibles : souple ou strict")
         sys.exit()
 else:
     mode = 'souple'
 
 finalYear = 2040
+usePluPriority = True
 
-projectPath = mode + '_' + str(taux) + 'pct/'
+projectPath = mode + '_' + str(rate) + 'pct/'
 if os.path.exists(projectPath):
     rmtree(projectPath)
 os.mkdir(projectPath)
@@ -136,7 +137,7 @@ def urbanize(mode, irisId, popALoger, saturateFirst=True, pluPriority=False):
     return popALoger - popLogee
 
 
-log.write('Commencé à ' + strftime('%H:%M:%S') + '\n')
+log.write("Commencé à " + strftime('%H:%M:%S') + "\n")
 
 # Création des dataframes contenant les informations par IRIS
 irisDf = pd.read_csv('iris.csv')
@@ -144,26 +145,24 @@ nbIris = len(irisDf)
 dicContig = {row[0]: row[4] for _, row in irisDf.iterrows()}
 
 # Projections démograhpiques
-irisDf['population'] = irisDf['population'].astype(int)
 popDf = pd.DataFrame()
 popDf['id'] = [i + 1 for i in range(nbIris)]
-for year in range(2014, finalYear + 1):
+for year in range(2015, finalYear + 1):
     popDf[year] = 0
 for irisId in range(nbIris):
-    year = 2014
-    pop = irisDf['population'][irisId]
-    popDf[year][irisId] = pop
-    year += 1
+    pop = int(irisDf['population'][irisId])
+    year = 2015
     while year <= finalYear:
-        popDf[year][irisId] = pop * (taux / 100)
-        pop += pop * (taux / 100)
+        popDf[year][irisId] = pop * (rate / 100)
+        pop += pop * (rate / 100)
         year += 1
 popDf.to_csv(projectPath + 'demographie.csv', index=0)
 
 # Nombre total de personnes à loger - permet de vérifier si le raster capacité permet d'accueillir tout le monde
-sumPopALoger = sum(popDf.sum()) - sum(range(nbIris + 1)) - sum(popDf[2014])
-log.write('Population à loger d\'ici à ' +
-          str(finalYear) + ' : ' + str(sumPopALoger) + '\n')
+sumPopALoger = sum(popDf.sum()) - sum(popDf['id'])
+
+log.write("Population à loger d'ici à " +
+          str(finalYear) + " : " + str(sumPopALoger) + "\n")
 
 # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
 if not os.path.exists('poids.csv'):
@@ -199,7 +198,7 @@ else:
 capaciteAccueil = np.sum(capacite)
 log.write("Capacité d'accueil du territoire : " + str(capaciteAccueil) + '\n')
 if capaciteAccueil < sumPopALoger:
-    if hasPlu:
+    if hasPlu and usePluPriority:
         print("La capacité d'accueil étant insuffisante, on retire les restrictions issues du PLU.")
         capacite = to_array('capacite.tif', 'uint16')
         capacite = np.where(restriction != 1, capacite, 0)
@@ -236,14 +235,15 @@ to_tif(interet, gdal.GDT_Float32, projectPath + 'interet.tif')
 
 del dicCoef, restriction, ecologie, ocsol, routes, transport, sirene
 
-filledList = []
+popRelogee = 0
+irisSatures = []
 for year in range(2015, finalYear + 1):
     print(str(year))
     dicPop = {row[0]: row[year] for _, row in popDf.iterrows()}
     for irisId in dicPop.keys():
         popALoger = dicPop[irisId]
-        if irisId not in filledList:
-            if hasPlu:
+        if irisId not in irisSatures:
+            if hasPlu and usePluPriority:
                 popRestante = urbanize(
                     mode, irisId, popALoger, pluPriority=True)
                 if popRestante > 0:
@@ -255,16 +255,17 @@ for year in range(2015, finalYear + 1):
 
         # Si population restante, tirage pour peupler un quartier contigu
         if popRestante > 0:
-            if irisId not in filledList:
-                filledList.append(irisId)
+            popRelogee += popRestante
+            if irisId not in irisSatures:
+                irisSatures.append(irisId)
             contigList = literal_eval(dicContig[irisId])
             testedList = []
             while len(testedList) < len(contigList):
                 contigId = int(np.random.choice(contigList, 1)[0])
                 if contigId not in testedList:
                     testedList.append(contigId)
-                    if contigId not in filledList:
-                        if hasPlu:
+                    if contigId not in irisSatures:
+                        if hasPlu and usePluPriority:
                             popRestante = urbanize(
                                 mode, contigId, popRestante, pluPriority=True)
                             if popRestante > 0:
@@ -272,15 +273,15 @@ for year in range(2015, finalYear + 1):
                                     mode, contigId, popRestante)
                         else:
                             popRestante = urbanize(mode, contigId, popRestante)
-                            
+
             # Si capacité des IRIS voisins insuffisante, tirage pour peupler n'importe quel quartier
             testedList = []
             while popRestante > 0:
                 anyId = np.random.choice([i + 1 for i in range(nbIris)], 1)[0]
                 if anyId not in testedList:
                     testedList.append(anyId)
-                    if anyId not in filledList:
-                        if hasPlu:
+                    if anyId not in irisSatures:
+                        if hasPlu and usePluPriority:
                             popRestante = urbanize(
                                 mode, anyId, popRestante, pluPriority=True)
                             if popRestante > 0:
@@ -289,12 +290,17 @@ for year in range(2015, finalYear + 1):
                         else:
                             popRestante = urbanize(mode, anyId, popRestante)
 
-log.write(str(len(filledList)) + ' IRIS saturés : \n' + str(filledList) + '\n')
+log.write(str(len(irisSatures)) + " IRIS saturés : \n" + str(irisSatures) + "\n")
 
 # Calcul et export des résultats
 popNouvelle = population - populationDepart
-expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
 capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
+expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
+
+peuplementMoyen = np.nanmean(np.where(popNouvelle == 0, np.nan, popNouvelle))
+log.write("Peuplement moyen des cellules : " + str(peuplementMoyen) + "\n")
+impactEnvironnemental = np.sum(np.where(expansion == 1, 1 - ecologie, 0))
+log.write("Impact environnemental cumulé : " + str(impactEnvironnemental) + "\n")
 
 to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite_future.tif')
 to_tif(population, gdal.GDT_UInt16, projectPath + 'population_future.tif')
@@ -302,4 +308,4 @@ to_tif(expansion, gdal.GDT_Byte, projectPath + 'expansion.tif')
 to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
 to_tif(capaSaturee, gdal.GDT_Byte, projectPath + 'capacite_saturee')
 
-log.write('Terminé  à ' + strftime('%H:%M:%S') + '\n')
+log.write('Terminé  à ' + strftime('%H:%M:%S'))

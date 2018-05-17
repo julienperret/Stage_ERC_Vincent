@@ -61,13 +61,15 @@ bufferDistance = 1000
 # Surfaces au sol minimales et maximales pour considérer un bâtiment comme habitable
 minSurf = 50
 maxSurf = 10000
+# Utilisation du taux de résidence principales pour réduire la surface plancher estimée
+useTxrp = True
 # Hauteur théorique d'un étage pour l'estimation du nombre de niveaux
 levelHeight = 3
 # Taux maximum de chevauchement entre les cellules et des couches à exclure (ex: bati industriel)
 maxOverlapRatio = 0.1
 # Paramètres variables pour la création des rasters de distance
 roadDist = 200
-transDist = 500
+transDist = 300
 # Seuil de pente en % pour interdiction à la construction
 maxSlope = 30
 
@@ -179,7 +181,6 @@ def to_array(tif, dtype=None):
     elif dtype == 'uint16':
         return ds.ReadAsArray().astype(np.uint16)
     else:
-
         return ds.ReadAsArray()
     ds = None
 
@@ -329,118 +330,130 @@ def envRestrict(layerList, overlay, outdir):
                 reproj(clip(layer, overlay), outdir)
 
 # Intersection entre la couche de bâti nettoyée jointe aux iris et la grille avec calcul et jointure des statistiques
-def peopleGrid(layerList, grid, iris, outdir):
+def statGridIris(buildings, csvList, grid, iris, outdir):
     csvGrid = []
     csvIris = []
     grid.dataProvider().createSpatialIndex()
-    for buildings in layerList:
-        year = buildings.name()
-        buildings.dataProvider().createSpatialIndex()
-        buildings.addExpressionField('$area', QgsField(
-            'area_i', QVariant.Double, len=10, prec=2))
-        expr = ' "area_i" * "NB_NIV" '
-        buildings.addExpressionField(expr, QgsField(
-            'planch', QVariant.Double, len=10, prec=2))
-        expr = ' ("planch" / sum("planch", group_by:="CODE_IRIS")) * "POP' + year + '" '
-        buildings.addExpressionField(expr, QgsField(
-            'pop_bati', QVariant.Double, len=10, prec=2))
-        params = {
-            'INPUT': buildings,
-            'OVERLAY': grid,
-            'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV', 'CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP' + year, 'area_i', 'planch', 'pop_bati'],
-            'OVERLAY_FIELDS': ['id'],
-            'OUTPUT': 'memory:bati_inter_grid'}
-        res = processing.run('qgis:intersection', params, feedback=feedback)
-        buildings = res['OUTPUT']
+    buildings.dataProvider().createSpatialIndex()
+    buildings.addExpressionField('$area', QgsField(
+        'area_i', QVariant.Double, len=10, prec=2))
 
-        # Calcul de stat sur la bâti dans la grille
-        buildings.addExpressionField('$area', QgsField(
-            'area_g', QVariant.Double, len=10, prec=2))
-        expr = ' "area_g" / "area_i" * "pop_bati" '
-        buildings.addExpressionField(expr, QgsField(
-            'pop_cell', QVariant.Double, len=10, prec=2))
-        expr = ' "area_g" * "NB_NIV" '
-        buildings.addExpressionField(expr, QgsField(
-            'planch_g', QVariant.Double, len=10, prec=2))
-        expr = ' "planch_g" / "pop_cell" '
-        buildings.addExpressionField(expr, QgsField(
-            'nb_m2_hab', QVariant.Double, len=10, prec=2))
+    expr = ' ("area_i" * "NB_NIV") '
+    if useTxrp :
+        expr +=  '* "TXRP14"'
+    buildings.addExpressionField(expr, QgsField(
+        'planch', QVariant.Double, len=10, prec=2))
+    expr = ' ("planch" / sum("planch", group_by:="CODE_IRIS")) * "POP14" '
+    buildings.addExpressionField(expr, QgsField(
+        'pop_bati', QVariant.Double, len=10, prec=2))
+    params = {
+        'INPUT': buildings,
+        'OVERLAY': grid,
+        'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV', 'CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14', 'TXRP14', 'area_i', 'planch', 'pop_bati'],
+        'OVERLAY_FIELDS': ['id'],
+        'OUTPUT': 'memory:bati_inter_grid'}
+    res = processing.run('qgis:intersection', params, feedback=feedback)
+    buildings = res['OUTPUT']
 
-        # Aggrégation de statistiques dans des fichiers CSV
-        params = {
-            'INPUT': buildings,
-            'VALUES_FIELD_NAME': 'pop_cell',
-            'CATEGORIES_FIELD_NAME': 'id_2',
-            'OUTPUT': outdir + 'csv/' + year  + '_pop_grid.csv'}
-        processing.run('qgis:statisticsbycategories',
-                       params, feedback=feedback)
+    # Calcul de stat sur la bâti dans la grille
+    buildings.addExpressionField('$area', QgsField(
+        'area_g', QVariant.Double, len=10, prec=2))
+    expr = ' ("area_g" * "NB_NIV") '
+    if useTxrp:
+        expr += '* "TXRP14"'
+    buildings.addExpressionField(expr, QgsField(
+        'planch_g', QVariant.Double, len=10, prec=2))
 
-        params = {
-            'INPUT': buildings,
-            'VALUES_FIELD_NAME': 'planch_g',
-            'CATEGORIES_FIELD_NAME': 'id_2',
-            'OUTPUT': outdir + 'csv/' + year + '_srf_pl_grid.csv'}
-        processing.run('qgis:statisticsbycategories',
-                       params, feedback=feedback)
+    expr = ' "area_g" / "area_i" * "pop_bati" '
+    buildings.addExpressionField(expr, QgsField(
+        'pop_cell', QVariant.Double, len=10, prec=2))
+    expr = ' "planch_g" / "pop_cell" '
+    buildings.addExpressionField(expr, QgsField(
+        'nb_m2_hab', QVariant.Double, len=10, prec=2))
 
-        params = {
-            'INPUT': buildings,
-            'VALUES_FIELD_NAME': 'nb_m2_hab',
-            'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-            'OUTPUT': outdir + 'csv/' + year + '_nb_m2_iris.csv'}
-        processing.run('qgis:statisticsbycategories',
-                       params, feedback=feedback)
+    params = {
+        'INPUT': buildings,
+        'VALUES_FIELD_NAME': 'pop_cell',
+        'CATEGORIES_FIELD_NAME': 'id_2',
+        'OUTPUT': outdir + 'csv/pop_grid.csv'}
+    processing.run('qgis:statisticsbycategories',
+                   params, feedback=feedback)
+    params = {
+        'INPUT': buildings,
+        'VALUES_FIELD_NAME': 'nb_m2_hab',
+        'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
+        'OUTPUT': outdir + 'csv/nb_m2_iris.csv'}
+    processing.run('qgis:statisticsbycategories',
+                   params, feedback=feedback)
+    params = {
+        'INPUT': buildings,
+        'VALUES_FIELD_NAME': 'planch_g',
+        'CATEGORIES_FIELD_NAME': 'id_2',
+        'OUTPUT': outdir + 'csv/srf_pl_grid.csv'}
+    processing.run('qgis:statisticsbycategories',
+                   params, feedback=feedback)
+    params = {
+        'INPUT': buildings,
+        'VALUES_FIELD_NAME': 'planch_g',
+        'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
+        'OUTPUT': outdir + 'csv/srf_pl_iris.csv'}
+    processing.run('qgis:statisticsbycategories',
+                   params, feedback=feedback)
 
-        params = {
-            'INPUT': buildings,
-            'VALUES_FIELD_NAME': 'planch_g',
-            'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-            'OUTPUT': outdir + 'csv/' + year + '_srf_pl_iris.csv'}
-        processing.run('qgis:statisticsbycategories',
-                       params, feedback=feedback)
+    to_shp(buildings, outdir + 'bati_inter_grid.shp')
+    del buildings, res
 
-        to_shp(buildings, outdir + 'bati_inter_grid_' + year + '.shp')
-        del buildings, res
+    # Correction et changement de nom pour jointure des stat sur la grille et les IRIS
+    csvPlanchI = QgsVectorLayer(
+        outdir + 'csv/srf_pl_iris.csv')
+    csvPlanchI.addExpressionField(
+        'to_real("q3")', QgsField('SP_Q3', QVariant.Double))
+    csvPlanchI.addExpressionField(
+        'to_real("max")', QgsField('SP_MAX', QVariant.Double))
+    csvPlanchI.addExpressionField(
+        'to_real("sum")', QgsField('SP_SUM', QVariant.Double))
+    csvIris.append(csvPlanchI)
 
-        # Correction et changement de nom pour jointure des stat sur la grille et les IRIS
-        csvPopG = QgsVectorLayer(
-            outdir + 'csv/' + year  + '_pop_grid.csv', year)
-        csvPopG.addExpressionField(
-            'to_real("sum")', QgsField('pop', QVariant.Double))
-        csvGrid.append(csvPopG)
+    csvPlanchG = QgsVectorLayer(
+        outdir + 'csv/srf_pl_grid.csv')
+    csvPlanchG.addExpressionField(
+        'to_real("sum")', QgsField('srf_p', QVariant.Double))
+    csvGrid.append(csvPlanchG)
 
-        csvPlanchG = QgsVectorLayer(
-            outdir + 'csv/' + year + '_srf_pl_grid.csv', year)
-        csvPlanchG.addExpressionField(
-            'to_real("sum")', QgsField('srf_p', QVariant.Double))
-        csvGrid.append(csvPlanchG)
+    csvM2I = QgsVectorLayer(
+        outdir + 'csv/nb_m2_iris.csv')
+    csvM2I.addExpressionField(
+        'to_real("mean")', QgsField('M2_HAB', QVariant.Double))
+    csvIris.append(csvM2I)
 
-        csvM2I = QgsVectorLayer(
-            outdir + 'csv/' + year + '_nb_m2_iris.csv', year)
-        csvM2I.addExpressionField(
-            'to_real("mean")', QgsField('M2_HAB', QVariant.Double))
-        csvIris.append(csvM2I)
+    csvPopG = QgsVectorLayer(
+        outdir + 'csv/pop_grid.csv')
+    csvPopG.addExpressionField(
+        'to_real("sum")', QgsField('pop', QVariant.Double))
+    csvGrid.append(csvPopG)
 
-        csvPlanchI = QgsVectorLayer(
-            outdir + 'csv/' + year + '_srf_pl_iris.csv', year)
-        csvPlanchI.addExpressionField(
-            'to_real("q3")', QgsField('SP_Q3', QVariant.Double))
-        csvPlanchI.addExpressionField(
-            'to_real("max")', QgsField('SP_MAX', QVariant.Double))
-        csvIris.append(csvPlanchI)
+    for csv in csvList:
+        year = csv.name()
+        csv.addExpressionField('to_real("sum")', QgsField(year + '_SB_SOL', QVariant.Double))
+        csvIris.append(csv)
 
     statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum',
                      'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
     for csv in csvGrid:
-        year = csv.name()
-        join(grid, 'id', csv, 'id_2', statBlackList, year + '_')
+        join(grid, 'id', csv, 'id_2', statBlackList)
     for csv in csvIris:
-        year = csv.name()
-        join(iris, 'CODE_IRIS', csv, 'CODE_IRIS', statBlackList, year + '_')
+        join(iris, 'CODE_IRIS', csv, 'CODE_IRIS', statBlackList)
 
-    iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
     to_shp(grid, outdir + '/stat_grid.shp')
+
+    iris.addExpressionField(' "09_SB_SOL" / "POP09"',
+                            QgsField('M2S_H_09', QVariant.Double))
+    iris.addExpressionField(' "14_SB_SOL" / "POP14"',
+                            QgsField('M2S_H_14', QVariant.Double))
+    iris.addExpressionField(
+        ' ("M2S_H_14" - "M2S_H_09") / "M2S_H_09" / 5 * 100 ', QgsField('EVM2H0914', QVariant.Double))
+    iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
     to_shp(iris, outdir + '/stat_iris.shp')
 
 # Crée une grille avec des statistiques par cellule sur la surface couverte pour chaque couche en entrée
@@ -508,7 +521,6 @@ def restrictGrid(layerList, grid, ratio, outdir):
                     '" >= ($area * ' + str(ratio) + '), 1, 0)'
 
     grid.addExpressionField(expr, QgsField('restrict', QVariant.Int))
-
     to_shp(grid, outdir + 'restrict_grid.shp')
     del fieldList, csvList
 
@@ -520,6 +532,11 @@ def irisExtractor(iris, overlay, csvdir, outdir):
     csvPop09.addExpressionField(
         'round(to_real("P09_POP"))', QgsField('POP09', QVariant.Int))
 
+    csvPop12 = QgsVectorLayer(
+        csvdir + 'inseePop12.csv')
+    csvPop12.addExpressionField(
+        'round(to_real("P12_POP"))', QgsField('POP12', QVariant.Int))
+
     csvPop14 = QgsVectorLayer(
         csvdir + 'inseePop14.csv')
     csvPop14.addExpressionField(
@@ -529,16 +546,19 @@ def irisExtractor(iris, overlay, csvdir, outdir):
     csvLog14 = QgsVectorLayer(
         csvdir + 'inseeLog14.csv')
     csvLog14.addExpressionField(
-        'round(to_real("P14_RP"))', QgsField('RP14', QVariant.Int))
-    csvLog14.addExpressionField(
         'to_real("P14_TXRP")', QgsField('TXRP14', QVariant.Double))
 
     # Jointure avec données INSEE et extraction des IRIS dans la zone
     join(iris, 'CODE_IRIS', csvPop09, 'IRIS', ['P09_POP'])
+    join(iris, 'CODE_IRIS', csvPop12, 'IRIS', ['P12_POP'])
     join(iris, 'CODE_IRIS', csvPop14, 'IRIS', ['P14_POP'])
-    join(iris, 'CODE_IRIS', csvLog14, 'IRIS', ['P14_RP', 'P14_TXRP'])
-    expr = '("POP14"-"POP09")/"POP09"/5*100'
-    iris.addExpressionField(expr, QgsField('EVO_0914', QVariant.Double))
+    join(iris, 'CODE_IRIS', csvLog14, 'IRIS', ['P14_TXRP'])
+    expr = '("POP12"-"POP09") / "POP09" / 3 * 100'
+    iris.addExpressionField(expr, QgsField('EVPOP0912', QVariant.Double))
+    expr = '("POP14"-"POP12") / "POP12" / 2 * 100'
+    iris.addExpressionField(expr, QgsField('EVPOP1214', QVariant.Double))
+    expr = '("POP14"-"POP09") / "POP09" / 5 * 100'
+    iris.addExpressionField(expr, QgsField('EVPOP0914', QVariant.Double))
 
     # Extraction des quartiers IRIS avec jointures
     params = {
@@ -549,7 +569,7 @@ def irisExtractor(iris, overlay, csvdir, outdir):
     }
     res = processing.run('native:extractbylocation', params, feedback=feedback)
     return reproj(res['OUTPUT'], outdir)
-    del csvPop09, csvPop14, csvLog14, iris
+    del csvPop09, csvPop12, csvPop14, csvLog14, iris
 
 # Corrige les géometries et reclasse un PLU
 def pluFixer(plu, overlay, outdir, encoding='utf-8'):
@@ -624,16 +644,24 @@ if not os.path.exists('../global_data/insee/csv'):
     inseePop09.to_csv('../global_data/insee/csv/inseePop09.csv',
                       index=0, columns=['IRIS', 'P09_POP'])
     del inseePop09
+
+    inseePop12 = pd.read_excel(
+        '../global_data/insee/base-ic-evol-struct-pop-2012.xls', skiprows=(0, 1, 2, 3, 4))
+    inseePop12.to_csv('../global_data/insee/csv/inseePop12.csv',
+                      index=0, columns=['IRIS', 'P12_POP'])
+    del inseePop12
+
     inseePop14 = pd.read_excel(
         '../global_data/insee/base-ic-evol-struct-pop-2014.xls', skiprows=(0, 1, 2, 3, 4))
     inseePop14.to_csv('../global_data/insee/csv/inseePop14.csv',
                       index=0, columns=['IRIS', 'P14_POP'])
     del inseePop14
+
     inseeLog14 = pd.read_excel(
         '../global_data/insee/base-ic-logement-2014.xls', skiprows=(0, 1, 2, 3, 4))
     inseeLog14['P14_TXRP'] = inseeLog14['P14_RP'] / inseeLog14['P14_LOG']
     inseeLog14.to_csv('../global_data/insee/csv/inseeLog14.csv',
-                      index=0, columns=['IRIS', 'P14_RP', 'P14_TXRP'])
+                      index=0, columns=['IRIS', 'P14_TXRP'])
     del inseeLog14
 
 # Découpe et reprojection de la donnée en l'absence du dossier ./data
@@ -663,58 +691,45 @@ if not os.path.exists('data'):
     irisExtractor(iris, zone_buffer, '../global_data/insee/csv/', 'data/')
 
     # Extractions et reprojections
-    os.mkdir('data/bati_2009')
+    os.mkdir('data/2016_bati')
     clipBati = [
-        '../global_data/rge/' + dept + '/bdtopo_2009/BATI_INDIFFERENCIE.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/BATI_INDUSTRIEL.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/BATI_REMARQUABLE.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/CIMETIERE.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/CONSTRUCTION_LEGERE.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/CONSTRUCTION_SURFACIQUE.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/PISTE_AERODROME.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/RESERVOIR.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/TERRAIN_SPORT.SHP']
+        '../global_data/rge/' + dept + '/bdtopo_2016/BATI_INDIFFERENCIE.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/BATI_INDUSTRIEL.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/BATI_REMARQUABLE.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/CIMETIERE.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/CONSTRUCTION_LEGERE.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/CONSTRUCTION_SURFACIQUE.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/PISTE_AERODROME.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/RESERVOIR.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/TERRAIN_SPORT.SHP']
     for path in clipBati:
-        reproj(clip(path, zone), 'data/bati_2009/')
+        reproj(clip(path, zone), 'data/2016_bati/')
 
-    os.mkdir('data/bati_2016')
+    os.mkdir('data/2009_bati')
     i = 0
     for path in clipBati:
-        path = path.replace('2009', '2016')
+        path = path.replace('2016', '2009')
         clipBati[i] = path
         i += 1
-
     for path in clipBati:
-        reproj(clip(path, zone), 'data/bati_2016/')
+        reproj(clip(path, zone), 'data/2009_bati/')
 
-    os.mkdir('data/pai_2009')
+    os.mkdir('data/pai')
     clipPai = [
-        '../global_data/rge/' + dept + '/bdtopo_2009/PAI_ADMINISTRATIF_MILITAIRE.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/PAI_CULTURE_LOISIRS.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/PAI_ESPACE_NATUREL.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/PAI_INDUSTRIEL_COMMERCIAL.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/PAI_RELIGIEUX.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/PAI_SANTE.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/PAI_SCIENCE_ENSEIGNEMENT.SHP',
-        '../global_data/rge/' + dept + '/bdtopo_2009/PAI_TRANSPORT.SHP'
+        '../global_data/rge/' + dept + '/bdtopo_2016/PAI_ADMINISTRATIF_MILITAIRE.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/PAI_CULTURE_LOISIRS.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/PAI_ESPACE_NATUREL.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/PAI_INDUSTRIEL_COMMERCIAL.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/PAI_RELIGIEUX.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/PAI_SANTE.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/PAI_SCIENCE_ENSEIGNEMENT.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/PAI_SPORT.SHP',
+        '../global_data/rge/' + dept + '/bdtopo_2016/PAI_TRANSPORT.SHP'
     ]
     for path in clipPai:
-        reproj(clip(path, zone_buffer), 'data/pai_2009/')
-
-    os.mkdir('data/pai_2016')
-    i = 0
-    for path in clipPai:
-        path = path.replace('2009', '2016')
-        clipPai[i] = path
-        i += 1
-
-    for path in clipPai:
-        reproj(clip(path, zone_buffer), 'data/pai_2016/')
-
+        reproj(clip(path, zone_buffer), 'data/pai/')
     reproj(clip('../global_data/rge/' + dept +
-                '/bdtopo_2009/SURFACE_ACTIVITE.SHP', zone), 'data/pai_2009/')
-    reproj(clip('../global_data/rge/' + dept +
-                '/bdtopo_2016/SURFACE_ACTIVITE.SHP', zone), 'data/pai_2016/')
+                '/bdtopo_2016/SURFACE_ACTIVITE.SHP', zone), 'data/pai/')
 
     os.mkdir('data/transport')
     clipRes = [
@@ -725,7 +740,6 @@ if not os.path.exists('data'):
     ]
     for path in clipRes:
         reproj(clip(path, zone_buffer), 'data/transport/')
-
     del clipBati, clipRes, clipPai
 
     # Préparation de la couche arrêts de transport en commun
@@ -737,7 +751,7 @@ if not os.path.exists('data'):
         del bus
 
     params = {
-        'INPUT': 'data/pai_2016/transport.shp',
+        'INPUT': 'data/pai/transport.shp',
         'EXPRESSION': """ "NATURE" = 'Station de métro' """,
         'OUTPUT': 'data/transport/transport_pai.shp',
         'FAIL_OUTPUT': 'memory:'
@@ -837,9 +851,9 @@ if not os.path.exists('data'):
     # Traitement des couches de zonage de protection
     zonages = []
     os.mkdir('data/zonages')
-    for file in os.listdir('../global_data/zonages/interdiction/'):
+    for file in os.listdir('../global_data/env/'):
         if os.path.splitext(file)[1] == '.shp':
-            zonages.append('../global_data/zonages/interdiction/' + file)
+            zonages.append('../global_data/env/' + file)
     envRestrict(zonages, zone, 'data/zonages/')
 
     zonages = []
@@ -878,149 +892,123 @@ if not os.path.exists('data'):
     reproj(zone_buffer, 'data/')
     del zone, zone_buffer
 
-    # Fusion des couches PAI
-    mergePai = [
-        'data/pai_2009/administratif_militaire.shp',
-        'data/pai_2009/culture_loisirs.shp',
-        'data/pai_2009/industriel_commercial.shp',
-        'data/pai_2009/religieux.shp',
-        'data/pai_2009/sante.shp',
-        'data/pai_2009/science_enseignement.shp'
-    ]
-    params = {
-        'LAYERS': mergePai,
-        'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/pai_2009/pai_merged.shp'
-    }
-    processing.run('native:mergevectorlayers', params, feedback=feedback)
-
-    i = 0
-    for path in mergePai:
-        path = path.replace('2009', '2016')
-        mergePai[i] = path
-        i += 1
-
-    params = {
-        'LAYERS': mergePai,
-        'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/pai_2016/pai_merged.shp'
-    }
-    processing.run('native:mergevectorlayers', params, feedback=feedback)
-
     # Fusion des routes primaires et secondaires
     mergeRoads = ['data/transport/route_primaire.shp',
                   'data/transport/route_secondaire.shp']
     params = {
         'LAYERS': mergeRoads,
         'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/transport/routes.shp'
-    }
+        'OUTPUT': 'data/transport/routes.shp'}
     processing.run('native:mergevectorlayers', params, feedback=feedback)
 
-    # Empaquetage de tout le bâti
+    # Fusion des couches PAI
+    mergePai = [
+        'data/pai/administratif_militaire.shp',
+        'data/pai/culture_loisirs.shp',
+        'data/pai/industriel_commercial.shp',
+        'data/pai/religieux.shp',
+        'data/pai/sante.shp',
+        'data/pai/science_enseignement.shp',
+        'data/pai/sport.shp']
+    params = {
+        'LAYERS': mergePai,
+        'CRS': 'EPSG:3035',
+        'OUTPUT': 'data/pai/pai_merged.shp'}
+    processing.run('native:mergevectorlayers', params, feedback=feedback)
+
+    # Empaquetage de tout le bâti, calcul de surfaces et intersection avec les IRIS
     mergeBuildings = []
-    for file in os.listdir('data/bati_2009'):
-        if os.path.splitext(file)[1] == '.shp':
-            path = 'data/bati_2009/' + file
+    for file in os.listdir('data/2016_bati'):
+        if os.path.splitext(file)[1] == '.shp' and 'cimetiere' not in file:
+            path = 'data/2016_bati/' + file
             mergeBuildings.append(path)
     params = {
         'LAYERS': mergeBuildings,
         'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/bati_2009/bati_merged.shp'
-    }
-    processing.run('native:mergevectorlayers', params, feedback=feedback)
+        'OUTPUT': 'memory:bati_merged'}
+    res = processing.run('native:mergevectorlayers', params, feedback=feedback)
+    layer = res['OUTPUT']
+    layer.addExpressionField('$area', QgsField('AIRE', QVariant.Double))
+    params = {
+        'INPUT': layer,
+        'OVERLAY': 'data/iris.shp',
+        'INPUT_FIELDS': ['ID', 'AIRE', 'layer'],
+        'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14'],
+        'OUTPUT': 'memory:'}
+    res = processing.run('qgis:intersection', params, feedback=feedback)
+    layer = res['OUTPUT']
+    params = {
+        'INPUT': layer,
+        'VALUES_FIELD_NAME': 'AIRE',
+        'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
+        'OUTPUT': 'data/2016_bati/stat_surf_sol.csv'}
+    processing.run('qgis:statisticsbycategories',
+                   params, feedback=feedback)
 
-    mergeBuildings = []
-    for file in os.listdir('data/bati_2016'):
-        if os.path.splitext(file)[1] == '.shp':
-            path = 'data/bati_2016/' + file
-            mergeBuildings.append(path)
+    i = 0
+    for path in mergeBuildings:
+        path = path.replace('2016', '2009')
+        mergeBuildings[i] = path
+        i += 1
     params = {
         'LAYERS': mergeBuildings,
         'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/bati_2016/bati_merged.shp'
-    }
-    processing.run('native:mergevectorlayers', params, feedback=feedback)
-    del mergePai, mergeRoads, mergeBuildings
+        'OUTPUT': 'memory:bati_merged'}
+    res = processing.run('native:mergevectorlayers', params, feedback=feedback)
+    layer = res['OUTPUT']
+    layer.addExpressionField('$area', QgsField('AIRE', QVariant.Double))
+    params = {
+        'INPUT': layer,
+        'OVERLAY': 'data/iris.shp',
+        'INPUT_FIELDS': ['ID', 'AIRE', 'layer'],
+        'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP09'],
+        'OUTPUT': 'memory:'}
+    res = processing.run('qgis:intersection', params, feedback=feedback)
+    layer = res['OUTPUT']
+    params = {
+        'INPUT': layer,
+        'VALUES_FIELD_NAME': 'AIRE',
+        'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
+        'OUTPUT': 'data/2009_bati/stat_surf_sol.csv'}
+    processing.run('qgis:statisticsbycategories',
+                   params, feedback=feedback)
+
+    del mergePai, mergeRoads, mergeBuildings, layer
 
     # Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
     bati_indif = QgsVectorLayer(
-        'data/bati_2009/bati_indifferencie.shp', 'bati_indif_2009')
+        'data/2016_bati/bati_indifferencie.shp', 'bati_indif_2016')
     bati_indif.dataProvider().createSpatialIndex()
     cleanPolygons = []
-    cleanPoints = ['data/pai_2009/pai_merged.shp']
-
+    cleanPoints = ['data/pai/pai_merged.shp']
     # On ignore les zones industrielles et commerciales
     params = {
-        'INPUT': 'data/pai_2009/surface_activite.shp',
+        'INPUT': 'data/pai/surface_activite.shp',
         'EXPRESSION': """ "CATEGORIE" != 'Industriel ou commercial' """,
-        'OUTPUT': 'data/pai_2009/surf_activ_non_com.shp',
-        'FAIL_OUTPUT': 'memory:'
-    }
+        'OUTPUT': 'data/pai/surf_activ_non_com.shp',
+        'FAIL_OUTPUT': 'memory:'}
     processing.run('native:extractbyexpression', params, feedback=feedback)
-
     # Fusion des polygones pour éviter les résidus avec le prédicat WITHIN
     params = {
-        'INPUT': 'data/pai_2009/surf_activ_non_com.shp',
+        'INPUT': 'data/pai/surf_activ_non_com.shp',
         'FIELD': [],
-        'OUTPUT': 'memory:'
-    }
+        'OUTPUT': 'memory:'}
     res = processing.run('native:dissolve', params, feedback=feedback)
     cleanPolygons.append(res['OUTPUT'])
-
     if os.path.exists('data/restriction/exclusion.shp'):
         cleanPolygons.append('data/restriction/exclusion.shp')
-
     buildingCleaner(bati_indif, minSurf, maxSurf, levelHeight, cleanPolygons, cleanPoints,
-                    'data/bati_2009/bati_clean.shp')
-
-    bati_indif = QgsVectorLayer(
-        'data/bati_2016/bati_indifferencie.shp', 'bati_indif_2016')
-    bati_indif.dataProvider().createSpatialIndex()
-    cleanPolygons = []
-    cleanPoints = ['data/pai_2016/pai_merged.shp']
-
-    # On ignore les zones industrielles et commerciales
-    params = {
-        'INPUT': 'data/pai_2016/surface_activite.shp',
-        'EXPRESSION': """ "CATEGORIE" != 'Industriel ou commercial' """,
-        'OUTPUT': 'data/pai_2016/surf_activ_non_com.shp',
-        'FAIL_OUTPUT': 'memory:'
-    }
-    processing.run('native:extractbyexpression', params, feedback=feedback)
-
-    # Fusion des polygones pour éviter les résidus avec le prédicat WITHIN
-    params = {
-        'INPUT': 'data/pai_2016/surf_activ_non_com.shp',
-        'FIELD': [],
-        'OUTPUT': 'memory:'
-    }
-    res = processing.run('native:dissolve', params, feedback=feedback)
-    cleanPolygons.append(res['OUTPUT'])
-
-    if os.path.exists('data/restriction/exclusion.shp'):
-        cleanPolygons.append('data/restriction/exclusion.shp')
-
-    buildingCleaner(bati_indif, minSurf, maxSurf, levelHeight, cleanPolygons, cleanPoints,
-                    'data/bati_2016/bati_clean.shp')
+                    'data/2016_bati/bati_clean.shp')
 
     del bati_indif, cleanPolygons, cleanPoints
 
     # Intersection du bâti résidentiel avec les quartiers IRIS
     params = {
-        'INPUT': 'data/bati_2009/bati_clean.shp',
+        'INPUT': 'data/2016_bati/bati_clean.shp',
         'OVERLAY': 'data/iris.shp',
         'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV'],
-        'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP09'],
-        'OUTPUT': 'data/bati_2009/bati_inter_iris.shp'}
-    processing.run('qgis:intersection', params, feedback=feedback)
-
-    params = {
-        'INPUT': 'data/bati_2016/bati_clean.shp',
-        'OVERLAY': 'data/iris.shp',
-        'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV'],
-        'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14'],
-        'OUTPUT': 'data/bati_2016/bati_inter_iris.shp'}
+        'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14', 'TXRP14'],
+        'OUTPUT': 'data/2016_bati/bati_inter_iris.shp'}
     processing.run('qgis:intersection', params, feedback=feedback)
 
 if not os.path.exists('data/' + gridSize + 'm/'):
@@ -1046,24 +1034,25 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     del zone_buffer, extent, extentStr
 
     # Intersection entre le couche de bâti nettoyée et la grille
-    bati_09 = QgsVectorLayer('data/bati_2009/bati_inter_iris.shp', '09')
-    bati_14 = QgsVectorLayer('data/bati_2016/bati_inter_iris.shp', '14')
-    bati = [bati_09, bati_14]
+    batiIndif = QgsVectorLayer('data/2016_bati/bati_inter_iris.shp')
+    stat09 = QgsVectorLayer('data/2009_bati/stat_surf_sol.csv', '09')
+    stat14 = QgsVectorLayer('data/2016_bati/stat_surf_sol.csv', '14')
+    statCsvList = [stat09, stat14]
     grid = QgsVectorLayer('data/' + gridSize + 'm/grid.shp', 'grid')
     iris = QgsVectorLayer('data/iris.shp')
-    peopleGrid(bati, grid, iris, 'data/' + gridSize + 'm/')
-    del bati_09, bati_14, bati, iris
+    statGridIris(batiIndif, statCsvList, grid, iris, 'data/' + gridSize + 'm/')
+    del batiIndif, stat09, stat14, statCsvList, iris
 
     # Création de la grille de restriction
-    b_indus = QgsVectorLayer('data/bati_2016/bati_industriel.shp', 'b_indus')
+    b_indus = QgsVectorLayer('data/2016_bati/bati_industriel.shp', 'b_indus')
     b_remarq = QgsVectorLayer(
-        'data/bati_2016/bati_remarquable.shp', 'b_remarq')
-    cimetiere = QgsVectorLayer('data/bati_2016/cimetiere.shp', 'cimetiere')
+        'data/2016_bati/bati_remarquable.shp', 'b_remarq')
+    cimetiere = QgsVectorLayer('data/2016_bati/cimetiere.shp', 'cimetiere')
     c_surfa = QgsVectorLayer(
-        'data/bati_2016/construction_surfacique.shp', 'c_surfa')
-    p_aero = QgsVectorLayer('data/bati_2016/piste_aerodrome.shp', 'p_aero')
+        'data/2016_bati/construction_surfacique.shp', 'c_surfa')
+    p_aero = QgsVectorLayer('data/2016_bati/piste_aerodrome.shp', 'p_aero')
     s_eau = QgsVectorLayer('data/restriction/surface_eau.shp', 's_eau')
-    t_sport = QgsVectorLayer('data/bati_2016/terrain_sport.shp', 't_sport')
+    t_sport = QgsVectorLayer('data/2016_bati/terrain_sport.shp', 't_sport')
 
     restrictList = [b_indus, b_remarq, cimetiere,
                     c_surfa, p_aero, s_eau, t_sport]
@@ -1118,16 +1107,16 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     rasterize('data/ecologie.shp', 'data/' +
               gridSize + 'm/tif/ecologie.tif', 'interet')
     rasterize('data/' + gridSize + 'm/stat_grid.shp', 'data/' +
-              gridSize + 'm/tif/s_planch_grid.tif', '14_srf_p')
+              gridSize + 'm/tif/s_planch_grid.tif', 'srf_p')
     rasterize('data/' + gridSize + 'm/restrict_grid.shp', 'data/' +
               gridSize + 'm/tif/restrict_grid.tif', 'restrict', 'byte')
 
     rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
-              gridSize + 'm/tif/seuil_q3_iris.tif', '14_SP_Q3')
+              gridSize + 'm/tif/seuil_q3_iris.tif', 'SP_Q3')
     rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
-              gridSize + 'm/tif/seuil_max_iris.tif', '14_SP_MAX')
+              gridSize + 'm/tif/seuil_max_iris.tif', 'SP_MAX')
     rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
-              gridSize + 'm/tif/nb_m2_iris.tif', '14_M2_HAB')
+              gridSize + 'm/tif/nb_m2_iris.tif', 'M2_HAB')
     rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
               gridSize + 'm/tif/masque.tif', dtype='byte', invert=True)
 
@@ -1137,7 +1126,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
               gridSize + 'm/tif/tampon_autoroutes.tif', dtype='byte')
     rasterize('data/restriction/exclusion.shp', 'data/' +
               gridSize + 'm/tif/exclusion.tif', dtype='byte')
-    rasterize('data/pai_2016/surf_activ_non_com.shp', 'data/' +
+    rasterize('data/pai/surf_activ_non_com.shp', 'data/' +
               gridSize + 'm/tif/surf_activ_non_com.tif', dtype='byte')
 
     if os.path.exists('data/restriction/ppr.shp'):
@@ -1223,11 +1212,12 @@ if not os.path.exists(projectPath):
 
     # Rasterisations
     rasterize('data/' + gridSize + 'm/stat_grid.shp',
-              projectPath + 'population.tif', '14_pop', 'uint16')
+              projectPath + 'population.tif', 'pop', 'uint16')
     rasterize('data/' + gridSize + 'm/stat_iris.shp',
               projectPath + 'iris_id.tif', 'ID', 'uint16')
     rasterize('data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
 
+    # Création des variables GDAL indispensables pour la fonction to_tif()
     ds = gdal.Open(projectPath + 'population.tif')
     cols = ds.RasterXSize
     rows = ds.RasterYSize
