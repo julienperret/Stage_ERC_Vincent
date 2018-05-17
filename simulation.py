@@ -232,7 +232,7 @@ interet = np.where((restriction != 1), (ecologie * dicCoef['ecologie']) + (ocsol
     sirene * dicCoef['sirene']), 0)
 to_tif(interet, gdal.GDT_Float32, projectPath + 'interet.tif')
 
-del dicCoef, restriction, ecologie, ocsol, routes, transport, sirene
+del dicCoef, restriction, ocsol, routes, transport, sirene
 
 popRelogee = 0
 irisSatures = []
