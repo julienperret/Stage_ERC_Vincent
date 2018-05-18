@@ -9,6 +9,9 @@ from time import strftime
 from shutil import rmtree
 from ast import literal_eval
 
+# Ignorer les erreurs de numpy lors d'une division par 0
+np.seterr(divide='ignore', invalid='ignore')
+
 # Stockage et contrôle de la validité des paramètres utilisateur
 workspace = sys.argv[1]
 os.chdir(workspace)
@@ -17,25 +20,37 @@ if rate > 3:
     print("Taux d'évolution trop élevé, valeur max acceptée : 3 %")
     sys.exit()
 if len(sys.argv) > 3:
-    mode = sys.argv[3]
-    if mode not in {'souple', 'strict'}:
-        print("Mode de seuillage invalide \nValeurs possibles : souple ou strict")
-        sys.exit()
-else:
-    mode = 'souple'
+    argList = sys.argv[3].split()
+    for arg in argList:
+        if 'mode' in arg:
+            mode = arg.split('=')[1]
+            if mode not in {'souple', 'strict'}:
+                print("Mode de seuillage invalide \nValeurs possibles : souple ou strict")
+                sys.exit()
+        if 'saturateFirst' in arg:
+            saturateFirst = literal_eval(arg.split('=')[1])
+        if 'pluPriority' in arg:
+            pluPriority = literal_eval(arg.split('=')[1])
+        if 'finalYear' in arg:
+            finalYear = literal_eval(arg.split('=')[1])
 
-finalYear = 2040
-usePluPriority = True
+# Valeurs de paramètres par défaut
+if 'mode' not in globals():
+    mode = 'souple'
+if 'saturateFirst' not in globals():
+    saturateFirst = True
+if 'pluPriority' not in globals():
+    pluPriority = True
+if 'finalYear' not in globals():
+    finalYear = 2040
 
 projectPath = mode + '_' + str(rate) + 'pct/'
 if os.path.exists(projectPath):
     rmtree(projectPath)
 os.mkdir(projectPath)
 
+# Création d'un fichier journal
 log = open(projectPath + 'log.txt', 'x')
-
-# Ignorer les erreurs de numpy lors d'une division par 0
-np.seterr(divide='ignore', invalid='ignore')
 
 # Convertit un tif en numpy array
 def to_array(tif, dtype=None):
@@ -197,7 +212,7 @@ else:
 capaciteAccueil = np.sum(capacite)
 log.write("Capacité d'accueil du territoire : " + str(capaciteAccueil) + '\n')
 if capaciteAccueil < sumPopALoger:
-    if hasPlu and usePluPriority:
+    if hasPlu and pluPriority:
         print("La capacité d'accueil étant insuffisante, on retire les restrictions issues du PLU.")
         capacite = to_array('capacite.tif', 'uint16')
         capacite = np.where(restriction != 1, capacite, 0)
@@ -242,13 +257,13 @@ for year in range(2015, finalYear + 1):
     for irisId in dicPop.keys():
         popALoger = dicPop[irisId]
         if irisId not in irisSatures:
-            if hasPlu and usePluPriority:
+            if hasPlu:
                 popRestante = urbanize(
-                    mode, irisId, popALoger, pluPriority=True)
+                    mode, irisId, popALoger, saturateFirst, pluPriority)
                 if popRestante > 0:
-                    popRestante = urbanize(mode, irisId, popRestante)
+                    popRestante = urbanize(mode, irisId, popRestante, saturateFirst)
             else:
-                popRestante = urbanize(mode, irisId, popALoger)
+                popRestante = urbanize(mode, irisId, popALoger, saturateFirst)
         else:
             popRestante = popALoger
 
@@ -264,14 +279,14 @@ for year in range(2015, finalYear + 1):
                 if contigId not in testedList:
                     testedList.append(contigId)
                     if contigId not in irisSatures:
-                        if hasPlu and usePluPriority:
+                        if hasPlu:
                             popRestante = urbanize(
-                                mode, contigId, popRestante, pluPriority=True)
+                                mode, contigId, popRestante, saturateFirst, pluPriority)
                             if popRestante > 0:
                                 popRestante = urbanize(
-                                    mode, contigId, popRestante)
+                                    mode, contigId, popRestante, saturateFirst)
                         else:
-                            popRestante = urbanize(mode, contigId, popRestante)
+                            popRestante = urbanize(mode, contigId, popRestante, saturateFirst)
 
             # Si capacité des IRIS voisins insuffisante, tirage pour peupler n'importe quel quartier
             testedList = []
@@ -280,17 +295,17 @@ for year in range(2015, finalYear + 1):
                 if anyId not in testedList:
                     testedList.append(anyId)
                     if anyId not in irisSatures:
-                        if hasPlu and usePluPriority:
+                        if hasPlu:
                             popRestante = urbanize(
-                                mode, anyId, popRestante, pluPriority=True)
+                                mode, anyId, popRestante, saturateFirst, pluPriority)
                             if popRestante > 0:
                                 popRestante = urbanize(
-                                    mode, anyId, popRestante)
+                                    mode, anyId, popRestante, saturateFirst)
                         else:
-                            popRestante = urbanize(mode, anyId, popRestante)
+                            popRestante = urbanize(mode, anyId, popRestante, saturateFirst)
 
 log.write(str(len(irisSatures)) +
-          " IRIS saturés : \n" + str(irisSatures) + "\n")
+          " IRIS saturés : " + str(irisSatures) + "\n")
 log.write("Population relogée : " + str(popRelogee) + "\n")
 
 # Calcul et export des résultats

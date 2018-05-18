@@ -7,6 +7,7 @@ import gdal
 import numpy as np
 import pandas as pd
 from time import strftime
+from ast import literal_eval
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
@@ -43,35 +44,68 @@ dept = sys.argv[1]
 workspace = sys.argv[2]
 os.chdir(workspace)
 if not os.path.exists('../global_data'):
-    print('La donnée régionale est manquante ou n''est pas dans le dossier approprié -> ../global_data)')
+    print("La donnée régionale est manquante ou n'est pas dans le dossier approprié -> ../global_data)")
     sys.exit()
 if not os.path.exists('zone.shp'):
-    print('Le shapefile de la zone d''étude (zone.shp) doit être placé dans le répertoire de travail.')
+    print("Le shapefile de la zone détude (zone.shp) doit être placé dans le répertoire de travail.")
     sys.exit()
 if len(sys.argv) > 3:
-    gridSize = sys.argv[3]
-    if not 100 >= int(gridSize) >= 10:
-        print('La taille de la grille doit être comprise entre 10m et 100m')
-        sys.exit()
-else:
-    gridSize = '50'
+    argList = sys.argv[3].split()
+    # Interprétation de la chaîne de paramètres
+    for arg in argList :
+        # Taille de la grille / résolution des rasters
+        if 'gridSize' in arg:
+            gridSize = arg.split("=")[1]
+            if not 100 >= int(gridSize) >= 10:
+                print('La taille de la grille doit être comprise entre 10m et 100m')
+                sys.exit()
+        # Taille du tampon utilisé pour extraire les iris et pour extraire la donnée utile au delà des limites de la zone (comme les points SIRENE)
+        if 'bufferDistance' in arg:
+            bufferDistance = literal_eval(arg.split('=')[1])
+        # Surfaces au sol minimales et maximales pour considérer un bâtiment comme habitable
+        if 'minSurf' in arg:
+            minSurf = literal_eval(arg.split('=')[1])
+        if 'maxSurf' in arg:
+            maxSurf = literal_eval(arg.split('=')[1])
+        # Utilisation du taux de résidence principales pour réduire la surface plancher estimée
+        if 'useTxrp' in arg:
+            useTxrp = literal_eval(arg.split('=')[1])
+        # Hauteur théorique d'un étage pour l'estimation du nombre de niveaux
+        if 'levelHeight' in arg:
+            levelHeight = literal_eval(arg.split('=')[1])
+        # Taux maximum de chevauchement entre les cellules et des couches à exclure (ex: bati industriel)
+        if 'maxOverlapRatio' in arg:
+            maxOverlapRatio = literal_eval(arg.split('=')[1])
+        # Paramètres variables pour la création des rasters de distance
+        if 'roadDist' in arg:
+            roadDist = literal_eval(arg.split('=')[1])
+        if 'transDist' in arg:
+            transDist = literal_eval(arg.split('=')[1])
+        # Seuil de pente en % pour interdiction à la construction
+        if 'maxSlope' in arg:
+            maxSlope = literal_eval(arg.split('=')[1])
 
-# Taille du tampon utilisé pour extraire les iris et pour extraire la donnée utile au delà des limites de la zone (comme les points SIRENE)
-bufferDistance = 1000
-# Surfaces au sol minimales et maximales pour considérer un bâtiment comme habitable
-minSurf = 50
-maxSurf = 10000
-# Utilisation du taux de résidence principales pour réduire la surface plancher estimée
-useTxrp = True
-# Hauteur théorique d'un étage pour l'estimation du nombre de niveaux
-levelHeight = 3
-# Taux maximum de chevauchement entre les cellules et des couches à exclure (ex: bati industriel)
-maxOverlapRatio = 0.1
-# Paramètres variables pour la création des rasters de distance
-roadDist = 200
-transDist = 300
-# Seuil de pente en % pour interdiction à la construction
-maxSlope = 30
+# Valeurs de paramètres par défaut
+if 'gridSize' not in globals():
+    gridSize = '50'
+if 'bufferDistance' not in globals():
+    bufferDistance = 1000
+if 'minSurf' not in globals():
+    minSurf = 50
+if 'maxSurf' not in globals():
+    maxSurf = 10000
+if 'usrTxrp' not in globals():
+    useTxrp = True
+if 'levelHeight' not in globals():
+    levelHeight = 3
+if 'maxOverlapRatio' not in globals():
+    maxOverlapRatio = 0.1
+if 'roadDist' not in globals():
+    roadDist = 200
+if 'transDist' not in globals():
+    transDist = 300
+if 'maxSlope' not in globals():
+    maxSlope = 30
 
 if not os.path.exists('simulation'):
     os.mkdir('simulation')
