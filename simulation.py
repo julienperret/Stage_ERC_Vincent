@@ -148,9 +148,8 @@ def urbanize(mode, irisId, popALoger, saturateFirst=True, pluPriority=False):
                         populate(row, col, cellCapa)
                 if np.sum(weight) == 0:
                     break
-
+                    
     return popALoger - popLogee
-
 
 log.write("Commencé à " + strftime('%H:%M:%S') + "\n")
 
@@ -246,7 +245,6 @@ sirene = to_array('sirene.tif', 'float32')
 interet = np.where((restriction != 1), (ecologie * dicCoef['ecologie']) + (ocsol * dicCoef['ocsol']) + (routes * dicCoef['routes']) + (transport * dicCoef['transport']) + (
     sirene * dicCoef['sirene']), 0)
 to_tif(interet, gdal.GDT_Float32, projectPath + 'interet.tif')
-
 del dicCoef, restriction, ocsol, routes, transport, sirene
 
 popRelogee = 0
@@ -261,7 +259,8 @@ for year in range(2015, finalYear + 1):
                 popRestante = urbanize(
                     mode, irisId, popALoger, saturateFirst, pluPriority)
                 if popRestante > 0:
-                    popRestante = urbanize(mode, irisId, popRestante, saturateFirst)
+                    popRestante = urbanize(
+                        mode, irisId, popRestante, saturateFirst)
             else:
                 popRestante = urbanize(mode, irisId, popALoger, saturateFirst)
         else:
@@ -286,7 +285,8 @@ for year in range(2015, finalYear + 1):
                                 popRestante = urbanize(
                                     mode, contigId, popRestante, saturateFirst)
                         else:
-                            popRestante = urbanize(mode, contigId, popRestante, saturateFirst)
+                            popRestante = urbanize(
+                                mode, contigId, popRestante, saturateFirst)
 
             # Si capacité des IRIS voisins insuffisante, tirage pour peupler n'importe quel quartier
             testedList = []
@@ -302,22 +302,15 @@ for year in range(2015, finalYear + 1):
                                 popRestante = urbanize(
                                     mode, anyId, popRestante, saturateFirst)
                         else:
-                            popRestante = urbanize(mode, anyId, popRestante, saturateFirst)
-
-log.write(str(len(irisSatures)) +
-          " IRIS saturés : " + str(irisSatures) + "\n")
-log.write("Population relogée : " + str(popRelogee) + "\n")
+                            popRestante = urbanize(
+                                mode, anyId, popRestante, saturateFirst)
 
 # Calcul et export des résultats
 popNouvelle = population - populationDepart
 capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
 expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
-
 peuplementMoyen = np.nanmean(np.where(popNouvelle == 0, np.nan, popNouvelle))
-log.write("Peuplement moyen des cellules : " + str(peuplementMoyen) + "\n")
 impactEnvironnemental = np.sum(np.where(expansion == 1, 1 - ecologie, 0))
-log.write("Impact environnemental cumulé : " +
-          str(impactEnvironnemental) + "\n")
 
 to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite_future.tif')
 to_tif(population, gdal.GDT_UInt16, projectPath + 'population_future.tif')
@@ -325,4 +318,10 @@ to_tif(expansion, gdal.GDT_Byte, projectPath + 'expansion.tif')
 to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
 to_tif(capaSaturee, gdal.GDT_Byte, projectPath + 'capacite_saturee')
 
+log.write(str(len(irisSatures)) +
+          " IRIS saturés : " + str(irisSatures) + "\n")
+log.write("Population relogée : " + str(popRelogee) + "\n")
+log.write("Peuplement moyen des cellules : " + str(peuplementMoyen) + "\n")
+log.write("Impact environnemental cumulé : " +
+          str(impactEnvironnemental) + "\n")
 log.write('Terminé  à ' + strftime('%H:%M:%S'))
