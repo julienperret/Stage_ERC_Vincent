@@ -291,6 +291,7 @@ for year in range(2015, finalYear + 1):
 
 log.write(str(len(irisSatures)) +
           " IRIS saturés : \n" + str(irisSatures) + "\n")
+log.write("Population relogée : " + str(popRelogee) + "\n")
 
 # Calcul et export des résultats
 popNouvelle = population - populationDepart
