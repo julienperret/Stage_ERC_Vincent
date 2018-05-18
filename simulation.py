@@ -32,7 +32,7 @@ if len(sys.argv) > 3:
         if 'pluPriority' in arg:
             pluPriority = literal_eval(arg.split('=')[1])
         if 'finalYear' in arg:
-            finalYear = literal_eval(arg.split('=')[1])
+            finalYear = int(arg.split('=')[1])
 
 # Valeurs de paramètres par défaut
 if 'mode' not in globals():

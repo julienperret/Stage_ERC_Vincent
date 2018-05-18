@@ -61,29 +61,29 @@ if len(sys.argv) > 3:
                 sys.exit()
         # Taille du tampon utilisé pour extraire les iris et pour extraire la donnée utile au delà des limites de la zone (comme les points SIRENE)
         if 'bufferDistance' in arg:
-            bufferDistance = literal_eval(arg.split('=')[1])
+            bufferDistance = int(arg.split('=')[1])
         # Surfaces au sol minimales et maximales pour considérer un bâtiment comme habitable
         if 'minSurf' in arg:
-            minSurf = literal_eval(arg.split('=')[1])
+            minSurf = int(arg.split('=')[1])
         if 'maxSurf' in arg:
-            maxSurf = literal_eval(arg.split('=')[1])
+            maxSurf = int(arg.split('=')[1])
         # Utilisation du taux de résidence principales pour réduire la surface plancher estimée
         if 'useTxrp' in arg:
             useTxrp = literal_eval(arg.split('=')[1])
         # Hauteur théorique d'un étage pour l'estimation du nombre de niveaux
         if 'levelHeight' in arg:
-            levelHeight = literal_eval(arg.split('=')[1])
+            levelHeight = int(arg.split('=')[1])
         # Taux maximum de chevauchement entre les cellules et des couches à exclure (ex: bati industriel)
         if 'maxOverlapRatio' in arg:
-            maxOverlapRatio = literal_eval(arg.split('=')[1])
+            maxOverlapRatio = float(arg.split('=')[1])
         # Paramètres variables pour la création des rasters de distance
         if 'roadDist' in arg:
-            roadDist = literal_eval(arg.split('=')[1])
+            roadDist = int(arg.split('=')[1])
         if 'transDist' in arg:
-            transDist = literal_eval(arg.split('=')[1])
+            transDist = int(arg.split('=')[1])
         # Seuil de pente en % pour interdiction à la construction
         if 'maxSlope' in arg:
-            maxSlope = literal_eval(arg.split('=')[1])
+            maxSlope = int(arg.split('=')[1])
 
 # Valeurs de paramètres par défaut
 if 'gridSize' not in globals():
