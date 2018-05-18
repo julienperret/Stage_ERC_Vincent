@@ -11,7 +11,7 @@ Dépendances pour python3 :
     PyQt5.QtCore.QVariant, qgis, gdal, numpy, pandas + xlrd (pour manipuler les .xls)  
 
 ./simulation.py  
-Deux paramètre au minimum :  
+Deux paramètres au minimum :  
     1 : le dossier contenant la donnée  
     2 : le taux annuel d'évolution de la population (en %)  
     3 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
