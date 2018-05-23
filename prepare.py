@@ -107,7 +107,7 @@ if 'maxSlope' not in globals():
 if 'force' not in globals():
     force = False
 
-if os.path.exists(outputDataPath):
+if force and os.path.exists(outputDataPath):
     rmtree(outputDataPath)
 studyAreaName = localDataPath.split('/')[len(localDataPath.split('/'))-1]
 workspacePath = outputDataPath  + '/' + codeDept + '/' + studyAreaName + '/'
@@ -229,7 +229,6 @@ def to_array(tif, dtype=None):
 def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut, removedOut):
     # Selection des bâtiments situés dans polygones
     for layer in polygons:
-        print(layer)
         params = {
             'INPUT': buildings,
             'PREDICATE': 6,
@@ -240,7 +239,6 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
 
     # Selection si la bâtiment intersecte des points
     for layer in points:
-        print(layer)
         params = {
             'INPUT': buildings,
             'PREDICATE': 0,
@@ -263,13 +261,11 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
         'EXPRESSION': ' $area < ' + str(sMin) + ' OR $area > ' + str(sMax),
         'METHOD': 1
     }
-    print('select')
     processing.run('qgis:selectbyexpression', params, feedback=feedback)
     params = {
         'INPUT': buildings,
         'OUTPUT': removedOut
     }
-    print('save')
     processing.run('native:saveselectedfeatures', params, feedback=feedback)
 
     # Inversion de la selection pour export final
@@ -278,7 +274,6 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
         'INPUT': buildings,
         'OUTPUT': cleanedOut
     }
-    print('save')
     res = processing.run('native:saveselectedfeatures', params, feedback=feedback)
     return res['OUTPUT']
     del buildings, polygons, points, layer
@@ -1209,7 +1204,10 @@ if not os.path.exists('data/' + gridSize + 'm/'):
 
 # Mise en forme finale des données raster pour le modèle
 if not os.path.exists(projectPath):
+    print(projectPath)
+    print(os.curdir)
     os.mkdir(projectPath)
+    print(projectPath)
 
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
     iris = QgsVectorLayer('data/' + gridSize + 'm/stat_iris.shp')
