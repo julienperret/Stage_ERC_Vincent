@@ -41,10 +41,10 @@ QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
 feedback = QgsProcessingFeedback()
 
 # Import des paramètres d'entrée
-globalDataPath = sys.argv[1]
+globalDataPath = os.path.abspath(sys.argv[1])
 codeDept = sys.argv[2]
-localDataPath = sys.argv[3]
-outputDataPath = sys.argv[4]
+localDataPath = os.path.abspath(sys.argv[3])
+outputDataPath = os.path.abspath(sys.argv[4])
 if len(sys.argv) > 5:
     argList = sys.argv[5].split()
     # Interprétation de la chaîne de paramètres
@@ -111,18 +111,9 @@ if force and os.path.exists(outputDataPath):
     rmtree(outputDataPath)
 studyAreaName = localDataPath.split('/')[len(localDataPath.split('/'))-1]
 workspacePath = outputDataPath  + '/' + codeDept + '/' + studyAreaName + '/'
-if not os.path.exists(outputDataPath):
-    os.mkdir(outputDataPath)
-if not os.path.exists(outputDataPath + '/' + codeDept):
-    os.mkdir(outputDataPath + '/' + codeDept)
+projectPath = 'simulation/' + gridSize + 'm/'
 if not os.path.exists(workspacePath):
-    os.mkdir(workspacePath)
-if not os.path.exists(outputDataPath + '/simulation'):
-    os.mkdir(outputDataPath + '/simulation')
-projectPath = outputDataPath + '/simulation/' + gridSize + 'm/'
-#if not os.path.exists(projectPath):
-#    os.mkdir(projectPath)
-
+    os.makedirs(workspacePath)
 os.chdir(workspacePath)
 
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
@@ -153,7 +144,7 @@ def clip(file, overlay, outdir='memory:'):
     return res['OUTPUT']
 
 # Rasterisation d'un fichier vecteur
-def rasterize(vector, output, field=None, burn=None, inverse=False):
+def rasterize(vector, output, field=None, burn=None, inverse=False, touch=False):
     gdal.Rasterize(
         output, vector,
         format='GTiff',
@@ -163,7 +154,7 @@ def rasterize(vector, output, field=None, burn=None, inverse=False):
         initValues=0,
         burnValues=burn,
         attribute=field,
-        allTouched=True,
+        allTouched=touch,
         outputBounds=(xMin, yMin, xMax, yMax),
         inverse=inverse
     )
@@ -689,7 +680,6 @@ if not os.path.exists('data'):
     os.mkdir('data')
     # Tampon de 1000m autour de la zone pour extractions des quartiers et des PAI
     zone = QgsVectorLayer(localDataPath + '/zone.shp', 'zone')
-#    print("zone : " + str(zone))
     zone.dataProvider().createSpatialIndex()
     params = {
         'INPUT': zone,
@@ -703,7 +693,6 @@ if not os.path.exists('data'):
     }
     res = processing.run('native:buffer', params, feedback=feedback)
     zone_buffer = res['OUTPUT']
-#    print("buffer distance " + str(bufferDistance) + " zone_buffer : " + str(zone_buffer))
     # Extraction des quartiers IRIS avec jointures
     iris = QgsVectorLayer(globalDataPath + '/rge/IRIS_GE.SHP', 'iris')
     iris.dataProvider().createSpatialIndex()
@@ -868,11 +857,9 @@ if not os.path.exists('data'):
     # Traitement des couches de zonage de protection
     zonagesEnv = []
     os.mkdir('data/zonages')
-    #print('zonages ' + globalDataPath)
     for file in os.listdir(globalDataPath + '/env/'):
         if os.path.splitext(file)[1] == '.shp':
             zonagesEnv.append(globalDataPath + '/env/' + file)
-    #print(zonagesEnv)
     envRestrict(zonagesEnv, zone, 'data/zonages/')
 
     zonagesEnv = []
@@ -1205,13 +1192,8 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     del projwin, dicSirene
 
 # Mise en forme finale des données raster pour le modèle
-os.chdir(outputDataPath)
 if not os.path.exists(projectPath):
-    print(projectPath)
-    print(os.curdir)
-    os.mkdir(projectPath)
-    print(projectPath)
-
+    os.makedirs(projectPath)
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
     iris = QgsVectorLayer('data/' + gridSize + 'm/stat_iris.shp')
     contiguityMatrix(iris, projectPath + 'iris.csv')
@@ -1265,8 +1247,9 @@ if not os.path.exists(projectPath):
     medical = np.where(medical != -9999, medical / np.amax(medical), 0)
     recreatif = np.where(recreatif != -9999, recreatif / np.amax(recreatif), 0)
 
-    sirene = ((administratif * dicSirene['administratif']) + (commercial * dicSirene['commercial']) + (
-        enseignement * dicSirene['enseignement']) + (medical * dicSirene['medical']) + (recreatif * dicSirene['recreatif'])) / sum(dicSirene.values())
+    sirene = ((administratif * dicSirene['administratif']) + (commercial * dicSirene['commercial']) +
+               (enseignement * dicSirene['enseignement']) + (medical * dicSirene['medical']) +
+               (recreatif * dicSirene['recreatif'])) / sum(dicSirene.values())
     sirene = sirene / np.amax(sirene)
     to_tif(sirene, gdal.GDT_Float32, projectPath + 'sirene.tif')
     del dicSirene, administratif, commercial, enseignement, medical, recreatif, sirene
@@ -1274,7 +1257,6 @@ if not os.path.exists(projectPath):
     # Création du raster de restriction (sans PLU)
     irisMask = to_array('data/' + gridSize + 'm/tif/masque.tif')
     exclusionMask = to_array('data/' + gridSize + 'm/tif/exclusion.tif')
-    buildingsRestrict = to_array('data/' + gridSize + 'm/tif/bati_removed.tif')
     gridMask = to_array('data/' + gridSize + 'm/tif/restrict_grid.tif')
     zonageMask = to_array('data/' + gridSize + 'm/tif/zonages_protection.tif')
     highwayMask = to_array('data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
@@ -1283,9 +1265,9 @@ if not os.path.exists(projectPath):
     slopeMask = np.where(slope > maxSlope, 1, 0)
 
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (gridMask == 1) | (
-        zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1) | (buildingsRestrict == 1), 1, 0)
+        zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
     to_tif(restriction, gdal.GDT_Byte, projectPath + 'restriction.tif')
-    del exclusionMask, gridMask, buildingsRestrict, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
+    del exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
 
     if os.path.exists('data/plu.shp'):
         pluRestrict = to_array('data/' + gridSize + 'm/tif/plu_rest.tif')
