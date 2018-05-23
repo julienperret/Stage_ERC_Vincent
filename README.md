@@ -22,3 +22,10 @@ Exemple :
 
 Dépendances pour python3 :  
     gdal, numpy, pandas  
+
+
+Commande CARE
+
+care -o ./prepare.tgz.bin  -p ./mtp  ./prepare.py 34  ./mtp "gridSize=50 useTxrp=True levelHeight=3"
+
+
