@@ -1,11 +1,12 @@
 ./prepare.py  
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  
-    1 : n° de département dans lequel la zone d'étude est située  
-    2 : répertoire des données locales (situé au même niveau que la donnée régionale)  
-    3 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
+    1 : repertoire des données globales
+    2 : n° de département dans lequel la zone d'étude est située  
+    3 : répertoire des données locales (situé au même niveau que la donnée régionale)  
+    4 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
 
 Exemple :  
-    ./prepare.py 34 ~/workspace/local_data/ "gridSize=50 useTxrp=True levelHeight=3"
+python3 prepare.py ./global_data 34 ./mtp ./results "gridSize=50 useTxrp=True levelHeight=3 force"   
 
 Dépendances pour python3 :  
     PyQt5.QtCore.QVariant, qgis, gdal, numpy, pandas + xlrd (pour manipuler les .xls)  
