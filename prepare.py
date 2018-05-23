@@ -120,6 +120,8 @@ if not os.path.exists(workspacePath):
 if not os.path.exists(outputDataPath + '/simulation'):
     os.mkdir(outputDataPath + '/simulation')
 projectPath = outputDataPath + '/simulation/' + gridSize + 'm/'
+#if not os.path.exists(projectPath):
+#    os.mkdir(projectPath)
 
 os.chdir(workspacePath)
 
@@ -1203,6 +1205,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     del projwin, dicSirene
 
 # Mise en forme finale des données raster pour le modèle
+os.chdir(outputDataPath)
 if not os.path.exists(projectPath):
     print(projectPath)
     print(os.curdir)
