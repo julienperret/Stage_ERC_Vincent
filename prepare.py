@@ -44,13 +44,6 @@ globalDataPath = sys.argv[1]
 codeDept = sys.argv[2]
 localDataPath = sys.argv[3]
 outputDataPath = sys.argv[4]
-studyAreaName = localDataPath.split('/')[len(localDataPath.split('/'))-1]
-workspacePath = outputDataPath  + '/' + codeDept + '/' + studyAreaName + '/'
-if not os.path.exists(outputDataPath + '/' + codeDept):
-    os.mkdir(outputDataPath + '/' + codeDept)
-if not os.path.exists(workspacePath):
-    os.mkdir(workspacePath)
-os.chdir(workspacePath)
 if len(sys.argv) > 5:
     argList = sys.argv[5].split()
     # Interprétation de la chaîne de paramètres
@@ -109,7 +102,19 @@ if 'transDist' not in globals():
 if 'maxSlope' not in globals():
     maxSlope = 30
 
-projectPath = outputDataPath + 'simulation/' + gridSize + 'm/'
+studyAreaName = localDataPath.split('/')[len(localDataPath.split('/'))-1]
+workspacePath = outputDataPath  + '/' + codeDept + '/' + studyAreaName + '/'
+if not os.path.exists(outputDataPath):
+    os.mkdir(outputDataPath)
+if not os.path.exists(outputDataPath + '/' + codeDept):
+    os.mkdir(outputDataPath + '/' + codeDept)
+if not os.path.exists(workspacePath):
+    os.mkdir(workspacePath)
+if not os.path.exists(outputDataPath + '/simulation'):
+    os.mkdir(outputDataPath + '/simulation')
+projectPath = outputDataPath + '/simulation/' + gridSize + 'm/'
+
+os.chdir(workspacePath)
 
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
@@ -695,15 +700,10 @@ if not os.path.exists('data'):
     res = processing.run('native:buffer', params, feedback=feedback)
     zone_buffer = res['OUTPUT']
     print("buffer distance " + str(bufferDistance) + " zone_buffer : " + str(zone_buffer))
-try:
     # Extraction des quartiers IRIS avec jointures
     iris = QgsVectorLayer(globalDataPath + '/rge/IRIS_GE.SHP', 'iris')
     iris.dataProvider().createSpatialIndex()
     irisExtractor(iris, zone_buffer, globalDataPath + '/insee/csv/', 'data/')
-except:
-    print(sys.exc_info())
-    sys.exit()
-# *******************
     # Extractions et reprojections
     os.mkdir('data/2016_bati')
     clipBati = [
