@@ -26,7 +26,8 @@ if len(sys.argv) > 3:
             mode = arg.split('=')[1]
             if mode not in {'souple', 'strict'}:
                 print(
-                    "Mode de seuillage invalide \nValeurs possibles : souple ou strict")
+                    "Mode de seuillage invalide \nValeurs possibles : souple \
+                    ou strict")
                 sys.exit()
         if 'saturateFirst' in arg:
             saturateFirst = literal_eval(arg.split('=')[1])
@@ -87,6 +88,8 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
         weight = np.where(capaciteTmp > 0, interet, 0)
         flatWeight = weight.flatten()
         while popLogee < popALoger:
+            if capaciteTmp.sum() == 0:
+                break
             choices = np.random.choice(
                 flatWeight.size, popALoger - popLogee, p=flatWeight / flatWeight.sum())
             for cell in choices:
@@ -96,8 +99,7 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
                     populationTmp[row][col] += 1
                     capaciteTmp[row][col] -= 1
                     popLogee += 1
-            if capaciteTmp.sum() == 0:
-                break
+
 
         # Si on a pas pu loger tout le monde dans des cellules déjà urbanisées => expansion
         if saturateFirst and popALoger - popLogee > 0:
@@ -108,6 +110,8 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
             weight = np.where(capaciteTmp > 0, interet, 0)
             flatWeight = weight.flatten()
             while popLogee < popALoger:
+                if capaciteTmp.sum() == 0:
+                    break
                 choices = np.random.choice(
                     flatWeight.size, popALoger - popLogee, p=flatWeight / flatWeight.sum())
                 for cell in choices:
@@ -117,8 +121,6 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
                         populationTmp[row][col] += 1
                         capaciteTmp[row][col] -= 1
                         popLogee += 1
-                if capaciteTmp.sum() == 0:
-                    break
 
     elif mode == 'strict':
         if pluPriority:
@@ -126,6 +128,8 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
         weight = np.where(capaciteTmp > 0, interet, 0)
         flatWeight = weight.flatten()
         while popLogee < popALoger:
+            if capaciteTmp.sum() == 0:
+                break
             choices = np.random.choice(
                 flatWeight.size, popALoger-popLogee, p=flatWeight / flatWeight.sum())
             for cell in choices:
@@ -143,8 +147,6 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
                         populationTmp[row][col] += cellCapa
                         capaciteTmp[row][col] -= cellCapa
                         popLogee += cellCapa
-                if capaciteTmp.sum() == 0:
-                    break
 
     capacite -= populationTmp
     population += populationTmp
@@ -247,9 +249,8 @@ for year in range(2015, finalYear + 1):
     if hasPlu:
         popRestante = urbanize(
             mode, popALoger, saturateFirst, pluPriority)
-        print(str(popRestante))
         if popRestante > 0:
-            popRestante = urbanize(
+            urbanize(
                 mode, popRestante, saturateFirst)
     else:
         urbanize(mode, popALoger, saturateFirst)
