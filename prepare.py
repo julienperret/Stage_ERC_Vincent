@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from time import strftime
 from ast import literal_eval
+from shutil import rmtree
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
@@ -79,6 +80,8 @@ if len(sys.argv) > 5:
         # Seuil de pente en % pour interdiction à la construction
         if 'maxSlope' in arg:
             maxSlope = int(arg.split('=')[1])
+        if 'force' in arg:
+            force = True
 
 # Valeurs de paramètres par défaut
 if 'gridSize' not in globals():
@@ -101,7 +104,11 @@ if 'transDist' not in globals():
     transDist = 300
 if 'maxSlope' not in globals():
     maxSlope = 30
+if 'force' not in globals():
+    force = False
 
+if os.path.exists(outputDataPath):
+    rmtree(outputDataPath)
 studyAreaName = localDataPath.split('/')[len(localDataPath.split('/'))-1]
 workspacePath = outputDataPath  + '/' + codeDept + '/' + studyAreaName + '/'
 if not os.path.exists(outputDataPath):
@@ -222,6 +229,7 @@ def to_array(tif, dtype=None):
 def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut, removedOut):
     # Selection des bâtiments situés dans polygones
     for layer in polygons:
+        print(layer)
         params = {
             'INPUT': buildings,
             'PREDICATE': 6,
@@ -232,6 +240,7 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
 
     # Selection si la bâtiment intersecte des points
     for layer in points:
+        print(layer)
         params = {
             'INPUT': buildings,
             'PREDICATE': 0,
@@ -246,8 +255,7 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
         WHEN "HAUTEUR" < 5 THEN 1
         ELSE floor("HAUTEUR"/""" + str(hEtage) + """) END
     """
-    buildings.addExpressionField(
-        expr, QgsField('NB_NIV', QVariant.Int, len=2))
+    buildings.addExpressionField(expr, QgsField('NB_NIV', QVariant.Int, len=2))
 
     # Nettoyage des bâtiments supposés trop grand ou trop petit pour être habités
     params = {
@@ -255,13 +263,14 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
         'EXPRESSION': ' $area < ' + str(sMin) + ' OR $area > ' + str(sMax),
         'METHOD': 1
     }
+    print('select')
     processing.run('qgis:selectbyexpression', params, feedback=feedback)
     params = {
         'INPUT': buildings,
         'OUTPUT': removedOut
     }
-    res = processing.run('native:saveselectedfeatures',
-                         params, feedback=feedback)
+    print('save')
+    processing.run('native:saveselectedfeatures', params, feedback=feedback)
 
     # Inversion de la selection pour export final
     buildings.invertSelection()
@@ -269,10 +278,10 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
         'INPUT': buildings,
         'OUTPUT': cleanedOut
     }
-    res = processing.run('native:saveselectedfeatures',
-                         params, feedback=feedback)
+    print('save')
+    res = processing.run('native:saveselectedfeatures', params, feedback=feedback)
     return res['OUTPUT']
-    del buildings, polygons, points, layer, outpath
+    del buildings, polygons, points, layer
 
 # Génère un csv contenant la matrice de contiguïté par ID et la population de départ
 def contiguityMatrix(iris, outcsv=None):
@@ -348,10 +357,9 @@ def envRestrict(layerList, overlay, outdir):
 
         layer.dataProvider().createSpatialIndex()
         i = 0
-        while i < layer.featureCount():
+        while i < layer.featureCount() and not intersects:
             if layer.getFeature(i).geometry().intersects(overlay.getFeature(0).geometry()):
                 intersects = True
-                break
             i += 1
 
         if intersects:
@@ -362,8 +370,7 @@ def envRestrict(layerList, overlay, outdir):
                     'OUTPUT': 'memory:coeur_parcs_nationaux',
                     'FAIL_OUTPUT': 'memory:'
                 }
-                res = processing.run(
-                    'native:extractbyexpression', params, feedback=feedback)
+                res = processing.run('native:extractbyexpression', params, feedback=feedback)
                 reproj(clip(res['OUTPUT'], overlay), outdir)
             else:
                 reproj(clip(layer, overlay), outdir)
@@ -685,7 +692,7 @@ if not os.path.exists('data'):
     os.mkdir('data')
     # Tampon de 1000m autour de la zone pour extractions des quartiers et des PAI
     zone = QgsVectorLayer(localDataPath + '/zone.shp', 'zone')
-    print("zone : " + str(zone))
+#    print("zone : " + str(zone))
     zone.dataProvider().createSpatialIndex()
     params = {
         'INPUT': zone,
@@ -699,7 +706,7 @@ if not os.path.exists('data'):
     }
     res = processing.run('native:buffer', params, feedback=feedback)
     zone_buffer = res['OUTPUT']
-    print("buffer distance " + str(bufferDistance) + " zone_buffer : " + str(zone_buffer))
+#    print("buffer distance " + str(bufferDistance) + " zone_buffer : " + str(zone_buffer))
     # Extraction des quartiers IRIS avec jointures
     iris = QgsVectorLayer(globalDataPath + '/rge/IRIS_GE.SHP', 'iris')
     iris.dataProvider().createSpatialIndex()
@@ -836,8 +843,7 @@ if not os.path.exists('data'):
         for field in ecologie.fields():
             ecoFields.append(field.name())
         if 'importance' not in ecoFields:
-            print(
-                "Attribut requis 'importance' manquant ou mal nommé dans la couche d'importance écologique")
+            print("Attribut requis 'importance' manquant ou mal nommé dans la couche d'importance écologique")
             sys.exit()
         ecologie.addExpressionField(
             '1 - ("importance"/100)', QgsField('interet', QVariant.Double))
@@ -865,15 +871,17 @@ if not os.path.exists('data'):
     # Traitement des couches de zonage de protection
     zonagesEnv = []
     os.mkdir('data/zonages')
+    #print('zonages ' + globalDataPath)
     for file in os.listdir(globalDataPath + '/env/'):
         if os.path.splitext(file)[1] == '.shp':
-            zonages.append(globalDataPath + '/env/' + file)
+            zonagesEnv.append(globalDataPath + '/env/' + file)
+    #print(zonagesEnv)
     envRestrict(zonagesEnv, zone, 'data/zonages/')
 
     zonagesEnv = []
     for file in os.listdir('data/zonages/'):
         if os.path.splitext(file)[1] == '.shp':
-            zonages.append('data/zonages/' + file)
+            zonagesEnv.append('data/zonages/' + file)
     params = {
         'LAYERS': zonagesEnv,
         'CRS': 'EPSG:3035',
@@ -889,8 +897,7 @@ if not os.path.exists('data'):
         'OUTPUT': 'memory:autoroutes',
         'FAIL_OUTPUT': 'memory:'
     }
-    res = processing.run('native:extractbyexpression',
-                         params, feedback=feedback)
+    res = processing.run('native:extractbyexpression', params, feedback=feedback)
     params = {
         'INPUT': res['OUTPUT'],
         'DISTANCE': 100,
@@ -908,8 +915,7 @@ if not os.path.exists('data'):
     del zone, zone_buffer
 
     # Fusion des routes primaires et secondaires
-    mergeRoads = ['data/transport/route_primaire.shp',
-                  'data/transport/route_secondaire.shp']
+    mergeRoads = ['data/transport/route_primaire.shp', 'data/transport/route_secondaire.shp']
     params = {
         'LAYERS': mergeRoads,
         'CRS': 'EPSG:3035',
@@ -1002,8 +1008,7 @@ if not os.path.exists('data'):
     # del mergePai, mergeRoads, mergeBuildings, layer
 
     # Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
-    bati_indif = QgsVectorLayer(
-        'data/2016_bati/bati_indifferencie.shp', 'bati_indif_2016')
+    bati_indif = QgsVectorLayer('data/2016_bati/bati_indifferencie.shp', 'bati_indif_2016')
     bati_indif.dataProvider().createSpatialIndex()
     cleanPolygons = []
     cleanPoints = ['data/pai/pai_merged.shp']
@@ -1050,8 +1055,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     # Création d'une grille régulière
     zone_buffer = QgsVectorLayer('data/zone_buffer.shp', 'zone_buffer')
     extent = zone_buffer.extent()
-    extentStr = str(extent.xMinimum()) + ',' + str(extent.xMaximum()) + ',' + \
-        str(extent.yMinimum()) + ',' + str(extent.yMaximum()) + ' [EPSG:3035]'
+    extentStr = str(extent.xMinimum()) + ',' + str(extent.xMaximum()) + ',' + str(extent.yMinimum()) + ',' + str(extent.yMaximum()) + ' [EPSG:3035]'
     params = {
         'TYPE': 2,
         'EXTENT': extentStr,
@@ -1080,19 +1084,15 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     # Création de la grille de restriction
     b_removed = QgsVectorLayer('data/restriction/bati_removed.shp', 'b_removed')
     b_indus = QgsVectorLayer('data/2016_bati/bati_industriel.shp', 'b_indus')
-    b_remarq = QgsVectorLayer(
-        'data/2016_bati/bati_remarquable.shp', 'b_remarq')
+    b_remarq = QgsVectorLayer('data/2016_bati/bati_remarquable.shp', 'b_remarq')
     cimetiere = QgsVectorLayer('data/2016_bati/cimetiere.shp', 'cimetiere')
-    c_surfa = QgsVectorLayer(
-        'data/2016_bati/construction_surfacique.shp', 'c_surfa')
+    c_surfa = QgsVectorLayer('data/2016_bati/construction_surfacique.shp', 'c_surfa')
     p_aero = QgsVectorLayer('data/2016_bati/piste_aerodrome.shp', 'p_aero')
     s_eau = QgsVectorLayer('data/restriction/surface_eau.shp', 's_eau')
     t_sport = QgsVectorLayer('data/2016_bati/terrain_sport.shp', 't_sport')
 
-    restrictList = [b_indus, b_removed, b_remarq, cimetiere,
-                    c_surfa, p_aero, s_eau, t_sport]
-    restrictGrid(restrictList, grid, maxOverlapRatio,
-                 'data/' + gridSize + 'm/')
+    restrictList = [b_indus, b_removed, b_remarq, cimetiere, c_surfa, p_aero, s_eau, t_sport]
+    restrictGrid(restrictList, grid, maxOverlapRatio, 'data/' + gridSize + 'm/')
     del b_removed, b_indus, b_remarq, cimetiere, c_surfa, p_aero, s_eau, t_sport, restrictList, grid
 
     # Objet pour transformation de coordonées
@@ -1109,8 +1109,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     extentL93 = coordTr.transform(extent, coordTr.ReverseTransform)
 
     # Extraction des tuiles MNT dans la zone d'étude
-    demList = demExtractor(globalDataPath + '/rge/' +
-                                   codeDept + '/bdalti/', extentL93)
+    demList = demExtractor(globalDataPath + '/rge/' + codeDept + '/bdalti/', extentL93)
 
     xMin = extent.xMinimum()
     yMin = extent.yMinimum()
@@ -1135,51 +1134,33 @@ if not os.path.exists('data/' + gridSize + 'm/'):
         slopeFormat='percent')
 
     # Chaîne à passer à QGIS pour l'étendue des rasterisations
-    extentStr = str(xMin) + ',' + str(xMax) + ',' + \
-        str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
+    extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
     # Rasterisations
-    rasterize('data/ecologie.shp', 'data/' +
-              gridSize + 'm/tif/ecologie.tif', 'interet')
-    rasterize('data/' + gridSize + 'm/stat_grid.shp', 'data/' +
-              gridSize + 'm/tif/s_planch_grid.tif', 'srf_p')
-    rasterize('data/' + gridSize + 'm/restrict_grid.shp', 'data/' +
-              gridSize + 'm/tif/restrict_grid.tif', 'restrict')
+    rasterize('data/ecologie.shp', 'data/' + gridSize + 'm/tif/ecologie.tif', 'interet')
+    rasterize('data/' + gridSize + 'm/stat_grid.shp', 'data/' + gridSize + 'm/tif/s_planch_grid.tif', 'srf_p')
+    rasterize('data/' + gridSize + 'm/restrict_grid.shp', 'data/' + gridSize + 'm/tif/restrict_grid.tif', 'restrict')
+    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif', 'SP_Q3')
+    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/seuil_max_iris.tif', 'SP_MAX')
+    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/nb_m2_iris.tif', 'M2_HAB')
+    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/masque.tif', burn=1, inverse=True)
 
-    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
-              gridSize + 'm/tif/seuil_q3_iris.tif', 'SP_Q3')
-    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
-              gridSize + 'm/tif/seuil_max_iris.tif', 'SP_MAX')
-    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
-              gridSize + 'm/tif/nb_m2_iris.tif', 'M2_HAB')
-    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' +
-              gridSize + 'm/tif/masque.tif', burn=1, inverse=True)
-
-    rasterize('data/restriction/zonages_protection.shp', 'data/' +
-              gridSize + 'm/tif/zonages_protection.tif', burn=1)
-    rasterize('data/restriction/tampon_autoroutes.shp', 'data/' +
-              gridSize + 'm/tif/tampon_autoroutes.tif', burn=1)
-    rasterize('data/restriction/exclusion.shp', 'data/' +
-              gridSize + 'm/tif/exclusion.tif', burn=1)
-    rasterize('data/pai/surf_activ_non_com.shp', 'data/' +
-              gridSize + 'm/tif/surf_activ_non_com.tif', burn=1)
+    rasterize('data/restriction/zonages_protection.shp', 'data/' + gridSize + 'm/tif/zonages_protection.tif', burn=1)
+    rasterize('data/restriction/tampon_autoroutes.shp', 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif', burn=1)
+    rasterize('data/restriction/exclusion.shp', 'data/' + gridSize + 'm/tif/exclusion.tif', burn=1)
+    rasterize('data/pai/surf_activ_non_com.shp', 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif', burn=1)
 
     if os.path.exists('data/restriction/ppr.shp'):
-        rasterize('data/restriction/ppr.shp', 'data/' +
-                  gridSize + 'm/tif/ppr.tif', burn=1)
+        rasterize('data/restriction/ppr.shp', 'data/' + gridSize + 'm/tif/ppr.tif', burn=1)
     elif os.path.exists('data/plu.shp'):
-        rasterize('data/plu.shp', 'data/' + gridSize +
-                  'm/tif/ppr.tif', 'ppr')
+        rasterize('data/plu.shp', 'data/' + gridSize + 'm/tif/ppr.tif', 'ppr')
 
     if os.path.exists('data/plu.shp'):
-        rasterize('data/plu.shp', 'data/' + gridSize +
-                  'm/tif/plu_rest.tif', 'restrict')
-        rasterize('data/plu.shp', 'data/' + gridSize +
-                  'm/tif/plu_prio.tif', 'priority')
+        rasterize('data/plu.shp', 'data/' + gridSize + 'm/tif/plu_rest.tif', 'restrict')
+        rasterize('data/plu.shp', 'data/' + gridSize + 'm/tif/plu_prio.tif', 'priority')
 
     # Calcul des rasters de distance
-    rasterize('data/transport/routes.shp', 'data/' +
-              gridSize + 'm/tif/routes.tif', burn=1)
+    rasterize('data/transport/routes.shp', 'data/' + gridSize + 'm/tif/routes.tif', burn=1)
     params = {
         'INPUT': 'data/' + gridSize + 'm/tif/routes.tif',
         'BAND': 1,
@@ -1192,19 +1173,16 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     }
     processing.run('gdal:proximity', params, feedback=feedback)
 
-    rasterize('data/transport/arrets_transport.shp', 'data/' +
-              gridSize + 'm/tif/arrets_transport.tif', burn=1)
+    rasterize('data/transport/arrets_transport.shp', 'data/' + gridSize + 'm/tif/arrets_transport.tif', burn=1)
     params['INPUT'] = 'data/' + gridSize + 'm/tif/arrets_transport.tif'
     params['MAX_DISTANCE'] = transDist
-    params['OUTPUT'] = 'data/' + gridSize + \
-        'm/tif/distance_arrets_transport.tif'
+    params['OUTPUT'] = 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif'
     processing.run('gdal:proximity', params, feedback=feedback)
 
     # Calcul des rasters de densité
     os.mkdir('data/' + gridSize + 'm/tif/tmp')
     projwin = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax)
-    dicSirene = {row[0]: row[1] for _, row in pd.read_csv(
-        globalDataPath + '/sirene/distances.csv').iterrows()}
+    dicSirene = {row[0]: row[1] for _, row in pd.read_csv(globalDataPath + '/sirene/distances.csv').iterrows()}
 
     for key in dicSirene.keys():
         layer = QgsVectorLayer('data/geosirene/type_' + key + '.shp', key)
@@ -1217,8 +1195,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
             'OUTPUT_VALUE': 0,
             'OUTPUT': 'data/' + gridSize + 'm/tif/tmp/densite_' + key + '.tif'
         }
-        processing.run('qgis:heatmapkerneldensityestimation',
-                       params, feedback=feedback)
+        processing.run('qgis:heatmapkerneldensityestimation', params, feedback=feedback)
 
         params = {
             'INPUT': 'data/' + gridSize + 'm/tif/tmp/densite_' + key + '.tif',
@@ -1245,14 +1222,11 @@ if not os.path.exists(projectPath):
     yMin = extent.yMinimum()
     xMax = extent.xMaximum()
     yMax = extent.yMaximum()
-    extentStr = str(xMin) + ',' + str(xMax) + ',' + \
-        str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
+    extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
     # Rasterisations
-    rasterize('data/' + gridSize + 'm/stat_grid.shp',
-              projectPath + 'population.tif', 'pop')
-    rasterize('data/' + gridSize + 'm/stat_iris.shp',
-              projectPath + 'iris_id.tif', 'ID')
+    rasterize('data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population.tif', 'pop')
+    rasterize('data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_id.tif', 'ID')
     rasterize('data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
 
     # Création des variables GDAL indispensables pour la fonction to_tif()
@@ -1266,40 +1240,27 @@ if not os.path.exists(projectPath):
     ds = None
 
     # Conversion des raster de distance
-    distance_routes = to_array(
-        'data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
-    routes = np.where(distance_routes > -1, 1 -
-                      (distance_routes / np.amax(distance_routes)), 0)
+    distance_routes = to_array('data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
+    routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
     to_tif(routes, gdal.GDT_Float32, projectPath + 'routes.tif')
 
-    distance_transport = to_array(
-        'data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
-    transport = np.where(distance_transport > -1, 1 -
-                         (distance_transport / np.amax(distance_transport)), 0)
+    distance_transport = to_array('data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
+    transport = np.where(distance_transport > -1, 1 - (distance_transport / np.amax(distance_transport)), 0)
     to_tif(transport, gdal.GDT_Float32, projectPath + 'transport.tif')
 
     # Conversion et aggrégation des rasters de densité SIRENE
-    dicSirene = {row[0]: row[1] for _, row in pd.read_csv(
-        globalDataPath + '/sirene/poids.csv').iterrows()}
+    dicSirene = {row[0]: row[1] for _, row in pd.read_csv(globalDataPath + '/sirene/poids.csv').iterrows()}
 
-    administratif = to_array('data/' + gridSize +
-                             'm/tif/densite_administratif.tif', 'float32')
-    commercial = to_array('data/' + gridSize +
-                          'm/tif/densite_commercial.tif', 'float32')
-    enseignement = to_array('data/' + gridSize +
-                            'm/tif/densite_enseignement.tif', 'float32')
-    medical = to_array('data/' + gridSize +
-                       'm/tif/densite_medical.tif', 'float32')
-    recreatif = to_array('data/' + gridSize +
-                         'm/tif/densite_recreatif.tif', 'float32')
+    administratif = to_array('data/' + gridSize + 'm/tif/densite_administratif.tif', 'float32')
+    commercial = to_array('data/' + gridSize + 'm/tif/densite_commercial.tif', 'float32')
+    enseignement = to_array('data/' + gridSize + 'm/tif/densite_enseignement.tif', 'float32')
+    medical = to_array('data/' + gridSize + 'm/tif/densite_medical.tif', 'float32')
+    recreatif = to_array('data/' + gridSize + 'm/tif/densite_recreatif.tif', 'float32')
 
     # Normalisation des valeurs entre 0 et 1
-    administratif = np.where(administratif != -9999,
-                             administratif / np.amax(administratif), 0)
-    commercial = np.where(commercial != -9999,
-                          commercial / np.amax(commercial), 0)
-    enseignement = np.where(enseignement != -9999,
-                            enseignement / np.amax(enseignement), 0)
+    administratif = np.where(administratif != -9999, administratif / np.amax(administratif), 0)
+    commercial = np.where(commercial != -9999, commercial / np.amax(commercial), 0)
+    enseignement = np.where(enseignement != -9999, enseignement / np.amax(enseignement), 0)
     medical = np.where(medical != -9999, medical / np.amax(medical), 0)
     recreatif = np.where(recreatif != -9999, recreatif / np.amax(recreatif), 0)
 
