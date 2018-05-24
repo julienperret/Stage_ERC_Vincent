@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from time import strftime
 from ast import literal_eval
-from shutil import rmtree
+from shutil import rmtree, copyfile
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
@@ -1253,10 +1253,12 @@ if not os.path.exists(projectPath):
     sirene = sirene / np.amax(sirene)
     to_tif(sirene, gdal.GDT_Float32, projectPath + 'sirene.tif')
     del dicSirene, administratif, commercial, enseignement, medical, recreatif, sirene
+    copyfile(localDataPath + '/poids.csv', projectPath + '/poids.csv')
 
     # Création du raster de restriction (sans PLU)
     irisMask = to_array('data/' + gridSize + 'm/tif/masque.tif')
     exclusionMask = to_array('data/' + gridSize + 'm/tif/exclusion.tif')
+    surfActivMask = to_array('data/' + gridSize + 'm/tif/surf_activ_non_com.tif')
     gridMask = to_array('data/' + gridSize + 'm/tif/restrict_grid.tif')
     zonageMask = to_array('data/' + gridSize + 'm/tif/zonages_protection.tif')
     highwayMask = to_array('data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
@@ -1264,10 +1266,10 @@ if not os.path.exists(projectPath):
     slope = to_array('data/' + gridSize + 'm/tif/slope.tif')
     slopeMask = np.where(slope > maxSlope, 1, 0)
 
-    restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (gridMask == 1) | (
+    restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (
         zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
     to_tif(restriction, gdal.GDT_Byte, projectPath + 'restriction.tif')
-    del exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
+    del surfActivMask, exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
 
     if os.path.exists('data/plu.shp'):
         pluRestrict = to_array('data/' + gridSize + 'm/tif/plu_rest.tif')
