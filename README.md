@@ -24,8 +24,7 @@ Dépendances pour python3 :
     gdal, numpy, pandas  
 
 
-Commande CARE
+Commande CARE qui semble marcher
 
-care -o ./prepare.tgz.bin  -p ./mtp  ./prepare.py 34  ./mtp "gridSize=50 useTxrp=True levelHeight=3"
-
+care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data 34  ./mtp ./results "gridSize=50 useTxrp=True levelHeight=3 force"
 
