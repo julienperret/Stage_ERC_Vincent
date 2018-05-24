@@ -47,7 +47,7 @@ if 'finalYear' not in globals():
     finalYear = 2040
 
 cellSurf = gridSize * gridSize
-projectPath = outputPath + mode + '_' + str(rate) + '/'
+projectPath = outputPath + str(gridSize) + 'm_' + mode + '_tx' + str(rate) + '/'
 if os.path.exists(projectPath):
     rmtree(projectPath)
 os.makedirs(projectPath)
@@ -239,7 +239,6 @@ capaciteDepart = capacite.copy()
 populationDepart = population.copy()
 
 # Conversion des autres raster d'entrée en numpy array
-iris = to_array(dataPath + 'iris_id.tif', 'uint16')
 ecologie = to_array(dataPath + 'ecologie.tif', 'float32')
 ocsol = to_array(dataPath + 'ocsol.tif', 'float32')
 routes = to_array(dataPath + 'routes.tif', 'float32')
@@ -268,7 +267,7 @@ capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
 expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
 peuplementMoyen = np.nanmean(np.where(popNouvelle == 0, np.nan, popNouvelle))
 impactEnvironnemental = int(np.where(expansion == 1, 1 - ecologie, 0).sum() * cellSurf)
-expansionSum = expansion.sum() * cellSurf
+expansionSum = expansion.sum()
 
 to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite_future.tif')
 to_tif(population, gdal.GDT_UInt16, projectPath + 'population_future.tif')
@@ -276,8 +275,11 @@ to_tif(expansion, gdal.GDT_Byte, projectPath + 'expansion.tif')
 to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
 to_tif(capaSaturee, gdal.GDT_Byte, projectPath + 'capacite_saturee')
 
+nbCapaCell = np.where(capaciteDepart != 0, 1, 0).sum()
 mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
-mesures.write("Expansion totale en m2, " + str(expansionSum) + "\n")
+mesures.write("Taux d'expansion, " + str(expansionSum / nbCapaCell) + "\n")
+mesures.write("Taux de saturation, " + str(capaSaturee.sum() / nbCapaCell) + "\n")
+mesures.write("Expansion totale en m2, " + str(expansionSum * cellSurf) + "\n")
 mesures.write("Impact environnemental cumulé, " + str(impactEnvironnemental) + "\n")
 
 log.write("Nombre de personnes final, " + str(population.sum()) + '\n')

@@ -1208,7 +1208,6 @@ if not os.path.exists(projectPath):
 
     # Rasterisations
     rasterize(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population.tif', 'pop')
-    rasterize(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_id.tif', 'ID')
     rasterize(workspacePath + 'data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
 
     # Création des variables GDAL indispensables pour la fonction to_tif()
