@@ -16,13 +16,13 @@ np.seterr(divide='ignore', invalid='ignore')
 # Stockage et contrôle de la validité des paramètres utilisateur
 workspacePath = sys.argv[1] + '/'
 outputPath = sys.argv[2] + '/'
-print('workspacePath : ' + workspacePath, 'outputPath : ' + outputPath)
-rate = float(sys.argv[3])
-if rate > 3:
+gridSize = int(sys.argv[3])
+rate = float(sys.argv[4])
+if rate > 4:
     print("Taux d'évolution trop élevé, valeur max acceptée : 3 %")
     sys.exit()
-if len(sys.argv) > 4:
-    argList = sys.argv[4].split()
+if len(sys.argv) > 5:
+    argList = sys.argv[5].split()
     for arg in argList:
         if 'mode' in arg:
             mode = arg.split('=')[1]
@@ -46,14 +46,12 @@ if 'pluPriority' not in globals():
 if 'finalYear' not in globals():
     finalYear = 2040
 
+cellSurf = gridSize * gridSize
 projectPath = workspacePath + mode + '_' + str(rate) + '/'
 if os.path.exists(projectPath):
     rmtree(projectPath)
 os.mkdir(projectPath)
 os.mkdir(projectPath + '/snapshots')
-
-res = re.search('.*/([0-9]*)m+', workspacePath)
-cellSurf = int(res.group(1)) * int(res.group(1))
 
 # Création d'un fichier journal
 log = open(projectPath + 'log.txt', 'x')
