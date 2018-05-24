@@ -115,8 +115,6 @@ projectPath = workspacePath + 'simulation/' + gridSize + 'm/'
 if not os.path.exists(workspacePath):
     os.makedirs(workspacePath)
 
-print('outputDataPath : ' + outputDataPath, 'workspacePath : ' + workspacePath, 'projectPath : ' + projectPath)
-
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
     if type(file) == QgsVectorLayer:
