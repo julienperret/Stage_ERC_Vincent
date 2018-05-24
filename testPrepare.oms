@@ -31,16 +31,21 @@ val output = Val[File]
 
 // python task
 val pythonTask =
-  CARETask(workDirectory / "prepare.tgz.bin", "python3 prepare.py ${dept} ./mtp ${optionsPrep}" ) set (
+  CARETask(workDirectory / "prepare.tgz.bin", "python3 prepare.py ./global_data ${dept} ./mtp ./results ${optionsPrep}" ) set (
     inputs += dept,
     inputs +=optionsPrep,
-    optionsPrep:="gridSize=50 useTxrp=True levelHeight=3"
+    outputs += output,
+    optionsPrep:="gridSize=50 useTxrp=True levelHeight=3 force"
   )
 
+ 
 val exploration = ExplorationTask(dept in List(34))
 //val copy = CopyFileHook(outputFiles, workDirectory / "prepare_${dept}")
 
+
+val copy = CopyFileHook(output, workDirectory /"results/departement${dept}")
+
 val env = LocalEnvironment(4)
-exploration -< (pythonTask  on env) 
+exploration -< (pythonTask   hook copy on env) 
 
 
