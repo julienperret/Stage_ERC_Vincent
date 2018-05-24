@@ -41,10 +41,10 @@ QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
 feedback = QgsProcessingFeedback()
 
 # Import des paramètres d'entrée
-globalDataPath = os.path.abspath(sys.argv[1])
+globalDataPath = sys.argv[1]
 codeDept = sys.argv[2]
-localDataPath = os.path.abspath(sys.argv[3])
-outputDataPath = os.path.abspath(sys.argv[4])
+localDataPath = sys.argv[3]
+outputDataPath = sys.argv[4]
 if len(sys.argv) > 5:
     argList = sys.argv[5].split()
     # Interprétation de la chaîne de paramètres
@@ -111,10 +111,11 @@ if force and os.path.exists(outputDataPath):
     rmtree(outputDataPath)
 studyAreaName = localDataPath.split('/')[len(localDataPath.split('/'))-1]
 workspacePath = outputDataPath  + '/' + codeDept + '/' + studyAreaName + '/'
-projectPath = 'simulation/' + gridSize + 'm/'
+projectPath = workspacePath + 'simulation/' + gridSize + 'm/'
 if not os.path.exists(workspacePath):
     os.makedirs(workspacePath)
-os.chdir(workspacePath)
+
+print('outputDataPath : ' + outputDataPath, 'workspacePath : ' + workspacePath, 'projectPath : ' + projectPath)
 
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
@@ -676,8 +677,8 @@ def sireneSplitter(geosirene, outpath):
 print('Commencé à ' + strftime('%H:%M:%S'))
 
 # Découpe et reprojection de la donnée en l'absence du dossier ./data
-if not os.path.exists('data'):
-    os.mkdir('data')
+if not os.path.exists(workspacePath + 'data'):
+    os.mkdir(workspacePath + 'data')
     # Tampon de 1000m autour de la zone pour extractions des quartiers et des PAI
     zone = QgsVectorLayer(localDataPath + '/zone.shp', 'zone')
     zone.dataProvider().createSpatialIndex()
@@ -696,9 +697,9 @@ if not os.path.exists('data'):
     # Extraction des quartiers IRIS avec jointures
     iris = QgsVectorLayer(globalDataPath + '/rge/IRIS_GE.SHP', 'iris')
     iris.dataProvider().createSpatialIndex()
-    irisExtractor(iris, zone_buffer, globalDataPath + '/insee/csv/', 'data/')
+    irisExtractor(iris, zone_buffer, globalDataPath + '/insee/csv/', workspacePath + 'data/')
     # Extractions et reprojections
-    os.mkdir('data/2016_bati')
+    os.mkdir(workspacePath + 'data/2016_bati')
     clipBati = [
         globalDataPath + '/rge/' + codeDept + '/bdtopo_2016/BATI_INDIFFERENCIE.SHP',
         globalDataPath + '/rge/' + codeDept + '/bdtopo_2016/BATI_INDUSTRIEL.SHP',
@@ -711,18 +712,18 @@ if not os.path.exists('data'):
         globalDataPath + '/rge/' + codeDept + '/bdtopo_2016/TERRAIN_SPORT.SHP'
     ]
     for path in clipBati:
-        reproj(clip(path, zone), 'data/2016_bati/')
+        reproj(clip(path, zone), workspacePath + 'data/2016_bati/')
 
-    os.mkdir('data/2009_bati')
+    os.mkdir(workspacePath + 'data/2009_bati')
     i = 0
     for path in clipBati:
         path = path.replace('2016', '2009')
         clipBati[i] = path
         i += 1
     for path in clipBati:
-        reproj(clip(path, zone), 'data/2009_bati/')
+        reproj(clip(path, zone), workspacePath + 'data/2009_bati/')
 
-    os.mkdir('data/pai')
+    os.mkdir(workspacePath + 'data/pai')
     clipPai = [
         globalDataPath + '/rge/' + codeDept + '/bdtopo_2016/PAI_ADMINISTRATIF_MILITAIRE.SHP',
         globalDataPath + '/rge/' + codeDept + '/bdtopo_2016/PAI_CULTURE_LOISIRS.SHP',
@@ -735,11 +736,11 @@ if not os.path.exists('data'):
         globalDataPath + '/rge/' + codeDept + '/bdtopo_2016/PAI_TRANSPORT.SHP'
     ]
     for path in clipPai:
-        reproj(clip(path, zone_buffer), 'data/pai/')
+        reproj(clip(path, zone_buffer), workspacePath + 'data/pai/')
     reproj(clip(globalDataPath + '/rge/' + codeDept +
-                '/bdtopo_2016/SURFACE_ACTIVITE.SHP', zone), 'data/pai/')
+                '/bdtopo_2016/SURFACE_ACTIVITE.SHP', zone), workspacePath + 'data/pai/')
 
-    os.mkdir('data/transport')
+    os.mkdir(workspacePath + 'data/transport')
     clipRes = [
         globalDataPath + '/rge/' + codeDept + '/bdtopo_2016/ROUTE_PRIMAIRE.SHP',
         globalDataPath + '/rge/' + codeDept + '/bdtopo_2016/ROUTE_SECONDAIRE.SHP',
@@ -747,28 +748,28 @@ if not os.path.exists('data'):
         globalDataPath + '/rge/' + codeDept + '/bdtopo_2016/GARE.SHP'
     ]
     for path in clipRes:
-        reproj(clip(path, zone_buffer), 'data/transport/')
+        reproj(clip(path, zone_buffer), workspacePath + 'data/transport/')
     del clipBati, clipRes, clipPai
 
     # Préparation de la couche arrêts de transport en commun
     transports = []
     if os.path.exists(localDataPath + '/bus.shp'):
-        reproj(clip(localDataPath + '/bus.shp', zone_buffer), 'data/transport/')
-        bus = QgsVectorLayer('data/transport/bus.shp', 'bus')
+        reproj(clip(localDataPath + '/bus.shp', zone_buffer), workspacePath + 'data/transport/')
+        bus = QgsVectorLayer(workspacePath + 'data/transport/bus.shp', 'bus')
         transports.append(bus)
         del bus
 
     params = {
-        'INPUT': 'data/pai/transport.shp',
+        'INPUT': workspacePath + 'data/pai/transport.shp',
         'EXPRESSION': """ "NATURE" = 'Station de métro' """,
-        'OUTPUT': 'data/transport/transport_pai.shp',
+        'OUTPUT': workspacePath + 'data/transport/transport_pai.shp',
         'FAIL_OUTPUT': 'memory:'
     }
     res = processing.run('native:extractbyexpression',
                          params, feedback=feedback)
     transports.append(res['OUTPUT'])
 
-    gare = QgsVectorLayer('data/transport/gare.shp', 'gare')
+    gare = QgsVectorLayer(workspacePath + 'data/transport/gare.shp', 'gare')
     params = {'INPUT': gare, 'OUTPUT': 'memory:gare'}
     res = processing.run('native:centroids', params, feedback=feedback)
     transports.append(res['OUTPUT'])
@@ -776,7 +777,7 @@ if not os.path.exists('data'):
     params = {
         'LAYERS': transports,
         'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/transport/arrets_transport.shp'
+        'OUTPUT': workspacePath + 'data/transport/arrets_transport.shp'
     }
     processing.run('native:mergevectorlayers', params, feedback=feedback)
     del transports, gare
@@ -784,20 +785,20 @@ if not os.path.exists('data'):
     # Traitement du PLU
     if os.path.exists(localDataPath + '/plu.shp'):
         plu = QgsVectorLayer(localDataPath + '/plu.shp', 'plu')
-        pluFixer(plu, zone, 'data/', 'windows-1258')
+        pluFixer(plu, zone, workspacePath + 'data/', 'windows-1258')
         del plu
 
     # Extraction et classification des points geosirene
-    os.mkdir('data/geosirene')
+    os.mkdir(workspacePath + 'data/geosirene')
     sirene = reproj(clip(globalDataPath + '/sirene/geosirene.shp', zone_buffer))
-    sireneSplitter(sirene, 'data/geosirene/')
+    sireneSplitter(sirene, workspacePath + 'data/geosirene/')
 
     # Correction de l'OCS ou extraction de l'OSO CESBIO si besoin
     if not os.path.exists(localDataPath + '/ocsol.shp'):
         ocsol = QgsVectorLayer(
             globalDataPath + '/oso/departement_' + codeDept + '.shp', 'ocsol')
         oso.dataProvider().createSpatialIndex()
-        reproj(clip(ocsol, zone), 'data/')
+        reproj(clip(ocsol, zone), workspacePath + 'data/')
     else:
         params = {
             'INPUT': localDataPath + '/ocsol.shp',
@@ -819,7 +820,7 @@ if not os.path.exists('data'):
             END
         """
         ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
-        reproj(clip(ocsol, zone), 'data/')
+        reproj(clip(ocsol, zone), workspacePath + 'data/')
     del ocsol
 
     # Traitement du shape de l'intérêt écologique
@@ -836,47 +837,47 @@ if not os.path.exists('data'):
 
         params = {'INPUT': ecologie, 'OUTPUT': 'memory:ecologie'}
         res = processing.run('native:fixgeometries', params, feedback=feedback)
-        reproj(clip(res['OUTPUT'], zone), 'data/')
+        reproj(clip(res['OUTPUT'], zone), workspacePath + 'data/')
         del ecologie, ecoFields, field
     # Autrement déterminer l'intérêt écologique grâce à l'ocsol ?
     else:
         pass
 
-    os.mkdir('data/restriction')
+    os.mkdir(workspacePath + 'data/restriction')
     reproj(clip(globalDataPath + '/rge/' + codeDept +
-                '/bdtopo_2016/SURFACE_EAU.SHP', zone), 'data/restriction/')
+                '/bdtopo_2016/SURFACE_EAU.SHP', zone), workspacePath + 'data/restriction/')
 
     # Traitement d'une couche facultative du PPR
     if os.path.exists('ppr.shp'):
-        reproj(clip('ppr.shp', zone), 'data/restriction')
+        reproj(clip('ppr.shp', zone), workspacePath + 'data/restriction')
 
     # Traitement d'une couche facultative pour exclusion de zones bâties lors du calcul de densité
     if os.path.exists(localDataPath + '/exclusion.shp'):
-        reproj(clip(localDataPath + '/exclusion.shp', zone), 'data/restriction/')
+        reproj(clip(localDataPath + '/exclusion.shp', zone), workspacePath + 'data/restriction/')
 
     # Traitement des couches de zonage de protection
     zonagesEnv = []
-    os.mkdir('data/zonages')
+    os.mkdir(workspacePath + 'data/zonages')
     for file in os.listdir(globalDataPath + '/env/'):
         if os.path.splitext(file)[1] == '.shp':
             zonagesEnv.append(globalDataPath + '/env/' + file)
-    envRestrict(zonagesEnv, zone, 'data/zonages/')
+    envRestrict(zonagesEnv, zone, workspacePath + 'data/zonages/')
 
     zonagesEnv = []
-    for file in os.listdir('data/zonages/'):
+    for file in os.listdir(workspacePath + 'data/zonages/'):
         if os.path.splitext(file)[1] == '.shp':
-            zonagesEnv.append('data/zonages/' + file)
+            zonagesEnv.append(workspacePath + 'data/zonages/' + file)
     params = {
         'LAYERS': zonagesEnv,
         'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/restriction/zonages_protection.shp'
+        'OUTPUT': workspacePath + 'data/restriction/zonages_protection.shp'
     }
     processing.run('native:mergevectorlayers', params, feedback=feedback)
     del zonagesEnv
 
     # Traitement des autoroutes
     params = {
-        'INPUT': 'data/transport/route_primaire.shp',
+        'INPUT': workspacePath + 'data/transport/route_primaire.shp',
         'EXPRESSION': """ "NATURE" = 'Autoroute' """,
         'OUTPUT': 'memory:autoroutes',
         'FAIL_OUTPUT': 'memory:'
@@ -890,45 +891,45 @@ if not os.path.exists('data'):
         'JOIN_STYLE': 0,
         'MITER_LIMIT': 2,
         'DISSOLVE': True,
-        'OUTPUT': 'data/restriction/tampon_autoroutes.shp'
+        'OUTPUT': workspacePath + 'data/restriction/tampon_autoroutes.shp'
     }
     processing.run('native:buffer', params, feedback=feedback)
 
-    reproj(zone, 'data/')
-    reproj(zone_buffer, 'data/')
+    reproj(zone, workspacePath + 'data/')
+    reproj(zone_buffer, workspacePath + 'data/')
     del zone, zone_buffer
 
     # Fusion des routes primaires et secondaires
-    mergeRoads = ['data/transport/route_primaire.shp', 'data/transport/route_secondaire.shp']
+    mergeRoads = [workspacePath + 'data/transport/route_primaire.shp', workspacePath + 'data/transport/route_secondaire.shp']
     params = {
         'LAYERS': mergeRoads,
         'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/transport/routes.shp'
+        'OUTPUT': workspacePath + 'data/transport/routes.shp'
     }
     processing.run('native:mergevectorlayers', params, feedback=feedback)
 
     # Fusion des couches PAI
     mergePai = [
-        'data/pai/administratif_militaire.shp',
-        'data/pai/culture_loisirs.shp',
-        'data/pai/industriel_commercial.shp',
-        'data/pai/religieux.shp',
-        'data/pai/sante.shp',
-        'data/pai/science_enseignement.shp',
-        'data/pai/sport.shp'
+        workspacePath + 'data/pai/administratif_militaire.shp',
+        workspacePath + 'data/pai/culture_loisirs.shp',
+        workspacePath + 'data/pai/industriel_commercial.shp',
+        workspacePath + 'data/pai/religieux.shp',
+        workspacePath + 'data/pai/sante.shp',
+        workspacePath + 'data/pai/science_enseignement.shp',
+        workspacePath + 'data/pai/sport.shp'
     ]
     params = {
         'LAYERS': mergePai,
         'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/pai/pai_merged.shp'
+        'OUTPUT': workspacePath + 'data/pai/pai_merged.shp'
     }
     processing.run('native:mergevectorlayers', params, feedback=feedback)
 
     # Empaquetage de tout le bâti, calcul de surfaces et intersection avec les IRIS
     # mergeBuildings = []
-    # for file in os.listdir('data/2016_bati'):
+    # for file in os.listdir(workspacePath + 'data/2016_bati'):
     #     if os.path.splitext(file)[1] == '.shp' and 'cimetiere' not in file:
-    #         path = 'data/2016_bati/' + file
+    #         path = workspacePath + 'data/2016_bati/' + file
     #         mergeBuildings.append(path)
     # params = {
     #     'LAYERS': mergeBuildings,
@@ -941,7 +942,7 @@ if not os.path.exists('data'):
     # layer.addExpressionField('$area', QgsField('AIRE', QVariant.Double))
     # params = {
     #     'INPUT': layer,
-    #     'OVERLAY': 'data/iris.shp',
+    #     'OVERLAY': workspacePath + 'data/iris.shp',
     #     'INPUT_FIELDS': ['ID', 'AIRE', 'layer'],
     #     'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14'],
     #     'OUTPUT': 'memory:'
@@ -952,7 +953,7 @@ if not os.path.exists('data'):
     #     'INPUT': layer,
     #     'VALUES_FIELD_NAME': 'AIRE',
     #     'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-    #     'OUTPUT': 'data/2016_bati/stat_surf_sol.csv'
+    #     'OUTPUT': workspacePath + 'data/2016_bati/stat_surf_sol.csv'
     # }
     # processing.run('qgis:statisticsbycategories',
     #                params, feedback=feedback)
@@ -973,7 +974,7 @@ if not os.path.exists('data'):
     # layer.addExpressionField('$area', QgsField('AIRE', QVariant.Double))
     # params = {
     #     'INPUT': layer,
-    #     'OVERLAY': 'data/iris.shp',
+    #     'OVERLAY': workspacePath + 'data/iris.shp',
     #     'INPUT_FIELDS': ['ID', 'AIRE', 'layer'],
     #     'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP09'],
     #     'OUTPUT': 'memory:'
@@ -984,7 +985,7 @@ if not os.path.exists('data'):
     #     'INPUT': layer,
     #     'VALUES_FIELD_NAME': 'AIRE',
     #     'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-    #     'OUTPUT': 'data/2009_bati/stat_surf_sol.csv'
+    #     'OUTPUT': workspacePath + 'data/2009_bati/stat_surf_sol.csv'
     # }
     # processing.run('qgis:statisticsbycategories',
     #                params, feedback=feedback)
@@ -992,52 +993,52 @@ if not os.path.exists('data'):
     # del mergePai, mergeRoads, mergeBuildings, layer
 
     # Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
-    bati_indif = QgsVectorLayer('data/2016_bati/bati_indifferencie.shp', 'bati_indif_2016')
+    bati_indif = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_indifferencie.shp', 'bati_indif_2016')
     bati_indif.dataProvider().createSpatialIndex()
     cleanPolygons = []
-    cleanPoints = ['data/pai/pai_merged.shp']
+    cleanPoints = [workspacePath + 'data/pai/pai_merged.shp']
     # On ignore les zones industrielles et commerciales
     params = {
-        'INPUT': 'data/pai/surface_activite.shp',
+        'INPUT': workspacePath + 'data/pai/surface_activite.shp',
         'EXPRESSION': """ "CATEGORIE" != 'Industriel ou commercial' """,
-        'OUTPUT': 'data/pai/surf_activ_non_com.shp',
+        'OUTPUT': workspacePath + 'data/pai/surf_activ_non_com.shp',
         'FAIL_OUTPUT': 'memory:'
     }
     processing.run('native:extractbyexpression', params, feedback=feedback)
     # Fusion des polygones pour éviter les résidus avec le prédicat WITHIN
     params = {
-        'INPUT': 'data/pai/surf_activ_non_com.shp',
+        'INPUT': workspacePath + 'data/pai/surf_activ_non_com.shp',
         'FIELD': [],
         'OUTPUT': 'memory:'
     }
     res = processing.run('native:dissolve', params, feedback=feedback)
     cleanPolygons.append(res['OUTPUT'])
-    if os.path.exists('data/restriction/exclusion.shp'):
-        cleanPolygons.append('data/restriction/exclusion.shp')
+    if os.path.exists(workspacePath + 'data/restriction/exclusion.shp'):
+        cleanPolygons.append(workspacePath + 'data/restriction/exclusion.shp')
     buildingCleaner(bati_indif, minSurf, maxSurf, levelHeight, cleanPolygons, cleanPoints,
-                    'data/2016_bati/bati_clean.shp', 'data/restriction/bati_removed.shp')
+                    workspacePath + 'data/2016_bati/bati_clean.shp', workspacePath + 'data/restriction/bati_removed.shp')
 
     del bati_indif, cleanPolygons, cleanPoints
 
     # Intersection du bâti résidentiel avec les quartiers IRIS
-    bati_clean = QgsVectorLayer('data/2016_bati/bati_clean.shp')
+    bati_clean = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_clean.shp')
     bati_clean.dataProvider().createSpatialIndex()
     params = {
-        'INPUT': 'data/2016_bati/bati_clean.shp',
-        'OVERLAY': 'data/iris.shp',
+        'INPUT': workspacePath + 'data/2016_bati/bati_clean.shp',
+        'OVERLAY': workspacePath + 'data/iris.shp',
         'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV'],
         'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14', 'TXRP14'],
-        'OUTPUT': 'data/2016_bati/bati_inter_iris.shp'
+        'OUTPUT': workspacePath + 'data/2016_bati/bati_inter_iris.shp'
     }
     processing.run('qgis:intersection', params, feedback=feedback)
 
-if not os.path.exists('data/' + gridSize + 'm/'):
-    os.mkdir('data/' + gridSize + 'm/')
-    os.mkdir('data/' + gridSize + 'm/tif')
-    os.mkdir('data/' + gridSize + 'm/csv')
+if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
+    os.mkdir(workspacePath + 'data/' + gridSize + 'm/')
+    os.mkdir(workspacePath + 'data/' + gridSize + 'm/tif')
+    os.mkdir(workspacePath + 'data/' + gridSize + 'm/csv')
 
     # Création d'une grille régulière
-    zone_buffer = QgsVectorLayer('data/zone_buffer.shp', 'zone_buffer')
+    zone_buffer = QgsVectorLayer(workspacePath + 'data/zone_buffer.shp', 'zone_buffer')
     extent = zone_buffer.extent()
     extentStr = str(extent.xMinimum()) + ',' + str(extent.xMaximum()) + ',' + str(extent.yMinimum()) + ',' + str(extent.yMaximum()) + ' [EPSG:3035]'
     params = {
@@ -1048,35 +1049,35 @@ if not os.path.exists('data/' + gridSize + 'm/'):
         'HOVERLAY': 0,
         'VOVERLAY': 0,
         'CRS': 'EPSG:3035',
-        'OUTPUT': 'data/' + gridSize + 'm/grid.shp'
+        'OUTPUT': workspacePath + 'data/' + gridSize + 'm/grid.shp'
     }
     processing.run('qgis:creategrid', params, feedback=feedback)
     del zone_buffer, extent, extentStr
 
     # Intersection entre le couche de bâti nettoyée et la grille
-    batiIndif = QgsVectorLayer('data/2016_bati/bati_inter_iris.shp')
-    # stat09 = QgsVectorLayer('data/2009_bati/stat_surf_sol.csv', '09')
-    # stat14 = QgsVectorLayer('data/2016_bati/stat_surf_sol.csv', '14')
+    batiIndif = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_inter_iris.shp')
+    # stat09 = QgsVectorLayer(workspacePath + 'data/2009_bati/stat_surf_sol.csv', '09')
+    # stat14 = QgsVectorLayer(workspacePath + 'data/2016_bati/stat_surf_sol.csv', '14')
     # statCsvList = [stat09, stat14]
-    grid = QgsVectorLayer('data/' + gridSize + 'm/grid.shp', 'grid')
-    iris = QgsVectorLayer('data/iris.shp')
-    # statGridIris(batiIndif, statCsvList, grid, iris, 'data/' + gridSize + 'm/')
-    statGridIris(batiIndif, grid, iris, 'data/' + gridSize + 'm/')
+    grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/grid.shp', 'grid')
+    iris = QgsVectorLayer(workspacePath + 'data/iris.shp')
+    # statGridIris(batiIndif, statCsvList, grid, iris, workspacePath + 'data/' + gridSize + 'm/')
+    statGridIris(batiIndif, grid, iris, workspacePath + 'data/' + gridSize + 'm/')
     del batiIndif, iris
     # del stat09, stat14, statCsvList
 
     # Création de la grille de restriction
-    b_removed = QgsVectorLayer('data/restriction/bati_removed.shp', 'b_removed')
-    b_indus = QgsVectorLayer('data/2016_bati/bati_industriel.shp', 'b_indus')
-    b_remarq = QgsVectorLayer('data/2016_bati/bati_remarquable.shp', 'b_remarq')
-    cimetiere = QgsVectorLayer('data/2016_bati/cimetiere.shp', 'cimetiere')
-    c_surfa = QgsVectorLayer('data/2016_bati/construction_surfacique.shp', 'c_surfa')
-    p_aero = QgsVectorLayer('data/2016_bati/piste_aerodrome.shp', 'p_aero')
-    s_eau = QgsVectorLayer('data/restriction/surface_eau.shp', 's_eau')
-    t_sport = QgsVectorLayer('data/2016_bati/terrain_sport.shp', 't_sport')
+    b_removed = QgsVectorLayer(workspacePath + 'data/restriction/bati_removed.shp', 'b_removed')
+    b_indus = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_industriel.shp', 'b_indus')
+    b_remarq = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_remarquable.shp', 'b_remarq')
+    cimetiere = QgsVectorLayer(workspacePath + 'data/2016_bati/cimetiere.shp', 'cimetiere')
+    c_surfa = QgsVectorLayer(workspacePath + 'data/2016_bati/construction_surfacique.shp', 'c_surfa')
+    p_aero = QgsVectorLayer(workspacePath + 'data/2016_bati/piste_aerodrome.shp', 'p_aero')
+    s_eau = QgsVectorLayer(workspacePath + 'data/restriction/surface_eau.shp', 's_eau')
+    t_sport = QgsVectorLayer(workspacePath + 'data/2016_bati/terrain_sport.shp', 't_sport')
 
     restrictList = [b_indus, b_removed, b_remarq, cimetiere, c_surfa, p_aero, s_eau, t_sport]
-    restrictGrid(restrictList, grid, maxOverlapRatio, 'data/' + gridSize + 'm/')
+    restrictGrid(restrictList, grid, maxOverlapRatio, workspacePath + 'data/' + gridSize + 'm/')
     del b_removed, b_indus, b_remarq, cimetiere, c_surfa, p_aero, s_eau, t_sport, restrictList, grid
 
     # Objet pour transformation de coordonées
@@ -1088,7 +1089,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     coordTr = QgsCoordinateTransform(l93, laea, trCxt)
 
     # BBOX pour extraction du MNT
-    grid = QgsVectorLayer('data/' + gridSize + 'm/stat_grid.shp', 'grid')
+    grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', 'grid')
     extent = grid.extent()
     extentL93 = coordTr.transform(extent, coordTr.ReverseTransform)
 
@@ -1102,7 +1103,7 @@ if not os.path.exists('data/' + gridSize + 'm/'):
 
     # Fusion des tuiles et reprojection
     gdal.Warp(
-        'data/' + gridSize + 'm/tif/mnt.tif', demList,
+        workspacePath + 'data/' + gridSize + 'm/tif/mnt.tif', demList,
         format='GTiff', outputType=gdal.GDT_Float32,
         xRes=int(gridSize), yRes=int(gridSize),
         resampleAlg='cubicspline',
@@ -1112,8 +1113,8 @@ if not os.path.exists('data/' + gridSize + 'm/'):
 
     # Calcul de pente en %
     gdal.DEMProcessing(
-        'data/' + gridSize + 'm/tif/slope.tif',
-        'data/' + gridSize + 'm/tif/mnt.tif',
+        workspacePath + 'data/' + gridSize + 'm/tif/slope.tif',
+        workspacePath + 'data/' + gridSize + 'm/tif/mnt.tif',
         'slope', format='GTiff',
         slopeFormat='percent')
 
@@ -1121,55 +1122,55 @@ if not os.path.exists('data/' + gridSize + 'm/'):
     extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
     # Rasterisations
-    rasterize('data/ecologie.shp', 'data/' + gridSize + 'm/tif/ecologie.tif', 'interet')
-    rasterize('data/' + gridSize + 'm/stat_grid.shp', 'data/' + gridSize + 'm/tif/s_planch_grid.tif', 'srf_p')
-    rasterize('data/' + gridSize + 'm/restrict_grid.shp', 'data/' + gridSize + 'm/tif/restrict_grid.tif', 'restrict')
-    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif', 'SP_Q3')
-    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/seuil_max_iris.tif', 'SP_MAX')
-    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/nb_m2_iris.tif', 'M2_HAB')
-    rasterize('data/' + gridSize + 'm/stat_iris.shp', 'data/' + gridSize + 'm/tif/masque.tif', burn=1, inverse=True)
+    rasterize(workspacePath + 'data/ecologie.shp', workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif', 'interet')
+    rasterize(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', workspacePath + 'data/' + gridSize + 'm/tif/s_planch_grid.tif', 'srf_p')
+    rasterize(workspacePath + 'data/' + gridSize + 'm/restrict_grid.shp', workspacePath + 'data/' + gridSize + 'm/tif/restrict_grid.tif', 'restrict')
+    rasterize(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif', 'SP_Q3')
+    rasterize(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/seuil_max_iris.tif', 'SP_MAX')
+    rasterize(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/nb_m2_iris.tif', 'M2_HAB')
+    rasterize(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/masque.tif', burn=1, inverse=True)
 
-    rasterize('data/restriction/zonages_protection.shp', 'data/' + gridSize + 'm/tif/zonages_protection.tif', burn=1)
-    rasterize('data/restriction/tampon_autoroutes.shp', 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif', burn=1)
-    rasterize('data/restriction/exclusion.shp', 'data/' + gridSize + 'm/tif/exclusion.tif', burn=1)
-    rasterize('data/pai/surf_activ_non_com.shp', 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif', burn=1)
+    rasterize(workspacePath + 'data/restriction/zonages_protection.shp', workspacePath + 'data/' + gridSize + 'm/tif/zonages_protection.tif', burn=1)
+    rasterize(workspacePath + 'data/restriction/tampon_autoroutes.shp', workspacePath + 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif', burn=1)
+    rasterize(workspacePath + 'data/restriction/exclusion.shp', workspacePath + 'data/' + gridSize + 'm/tif/exclusion.tif', burn=1)
+    rasterize(workspacePath + 'data/pai/surf_activ_non_com.shp', workspacePath + 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif', burn=1)
 
-    if os.path.exists('data/restriction/ppr.shp'):
-        rasterize('data/restriction/ppr.shp', 'data/' + gridSize + 'm/tif/ppr.tif', burn=1)
-    elif os.path.exists('data/plu.shp'):
-        rasterize('data/plu.shp', 'data/' + gridSize + 'm/tif/ppr.tif', 'ppr')
+    if os.path.exists(workspacePath + 'data/restriction/ppr.shp'):
+        rasterize(workspacePath + 'data/restriction/ppr.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', burn=1)
+    elif os.path.exists(workspacePath + 'data/plu.shp'):
+        rasterize(workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', 'ppr')
 
-    if os.path.exists('data/plu.shp'):
-        rasterize('data/plu.shp', 'data/' + gridSize + 'm/tif/plu_rest.tif', 'restrict')
-        rasterize('data/plu.shp', 'data/' + gridSize + 'm/tif/plu_prio.tif', 'priority')
+    if os.path.exists(workspacePath + 'data/plu.shp'):
+        rasterize(workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif', 'restrict')
+        rasterize(workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif', 'priority')
 
     # Calcul des rasters de distance
-    rasterize('data/transport/routes.shp', 'data/' + gridSize + 'm/tif/routes.tif', burn=1)
+    rasterize(workspacePath + 'data/transport/routes.shp', workspacePath + 'data/' + gridSize + 'm/tif/routes.tif', burn=1)
     params = {
-        'INPUT': 'data/' + gridSize + 'm/tif/routes.tif',
+        'INPUT': workspacePath + 'data/' + gridSize + 'm/tif/routes.tif',
         'BAND': 1,
         'VALUES': 1,
         'UNITS': 0,
         'NODATA': -1,
         'MAX_DISTANCE': roadDist,
         'DATA_TYPE': 5,
-        'OUTPUT': 'data/' + gridSize + 'm/tif/distance_routes.tif'
+        'OUTPUT': workspacePath + 'data/' + gridSize + 'm/tif/distance_routes.tif'
     }
     processing.run('gdal:proximity', params, feedback=feedback)
 
-    rasterize('data/transport/arrets_transport.shp', 'data/' + gridSize + 'm/tif/arrets_transport.tif', burn=1)
-    params['INPUT'] = 'data/' + gridSize + 'm/tif/arrets_transport.tif'
+    rasterize(workspacePath + 'data/transport/arrets_transport.shp', workspacePath + 'data/' + gridSize + 'm/tif/arrets_transport.tif', burn=1)
+    params['INPUT'] = workspacePath + 'data/' + gridSize + 'm/tif/arrets_transport.tif'
     params['MAX_DISTANCE'] = transDist
-    params['OUTPUT'] = 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif'
+    params['OUTPUT'] = workspacePath + 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif'
     processing.run('gdal:proximity', params, feedback=feedback)
 
     # Calcul des rasters de densité
-    os.mkdir('data/' + gridSize + 'm/tif/tmp')
+    os.mkdir(workspacePath + 'data/' + gridSize + 'm/tif/tmp')
     projwin = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax)
     dicSirene = {row[0]: row[1] for _, row in pd.read_csv(globalDataPath + '/sirene/distances.csv').iterrows()}
 
     for key in dicSirene.keys():
-        layer = QgsVectorLayer('data/geosirene/type_' + key + '.shp', key)
+        layer = QgsVectorLayer(workspacePath + 'data/geosirene/type_' + key + '.shp', key)
         layer.setExtent(extent)
         params = {
             'INPUT': layer,
@@ -1177,16 +1178,16 @@ if not os.path.exists('data/' + gridSize + 'm/'):
             'PIXEL_SIZE': int(gridSize),
             'KERNEL': 0,
             'OUTPUT_VALUE': 0,
-            'OUTPUT': 'data/' + gridSize + 'm/tif/tmp/densite_' + key + '.tif'
+            'OUTPUT': workspacePath + 'data/' + gridSize + 'm/tif/tmp/densite_' + key + '.tif'
         }
         processing.run('qgis:heatmapkerneldensityestimation', params, feedback=feedback)
 
         params = {
-            'INPUT': 'data/' + gridSize + 'm/tif/tmp/densite_' + key + '.tif',
+            'INPUT': workspacePath + 'data/' + gridSize + 'm/tif/tmp/densite_' + key + '.tif',
             'PROJWIN': projwin,
             'NODATA': -9999,
             'DATA_TYPE': 5,
-            'OUTPUT': 'data/' + gridSize + 'm/tif/densite_' + key + '.tif'
+            'OUTPUT': workspacePath + 'data/' + gridSize + 'm/tif/densite_' + key + '.tif'
         }
         processing.run('gdal:cliprasterbyextent', params, feedback=feedback)
     del projwin, dicSirene
@@ -1195,11 +1196,11 @@ if not os.path.exists('data/' + gridSize + 'm/'):
 if not os.path.exists(projectPath):
     os.makedirs(projectPath)
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
-    iris = QgsVectorLayer('data/' + gridSize + 'm/stat_iris.shp')
+    iris = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp')
     contiguityMatrix(iris, projectPath + 'iris.csv')
     del iris
 
-    grid = QgsVectorLayer('data/' + gridSize + 'm/stat_grid.shp', 'grid')
+    grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', 'grid')
     extent = grid.extent()
     xMin = extent.xMinimum()
     yMin = extent.yMinimum()
@@ -1208,9 +1209,9 @@ if not os.path.exists(projectPath):
     extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
     # Rasterisations
-    rasterize('data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population.tif', 'pop')
-    rasterize('data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_id.tif', 'ID')
-    rasterize('data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
+    rasterize(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population.tif', 'pop')
+    rasterize(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_id.tif', 'ID')
+    rasterize(workspacePath + 'data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
 
     # Création des variables GDAL indispensables pour la fonction to_tif()
     ds = gdal.Open(projectPath + 'population.tif')
@@ -1223,22 +1224,22 @@ if not os.path.exists(projectPath):
     ds = None
 
     # Conversion des raster de distance
-    distance_routes = to_array('data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
+    distance_routes = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
     routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
     to_tif(routes, gdal.GDT_Float32, projectPath + 'routes.tif')
 
-    distance_transport = to_array('data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
+    distance_transport = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
     transport = np.where(distance_transport > -1, 1 - (distance_transport / np.amax(distance_transport)), 0)
     to_tif(transport, gdal.GDT_Float32, projectPath + 'transport.tif')
 
     # Conversion et aggrégation des rasters de densité SIRENE
     dicSirene = {row[0]: row[1] for _, row in pd.read_csv(globalDataPath + '/sirene/poids.csv').iterrows()}
 
-    administratif = to_array('data/' + gridSize + 'm/tif/densite_administratif.tif', 'float32')
-    commercial = to_array('data/' + gridSize + 'm/tif/densite_commercial.tif', 'float32')
-    enseignement = to_array('data/' + gridSize + 'm/tif/densite_enseignement.tif', 'float32')
-    medical = to_array('data/' + gridSize + 'm/tif/densite_medical.tif', 'float32')
-    recreatif = to_array('data/' + gridSize + 'm/tif/densite_recreatif.tif', 'float32')
+    administratif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_administratif.tif', 'float32')
+    commercial = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_commercial.tif', 'float32')
+    enseignement = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_enseignement.tif', 'float32')
+    medical = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_medical.tif', 'float32')
+    recreatif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_recreatif.tif', 'float32')
 
     # Normalisation des valeurs entre 0 et 1
     copyfile(localDataPath + '/poids.csv', projectPath + '/poids.csv')
@@ -1258,14 +1259,14 @@ if not os.path.exists(projectPath):
 
 
     # Création du raster de restriction (sans PLU)
-    irisMask = to_array('data/' + gridSize + 'm/tif/masque.tif')
-    exclusionMask = to_array('data/' + gridSize + 'm/tif/exclusion.tif')
-    surfActivMask = to_array('data/' + gridSize + 'm/tif/surf_activ_non_com.tif')
-    gridMask = to_array('data/' + gridSize + 'm/tif/restrict_grid.tif')
-    zonageMask = to_array('data/' + gridSize + 'm/tif/zonages_protection.tif')
-    highwayMask = to_array('data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
-    pprMask = to_array('data/' + gridSize + 'm/tif/ppr.tif')
-    slope = to_array('data/' + gridSize + 'm/tif/slope.tif')
+    irisMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/masque.tif')
+    exclusionMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/exclusion.tif')
+    surfActivMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif')
+    gridMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/restrict_grid.tif')
+    zonageMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/zonages_protection.tif')
+    highwayMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
+    pprMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif')
+    slope = to_array(workspacePath + 'data/' + gridSize + 'm/tif/slope.tif')
     slopeMask = np.where(slope > maxSlope, 1, 0)
 
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (
@@ -1273,21 +1274,21 @@ if not os.path.exists(projectPath):
     to_tif(restriction, gdal.GDT_Byte, projectPath + 'restriction.tif')
     del surfActivMask, exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
 
-    if os.path.exists('data/plu.shp'):
-        pluRestrict = to_array('data/' + gridSize + 'm/tif/plu_rest.tif')
-        pluPriority = to_array('data/' + gridSize + 'm/tif/plu_prio.tif')
+    if os.path.exists(workspacePath + 'data/plu.shp'):
+        pluRestrict = to_array(workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif')
+        pluPriority = to_array(workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif')
         to_tif(pluRestrict, gdal.GDT_Byte, projectPath + 'plu_restriction.tif')
         to_tif(pluPriority, gdal.GDT_Byte, projectPath + 'plu_priorite.tif')
         del pluRestrict, pluPriority
 
-    ecologie = to_array('data/' + gridSize + 'm/tif/ecologie.tif')
+    ecologie = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif')
     ecologie = np.where((ecologie == 0) & (irisMask != 1), 1, ecologie)
     to_tif(ecologie, gdal.GDT_Float32, projectPath + 'ecologie.tif')
     del ecologie
 
-    nb_m2 = to_array('data/' + gridSize + 'm/tif/nb_m2_iris.tif')
-    s_planch = to_array('data/' + gridSize + 'm/tif/s_planch_grid.tif')
-    seuil = to_array('data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
+    nb_m2 = to_array(workspacePath + 'data/' + gridSize + 'm/tif/nb_m2_iris.tif')
+    s_planch = to_array(workspacePath + 'data/' + gridSize + 'm/tif/s_planch_grid.tif')
+    seuil = to_array(workspacePath + 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
     capa_m2 = np.where(seuil - s_planch >= 0, seuil - s_planch, 0)
     capacite = np.where((irisMask != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
     to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite.tif')

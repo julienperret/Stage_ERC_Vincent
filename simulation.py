@@ -14,14 +14,15 @@ from ast import literal_eval
 np.seterr(divide='ignore', invalid='ignore')
 
 # Stockage et contrôle de la validité des paramètres utilisateur
-workspacePath = sys.argv[1]
-os.chdir(workspacePath)
-rate = float(sys.argv[2])
+workspacePath = sys.argv[1] + '/'
+outputPath = sys.argv[2] + '/'
+print('workspacePath : ' + workspacePath, 'outputPath : ' + outputPath)
+rate = float(sys.argv[3])
 if rate > 3:
     print("Taux d'évolution trop élevé, valeur max acceptée : 3 %")
     sys.exit()
-if len(sys.argv) > 3:
-    argList = sys.argv[3].split()
+if len(sys.argv) > 4:
+    argList = sys.argv[4].split()
     for arg in argList:
         if 'mode' in arg:
             mode = arg.split('=')[1]
@@ -45,7 +46,7 @@ if 'pluPriority' not in globals():
 if 'finalYear' not in globals():
     finalYear = 2040
 
-projectPath = mode + '_' + str(rate) + '/'
+projectPath = workspacePath + mode + '_' + str(rate) + '/'
 if os.path.exists(projectPath):
     rmtree(projectPath)
 os.mkdir(projectPath)
@@ -153,7 +154,7 @@ start_time = time.time()
 print("Commencé à " + time.strftime('%H:%M:%S'))
 
 # Création des dataframes contenant les informations par IRIS
-irisDf = pd.read_csv('iris.csv')
+irisDf = pd.read_csv(workspacePath + 'iris.csv')
 pop = sum(irisDf['population'])
 dicPop = {}
 year = 2015
@@ -174,14 +175,14 @@ log.write("Population à loger d'ici à " +
           str(finalYear) + ", " + str(sumPopALoger) + "\n")
 
 # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
-poids = pd.read_csv('poids.csv')
+poids = pd.read_csv(workspacePath + 'poids.csv')
 poids['coef'] = poids['poids'] / sum(poids['poids'])
 poids.to_csv(projectPath + 'coefficients.csv', index=0)
 dicCoef = {row[0]: row[2] for _, row in poids.iterrows()}
 del poids
 
 # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-ds = gdal.Open('population.tif')
+ds = gdal.Open(workspacePath + 'population.tif')
 population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
 cols = ds.RasterXSize
 rows = ds.RasterYSize
@@ -191,14 +192,14 @@ driver = gdal.GetDriverByName('GTiff')
 ds = None
 
 # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
-restriction = to_array('restriction.tif')
-capacite = to_array('capacite.tif', 'uint16')
+restriction = to_array(workspacePath + 'restriction.tif')
+capacite = to_array(workspacePath + 'capacite.tif', 'uint16')
 to_tif(capacite, gdal.GDT_UInt16, 'capa2.tif')
 capacite = np.where(restriction != 1, capacite, 0)
-if os.path.exists('plu_restriction.tif') and os.path.exists('plu_priorite.tif'):
+if os.path.exists(workspacePath + 'plu_restriction.tif') and os.path.exists(workspacePath + 'plu_priorite.tif'):
     hasPlu = True
-    plu_priorite = to_array('plu_priorite.tif')
-    plu_restriction = to_array('plu_restriction.tif')
+    plu_priorite = to_array(workspacePath + 'plu_priorite.tif')
+    plu_restriction = to_array(workspacePath + 'plu_restriction.tif')
     capacite = np.where(plu_restriction != 1, capacite, 0)
 else:
     hasPlu = False
@@ -211,13 +212,13 @@ if capaciteAccueil < sumPopALoger:
     f += 100
     if hasPlu:
         print("La capacité d'accueil étant insuffisante, on retire les restrictions issues du PLU.")
-        capacite = to_array('capacite.tif', 'uint16')
+        capacite = to_array(workspacePath + 'capacite.tif', 'uint16')
         capacite = np.where(restriction != 1, capacite, 0)
         capaciteAccueil = np.sum(capacite)
         if capaciteAccueil < sumPopALoger:
             while capaciteAccueil < sumPopALoger:
                 f += 5
-                capacite = to_array('capacite.tif', 'uint16')
+                capacite = to_array(workspacePath + 'capacite.tif', 'uint16')
                 capacite = np.where(restriction != 1, capacite, 0)
                 capacite = capacite * (f/100)
                 capaciteAccueil = np.sum(capacite)
@@ -227,7 +228,7 @@ if capaciteAccueil < sumPopALoger:
         while capaciteAccueil < sumPopALoger:
             f += 5
             print("Capacite  " + str(f) + ' %')
-            capacite = to_array('capacite.tif', 'uint16')
+            capacite = to_array(workspacePath + 'capacite.tif', 'uint16')
             capacite = np.where(restriction != 1, capacite, 0)
             capacite = capacite * (f/100)
             capaciteAccueil = np.sum(capacite)
@@ -239,12 +240,12 @@ capaciteDepart = capacite.copy()
 populationDepart = population.copy()
 
 # Conversion des autres raster d'entrée en numpy array
-iris = to_array('iris_id.tif', 'uint16')
-ecologie = to_array('ecologie.tif', 'float32')
-ocsol = to_array('ocsol.tif', 'float32')
-routes = to_array('routes.tif', 'float32')
-transport = to_array('transport.tif', 'float32')
-sirene = to_array('sirene.tif', 'float32')
+iris = to_array(workspacePath + 'iris_id.tif', 'uint16')
+ecologie = to_array(workspacePath + 'ecologie.tif', 'float32')
+ocsol = to_array(workspacePath + 'ocsol.tif', 'float32')
+routes = to_array(workspacePath + 'routes.tif', 'float32')
+transport = to_array(workspacePath + 'transport.tif', 'float32')
+sirene = to_array(workspacePath + 'sirene.tif', 'float32')
 
 # Création du raster final d'intérêt avec pondération
 interet = np.where((restriction != 1), (ecologie * dicCoef['ecologie']) + (ocsol * dicCoef['ocsol']) + (routes * dicCoef['routes']) + (transport * dicCoef['transport']) + (
@@ -258,7 +259,7 @@ for year in range(2015, finalYear + 1):
     if hasPlu:
         popRestante = urbanize(mode, popALoger, saturateFirst, pluPriority)
         if popRestante > 0:
-            reste=urbanize(mode, popRestante, saturateFirst)
+            urbanize(mode, popRestante, saturateFirst)
     else:
         urbanize(mode, popALoger, saturateFirst)
 
