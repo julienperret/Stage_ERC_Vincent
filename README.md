@@ -18,7 +18,7 @@ Deux paramètres au minimum :
     3 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
 
 Exemple :  
-    ./simulation.py ~/workspace/mtp/simulation_50m/ 0.5 "mode=souple saturateFirst=True pluPriority=False"  
+    ./simulation.py ./workspace/mtp/simulation_50m ./results 0.5 "mode=souple saturateFirst=True pluPriority=False"  
 
 Dépendances pour python3 :  
     gdal, numpy, pandas  
@@ -27,4 +27,3 @@ Dépendances pour python3 :
 Commande CARE qui semble marcher
 
 care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data 34  ./mtp ./results "gridSize=50 useTxrp=True levelHeight=3 force"
-
