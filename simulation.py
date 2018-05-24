@@ -55,6 +55,7 @@ os.mkdir(projectPath + '/snapshots')
 
 # Création d'un fichier journal
 log = open(projectPath + 'log.txt', 'x')
+mesures = open(projectPath + 'mesures.txt', 'x')
 
 # Convertit un tif en numpy array
 def to_array(tif, dtype=None):
@@ -144,7 +145,7 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
                 i += 1
 
     capacite -= populationTmp
-    population = population + populationTmp
+    population += populationTmp
     to_tif(population, gdal.GDT_UInt16, projectPath + 'snapshots/pop_' + str(year) + '.tif')
     return popALoger - popLogee
 
@@ -169,8 +170,7 @@ sumPopALoger = sum(dicPop.values())
 # Nombre total de personnes à loger - permet de vérifier si le raster capacité permet d'accueillir tout le monde
 dfPop = pd.DataFrame.from_dict(dicPop, orient='index')
 dfPop.to_csv(projectPath + 'projections.csv')
-log.write("Population à loger d'ici à " +
-          str(finalYear) + ", " + str(sumPopALoger) + "\n")
+log.write("Population à loger d'ici à " + str(finalYear) + ", " + str(sumPopALoger) + "\n")
 
 # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
 poids = pd.read_csv(dataPath + 'poids.csv')
@@ -231,8 +231,10 @@ if capaciteAccueil < sumPopALoger:
             capaciteAccueil = np.sum(capacite)
         print("Afin de loger tout le monde, la capacite est augmentée de " + str(f) + ' %')
 
-log.write("Pourcentage d'augmentation de la capacite, " + str(f) + "\n")
 log.write("Nouvelle capacité d'accueil du territoire, " + str(capaciteAccueil) + "\n")
+log.write("Pourcentage d'augmentation de la capacite, " + str(f) + "\n")
+log.write("Objectif démographique pour 2040, " + str(int(population.sum()) + sumPopALoger ) + "\n")
+
 capaciteDepart = capacite.copy()
 populationDepart = population.copy()
 
@@ -265,7 +267,7 @@ popNouvelle = population - populationDepart
 capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
 expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
 peuplementMoyen = np.nanmean(np.where(popNouvelle == 0, np.nan, popNouvelle))
-impactEnvironnemental = np.where(expansion == 1, 1 - ecologie, 0).sum() * cellSurf
+impactEnvironnemental = int(np.where(expansion == 1, 1 - ecologie, 0).sum() * cellSurf)
 expansionSum = expansion.sum() * cellSurf
 
 to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite_future.tif')
@@ -274,8 +276,10 @@ to_tif(expansion, gdal.GDT_Byte, projectPath + 'expansion.tif')
 to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
 to_tif(capaSaturee, gdal.GDT_Byte, projectPath + 'capacite_saturee')
 
-log.write("Expansion totale en m2, " + str(expansionSum) + "\n")
-log.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
-log.write("Impact environnemental cumulé, " + str(impactEnvironnemental) + "\n")
+mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
+mesures.write("Expansion totale en m2, " + str(expansionSum) + "\n")
+mesures.write("Impact environnemental cumulé, " + str(impactEnvironnemental) + "\n")
+
+log.write("Nombre de personnes final, " + str(population.sum()) + '\n')
 log.write("Temps d'execution, " + str(round(time.time() - start_time, 2)))
 print('Terminé  à ' + time.strftime('%H:%M:%S'))
