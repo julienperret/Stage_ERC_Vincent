@@ -26,15 +26,20 @@ val maxSlope= Val[Int]
 
 //=========================
 
-
+val globalDataDirectory = Val[File]
+val localDataDirectory = Val[File]
 val output = Val[File]
 
 // python task
 val pythonTask =
-  CARETask(workDirectory / "prepare.tgz.bin", "python3 prepare.py ./global_data ${dept} ./mtp ./results ${optionsPrep}" ) set (
-    inputs += dept,
+  CARETask(workDirectory / "prepare.tgz.bin", "./prepare.py global_data ${dept} local_data results ${optionsPrep}" ) set (
+    globalDataDirectory := workDirectory / "global_data",
+    localDataDirectory := workDirectory / "local_data",
+    (inputs, outputs) += dept,
     inputs +=optionsPrep,
-    outputs += output,
+    inputFiles += (globalDataDirectory, "global_data"),
+    inputFiles += (localDataDirectory, "local_data"),
+    outputFiles += ("results", output),
     optionsPrep:="gridSize=50 useTxrp=True levelHeight=3 force"
   )
 
@@ -42,10 +47,9 @@ val pythonTask =
 val exploration = ExplorationTask(dept in List(34))
 //val copy = CopyFileHook(outputFiles, workDirectory / "prepare_${dept}")
 
-
 val copy = CopyFileHook(output, workDirectory /"results/departement${dept}")
 
 val env = LocalEnvironment(4)
-exploration -< (pythonTask   hook copy on env) 
+exploration -< (pythonTask hook copy on env) 
 
 
