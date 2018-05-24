@@ -397,13 +397,13 @@ def statGridIris(buildings, grid, iris, outdir):
     if useTxrp:
         expr += '* "TXRP14"'
     buildings.addExpressionField(expr, QgsField(
-        'planch_g', QVariant.Double, len=10, prec=2))
+        'planch_g', QVariant.Int, len=10))
     expr = ' "area_g" / "area_i" * "pop_bati" '
     buildings.addExpressionField(expr, QgsField(
-        'pop_cell', QVariant.Double, len=10, prec=2))
+        'pop_cell', QVariant.Int, len=10))
     expr = ' "planch_g" / "pop_cell" '
     buildings.addExpressionField(expr, QgsField(
-        'nb_m2_hab', QVariant.Double, len=10, prec=2))
+        'nb_m2_hab', QVariant.Int, len=10))
 
     params = {
         'INPUT': buildings,
@@ -1241,6 +1241,8 @@ if not os.path.exists(projectPath):
     recreatif = to_array('data/' + gridSize + 'm/tif/densite_recreatif.tif', 'float32')
 
     # Normalisation des valeurs entre 0 et 1
+    copyfile(localDataPath + '/poids.csv', projectPath + '/poids.csv')
+
     administratif = np.where(administratif != -9999, administratif / np.amax(administratif), 0)
     commercial = np.where(commercial != -9999, commercial / np.amax(commercial), 0)
     enseignement = np.where(enseignement != -9999, enseignement / np.amax(enseignement), 0)
@@ -1253,7 +1255,7 @@ if not os.path.exists(projectPath):
     sirene = sirene / np.amax(sirene)
     to_tif(sirene, gdal.GDT_Float32, projectPath + 'sirene.tif')
     del dicSirene, administratif, commercial, enseignement, medical, recreatif, sirene
-    copyfile(localDataPath + '/poids.csv', projectPath + '/poids.csv')
+
 
     # Création du raster de restriction (sans PLU)
     irisMask = to_array('data/' + gridSize + 'm/tif/masque.tif')

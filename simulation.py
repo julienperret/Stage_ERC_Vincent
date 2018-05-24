@@ -78,7 +78,7 @@ def to_tif(array, dtype, path):
 
 # Fonction de répartition de la population
 def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
-    global capacite, population
+    global population, capacite
     popLogee = 0
     capaciteTmp = capacite.copy()
     populationTmp = np.zeros([rows, cols], np.uint16)
@@ -88,9 +88,9 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
             capaciteTmp = np.where(population > 0, capaciteTmp, 0)
         if pluPriority:
             capaciteTmp = np.where(plu_priorite == 1, capaciteTmp, 0)
-        weight = np.where(capaciteTmp > 0, interet, 0)
-        flatWeight = weight.flatten()
         while popLogee < popALoger and capaciteTmp.sum() > 0:
+            weight = np.where(capaciteTmp > 0, interet, 0)
+            flatWeight = weight.flatten()
             choices = np.random.choice(flatWeight.size, popALoger - popLogee, p=flatWeight / flatWeight.sum())
             i = 0
             while i < choices.size :
@@ -106,9 +106,9 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
             capaciteTmp = np.where(population == 0, capacite - populationTmp, 0)
             if pluPriority:
                 capaciteTmp = np.where(plu_priorite == 1, capaciteTmp, 0)
-            weight = np.where(capaciteTmp > 0, interet, 0)
-            flatWeight = weight.flatten()
             while popLogee < popALoger and capaciteTmp.sum() > 0:
+                weight = np.where(capaciteTmp > 0, interet, 0)
+                flatWeight = weight.flatten()
                 choices = np.random.choice(flatWeight.size, popALoger - popLogee, p=flatWeight / flatWeight.sum())
                 i = 0
                 while i < choices.size :
@@ -123,10 +123,10 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
     elif mode == 'strict':
         if pluPriority:
             capaciteTmp = np.where(plu_priorite == 1, capaciteTmp, 0)
-        weight = np.where(capaciteTmp > 0, interet, 0)
-        flatWeight = weight.flatten()
         while popLogee < popALoger and capaciteTmp.sum() > 0:
             i = 0
+            weight = np.where(capaciteTmp > 0, interet, 0)
+            flatWeight = weight.flatten()
             choices = np.random.choice(flatWeight.size, popALoger - popLogee, p=flatWeight / flatWeight.sum())
             while i < choices.size:
                 row = choices[i] // weight.shape[1]
@@ -145,7 +145,7 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
                 i += 1
 
     capacite -= populationTmp
-    population += populationTmp
+    population = population + populationTmp
     to_tif(population, gdal.GDT_UInt16, projectPath + 'snapshots/pop_' + str(year) + '.tif')
     return popALoger - popLogee
 
@@ -193,6 +193,7 @@ ds = None
 # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
 restriction = to_array('restriction.tif')
 capacite = to_array('capacite.tif', 'uint16')
+to_tif(capacite, gdal.GDT_UInt16, 'capa2.tif')
 capacite = np.where(restriction != 1, capacite, 0)
 if os.path.exists('plu_restriction.tif') and os.path.exists('plu_priorite.tif'):
     hasPlu = True
