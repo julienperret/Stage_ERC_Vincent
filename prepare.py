@@ -1204,8 +1204,8 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
 
 # Mise en forme finale des données raster pour le modèle
 if not os.path.exists(projectPath):
-    if not wisdom:
-        os.makedirs(projectPath)
+    os.makedirs(projectPath)
+if os.path.exists(projectPath) or wisdom:
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
     iris = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp')
     contiguityMatrix(iris, projectPath + 'iris.csv')
