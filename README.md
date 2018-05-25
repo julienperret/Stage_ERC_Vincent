@@ -1,3 +1,8 @@
+./insee_to_csv.py  
+Convertir les données XLS de l'INSEE en CSV en supprimant les champs inutiles, à lancer une seule fois pour toute la région  
+Dépendances pour python3 :  
+    pandas + xlrd (pour manipuler les .xls)  
+
 ./prepare.py  
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  
     1 : répertoire des données globales  
@@ -14,7 +19,7 @@ Exemple :
 python3 prepare.py ./global_data 34 ./mtp ./results "gridSize=50 useTxrp=True levelHeight=3 force"   
 
 Dépendances pour python3 :  
-    PyQt5.QtCore.QVariant, qgis, gdal, numpy, pandas + xlrd (pour manipuler les .xls)  
+    PyQt5.QtCore.QVariant, qgis, gdal, numpy  
 
 ./simulation.py  
 Deux paramètres au minimum :  

@@ -3,9 +3,9 @@
 import os
 import re
 import sys
+import csv
 import gdal
 import numpy as np
-import pandas as pd
 from time import strftime
 from ast import literal_eval
 from shutil import rmtree, copyfile
@@ -282,25 +282,6 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
     return res['OUTPUT']
     del buildings, polygons, points, layer
 
-# Génère un csv contenant la matrice de contiguïté par ID et la population de départ
-def contiguityMatrix(iris, outcsv=None):
-    irisDf = pd.DataFrame(None, [i for i in range(iris.featureCount())], [
-        'id', 'code', 'nom', 'population', 'contiguite'])
-    for i in range(iris.featureCount()):
-        feat = iris.getFeature(i)
-        irisDf.id[i] = feat.attribute('ID')
-        irisDf.code[i] = feat.attribute('CODE_IRIS')
-        irisDf.nom[i] = feat.attribute('NOM_IRIS')
-        irisDf.population[i] = feat.attribute('POP14')
-        irisDf.contiguite[i] = []
-        for poly in iris.getFeatures():
-            if feat.geometry().touches(poly.geometry()):
-                irisDf.contiguite[i].append(poly.attribute('ID'))
-    if outcsv:
-        irisDf.to_csv(outcsv, index=0)
-    else:
-        return irisDf
-
 # Selection des tuiles MNT dans la zone d'étude sous forme de liste
 def demExtractor(directory, bbox):
     tileList = []
@@ -481,17 +462,17 @@ def statGridIris(buildings, grid, iris, outdir):
         'to_real("sum")', QgsField('pop', QVariant.Double))
     csvGrid.append(csvPopG)
 
-    # for csv in csvList:
-    #     year = csv.name()
-    #     csv.addExpressionField('to_real("sum")', QgsField(year + '_SB_SOL', QVariant.Double))
-    #     csvIris.append(csv)
+    # for csvLayer in csvList:
+    #     year = csvLayer.name()
+    #     csvLayer.addExpressionField('to_real("sum")', QgsField(year + '_SB_SOL', QVariant.Double))
+    #     csvIris.append(csvLayer)
 
     statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum',
                      'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
-    for csv in csvGrid:
+    for csvLayer in csvGrid:
         join(grid, 'id', csv, 'id_2', statBlackList)
-    for csv in csvIris:
+    for csvLayer in csvIris:
         join(iris, 'CODE_IRIS', csv, 'CODE_IRIS', statBlackList)
 
     to_shp(grid, outdir + '/stat_grid.shp')
@@ -536,14 +517,14 @@ def restrictGrid(layerList, grid, ratio, outdir):
         }
         processing.run('qgis:statisticsbycategories',
                        params, feedback=feedback)
-        csv = QgsVectorLayer(
+        csvLayer = QgsVectorLayer(
             outdir + 'csv/restriction_' + name + '.csv')
-        csv.addExpressionField(
+        csvLayer.addExpressionField(
             'to_real("sum")', QgsField(name, QVariant.Double))
         csvList.append(csv)
         del layer, res
 
-    for csv in csvList:
+    for csvLayer in csvList:
         join(grid, 'id', csv, 'id_2', statBlackList)
     cpt = 0
     # Expression pour écarter complètement les cellules qui intersectent
@@ -1177,14 +1158,16 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
     # Calcul des rasters de densité
     os.mkdir(workspacePath + 'data/' + gridSize + 'm/tif/tmp')
     projwin = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax)
-    dicSirene = {row[0]: row[1] for _, row in pd.read_csv(globalDataPath + '/sirene/distances.csv').iterrows()}
+    with open(globalDataPath + '/sirene/distances.csv') as csvFile:
+        reader = csv.reader(csvFile)
+        distancesSirene = {rows[0]:int(rows[1]) for rows in reader}
 
-    for key in dicSirene.keys():
+    for key in distancesSirene.keys():
         layer = QgsVectorLayer(workspacePath + 'data/geosirene/type_' + key + '.shp', key)
         layer.setExtent(extent)
         params = {
             'INPUT': layer,
-            'RADIUS': dicSirene[key],
+            'RADIUS': distancesSirene[key],
             'PIXEL_SIZE': int(gridSize),
             'KERNEL': 0,
             'OUTPUT_VALUE': 0,
@@ -1200,16 +1183,21 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
             'OUTPUT': workspacePath + 'data/' + gridSize + 'm/tif/densite_' + key + '.tif'
         }
         processing.run('gdal:cliprasterbyextent', params, feedback=feedback)
-    del projwin, dicSirene
+    del projwin, distancesSirene
 
 # Mise en forme finale des données raster pour le modèle
 if not os.path.exists(projectPath):
     os.makedirs(projectPath)
 
 # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
+population = 0
 iris = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp')
-contiguityMatrix(iris, projectPath + 'iris.csv')
+for feat in iris.getFeatures():
+    population += int(feat.attribute('POP14'))
 del iris
+
+populationCsv = open(projectPath + 'population.csv', 'x')
+populationCsv.write('population, ' + str(population))
 
 grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', 'grid')
 extent = grid.extent()
@@ -1243,7 +1231,9 @@ transport = np.where(distance_transport > -1, 1 - (distance_transport / np.amax(
 to_tif(transport, gdal.GDT_Float32, projectPath + 'transport.tif')
 
 # Conversion et aggrégation des rasters de densité SIRENE
-dicSirene = {row[0]: row[1] for _, row in pd.read_csv(globalDataPath + '/sirene/poids.csv').iterrows()}
+with open(globalDataPath + '/sirene/poids.csv') as csvFile:
+    reader = csv.reader(csvFile)
+    poidsSirene = {rows[0]:int(rows[1]) for rows in reader}
 
 administratif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_administratif.tif', 'float32')
 commercial = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_commercial.tif', 'float32')
@@ -1260,12 +1250,12 @@ enseignement = np.where(enseignement != -9999, enseignement / np.amax(enseigneme
 medical = np.where(medical != -9999, medical / np.amax(medical), 0)
 recreatif = np.where(recreatif != -9999, recreatif / np.amax(recreatif), 0)
 
-sirene = ((administratif * dicSirene['administratif']) + (commercial * dicSirene['commercial']) +
-           (enseignement * dicSirene['enseignement']) + (medical * dicSirene['medical']) +
-           (recreatif * dicSirene['recreatif'])) / sum(dicSirene.values())
+sirene = ((administratif * poidsSirene['administratif']) + (commercial * poidsSirene['commercial']) +
+           (enseignement * poidsSirene['enseignement']) + (medical * poidsSirene['medical']) +
+           (recreatif * poidsSirene['recreatif'])) / sum(poidsSirene.values())
 sirene = sirene / np.amax(sirene)
 to_tif(sirene, gdal.GDT_Float32, projectPath + 'sirene.tif')
-del dicSirene, administratif, commercial, enseignement, medical, recreatif, sirene
+del poidsSirene, administratif, commercial, enseignement, medical, recreatif, sirene
 
 
 # Création du raster de restriction (sans PLU)

@@ -3,10 +3,10 @@
 import os
 import re
 import sys
+import csv
 import gdal
 import time
 import numpy as np
-import pandas as pd
 from shutil import rmtree
 from ast import literal_eval
 
@@ -153,8 +153,10 @@ start_time = time.time()
 print("Commencé à " + time.strftime('%H:%M:%S'))
 
 # Création des dataframes contenant les informations par IRIS
-irisDf = pd.read_csv(dataPath + 'iris.csv')
-pop = sum(irisDf['population'])
+with open(dataPath + 'population.csv') as csvFile:
+    reader = csv.reader(csvFile)
+    pop = {rows[1] for rows in reader}
+
 dicPop = {}
 year = 2015
 while year <= finalYear:
@@ -166,18 +168,19 @@ while year <= finalYear:
         pop += int(pop * (rate / 100))
     year += 1
 
-sumPopALoger = sum(dicPop.values())
 # Nombre total de personnes à loger - permet de vérifier si le raster capacité permet d'accueillir tout le monde
-dfPop = pd.DataFrame.from_dict(dicPop, orient='index')
-dfPop.to_csv(projectPath + 'projections.csv')
+sumPopALoger = sum(dicPop.values())
 log.write("Population à loger d'ici à " + str(finalYear) + ", " + str(sumPopALoger) + "\n")
 
 # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
-poids = pd.read_csv(dataPath + 'poids.csv')
-poids['coef'] = poids['poids'] / sum(poids['poids'])
-poids.to_csv(projectPath + 'coefficients.csv', index=0)
-dicCoef = {row[0]: row[2] for _, row in poids.iterrows()}
-del poids
+with open(dataPath + 'poids.csv') as csvFile:
+    reader = csv.reader(csvFile)
+    poids = {rows[0]:int(rows[1]) for rows in reader}
+
+coefficients = open(projectPath + 'coefficients.csv', 'x')
+for key in poids:
+    poids[key] = poids[key] / sum(poids.values())
+    coefficients.write(key + ', ' + str(poids[key]))
 
 # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
 ds = gdal.Open(dataPath + 'population.tif')
@@ -246,10 +249,10 @@ transport = to_array(dataPath + 'transport.tif', 'float32')
 sirene = to_array(dataPath + 'sirene.tif', 'float32')
 
 # Création du raster final d'intérêt avec pondération
-interet = np.where((restriction != 1), (ecologie * dicCoef['ecologie']) + (ocsol * dicCoef['ocsol']) + (routes * dicCoef['routes']) + (transport * dicCoef['transport']) + (
-    sirene * dicCoef['sirene']), 0)
+interet = np.where((restriction != 1), (ecologie * poids['ecologie']) + (ocsol * poids['ocsol']) + (routes * poids['routes']) + (transport * poids['transport']) + (
+    sirene * poids['sirene']), 0)
 to_tif(interet, gdal.GDT_Float32, projectPath + 'interet.tif')
-del dicCoef, restriction, ocsol, routes, transport, sirene
+del poids, restriction, ocsol, routes, transport, sirene
 
 for year in range(2015, finalYear + 1):
     print(str(year))
