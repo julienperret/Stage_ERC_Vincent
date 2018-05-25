@@ -6,6 +6,10 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
     4 : répertoire des résultats (créé si besoin)  
     5 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
 
+Mots magiques :  
+force = suppression du répertoire de sortie si il existe  
+wisdom = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires  
+
 Exemple :  
 python3 prepare.py ./global_data 34 ./mtp ./results "gridSize=50 useTxrp=True levelHeight=3 force"   
 

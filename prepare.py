@@ -82,6 +82,8 @@ if len(sys.argv) > 5:
             maxSlope = int(arg.split('=')[1])
         if 'force' in arg:
             force = True
+        if 'wisdom' in arg:
+            wisdom = True
 
 # Valeurs de paramètres par défaut
 if 'gridSize' not in globals():
@@ -106,12 +108,22 @@ if 'maxSlope' not in globals():
     maxSlope = 30
 if 'force' not in globals():
     force = False
+if 'wisdom' not in arg:
+    wisdom = False
 
 if force and os.path.exists(outputDataPath):
     rmtree(outputDataPath)
 studyAreaName = localDataPath.split('/')[len(localDataPath.split('/'))-1]
-workspacePath = outputDataPath  + '/' + codeDept + '/' + studyAreaName + '/'
-projectPath = workspacePath + 'simulation/' + gridSize + 'm/'
+
+if not wisdom:
+    workspacePath = outputDataPath  + '/' + codeDept + '/' + studyAreaName + '/'
+    projectPath = workspacePath + 'simulation/' + gridSize + 'm/'
+else:
+    if os.path.exists(outputDataPath + '/tmp') :
+        rmtree(outputDataPath + '/tmp')
+    workspacePath = outputDataPath  + '/tmp/'
+    projectPath = outputDataPath
+
 if not os.path.exists(workspacePath):
     os.makedirs(workspacePath)
 
@@ -1192,7 +1204,8 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
 
 # Mise en forme finale des données raster pour le modèle
 if not os.path.exists(projectPath):
-    os.makedirs(projectPath)
+    if not wisdom:
+        os.makedirs(projectPath)
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
     iris = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp')
     contiguityMatrix(iris, projectPath + 'iris.csv')
