@@ -54,8 +54,8 @@ os.makedirs(projectPath)
 os.mkdir(projectPath + '/snapshots')
 
 # Création d'un fichier journal
-log = open(projectPath + 'log.txt', 'x')
-mesures = open(projectPath + 'mesures.txt', 'x')
+log = open(projectPath + 'log.csv', 'x')
+mesures = open(projectPath + 'mesures.csv', 'x')
 
 # Convertit un tif en numpy array
 def to_array(tif, dtype=None):
