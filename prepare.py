@@ -122,7 +122,7 @@ else:
     if os.path.exists(outputDataPath + '/tmp') :
         rmtree(outputDataPath + '/tmp')
     workspacePath = outputDataPath  + '/tmp/'
-    projectPath = outputDataPath
+    projectPath = outputDataPath + '/'
 
 if not os.path.exists(workspacePath):
     os.makedirs(workspacePath)
@@ -1304,4 +1304,8 @@ if not os.path.exists(projectPath):
     to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite.tif')
 
 print('Terminé  à ' + strftime('%H:%M:%S'))
+if wisdom:
+    print('Suppression des données temporaires')
+    rmtree(workspacePath)
+
 qgs.exitQgis()
