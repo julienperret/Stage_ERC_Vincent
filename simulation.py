@@ -155,14 +155,15 @@ print("Commencé à " + time.strftime('%H:%M:%S'))
 # Création des dataframes contenant les informations par IRIS
 with open(dataPath + 'population.csv') as csvFile:
     reader = csv.reader(csvFile)
-    pop = {rows[1] for rows in reader}
+    pop = {rows[0]:rows[1] for rows in reader}
+pop=int(pop['population'])
 
 dicPop = {}
 year = 2015
 while year <= finalYear:
     if year == 2015:
-        dicPop[year] = int(sum(irisDf['population']) * (rate / 100))
-        pop += int(sum(irisDf['population']) * (rate / 100))
+        dicPop[year] = int(pop * (rate / 100))
+        pop += int(pop * (rate / 100))
     else:
         dicPop[year] = int(pop * (rate / 100))
         pop += int(pop * (rate / 100))
@@ -287,4 +288,8 @@ mesures.write("Impact environnemental cumulé, " + str(impactEnvironnemental) + 
 
 log.write("Nombre de personnes final, " + str(population.sum()) + '\n')
 log.write("Temps d'execution, " + str(round(time.time() - start_time, 2)))
+
+log.close()
+mesures.close()
+
 print('Terminé  à ' + time.strftime('%H:%M:%S'))

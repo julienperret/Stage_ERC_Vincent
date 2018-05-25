@@ -1196,8 +1196,8 @@ for feat in iris.getFeatures():
     population += int(feat.attribute('POP14'))
 del iris
 
-populationCsv = open(projectPath + 'population.csv', 'x')
-populationCsv.write('population, ' + str(population))
+with open(projectPath + 'population.csv', 'x') as populationCsv:
+    populationCsv.write('population, ' + str(population))
 
 grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', 'grid')
 extent = grid.extent()
