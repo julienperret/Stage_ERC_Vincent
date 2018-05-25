@@ -24,30 +24,32 @@ val transDist = Val[Int]
 // Seuil de pente en % pour interdiction à la construction
 val maxSlope= Val[Int]
 
+val taux = Val[Double]
+val res = Val[Int]
+
 //=========================
 
-val globalDataDirectory = Val[File]
-val localDataDirectory = Val[File]
+val inputDirectory = Val[File]
 val output = Val[File]
 
 // python task
 val pythonTask =
-  CARETask(workDirectory / "prepare.tgz.bin", "./prepare.py global_data ${dept} local_data results ${optionsPrep}" ) set (
-    globalDataDirectory := workDirectory / "global_data",
-    localDataDirectory := workDirectory / "local_data",
-    (inputs, outputs) += dept,
+  CARETask(workDirectory / "simulation.tgz.bin", "./simulation.py data resultdata ${res} ${taux} ${optionsPrep}" ) set (
+    inputDirectory := workDirectory / "50m",
+    inputs += (taux, res),
     inputs +=optionsPrep,
-    inputFiles += (globalDataDirectory, "global_data"),
-    inputFiles += (localDataDirectory, "local_data"),
-    outputFiles += ("results", output),
-    optionsPrep:="gridSize=50 useTxrp=True levelHeight=3 force"
+    outputs += (taux, res),
+    inputFiles += (inputDirectory, "data"),
+    outputFiles += ("resultdata", output),
+//    customWorkDirectory := "/tmp",
+    optionsPrep:="mode=souple saturateFirst=True pluPriority=False"
   )
 
  
-val exploration = ExplorationTask(dept in List(34))
+val exploration = ExplorationTask((taux in List(0.5)) x (res in List(50)))
 //val copy = CopyFileHook(outputFiles, workDirectory / "prepare_${dept}")
 
-val copy = CopyFileHook(output, workDirectory /"results/departement${dept}")
+val copy = CopyFileHook(output, workDirectory /"simulation_${res}_${taux}")
 
 val env = LocalEnvironment(4)
 exploration -< (pythonTask hook copy on env) 

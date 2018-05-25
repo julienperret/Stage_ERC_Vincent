@@ -29,3 +29,5 @@ Dépendances pour python3 :
 Commande CARE qui semble marcher  
 
 care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data 34  ./mtp ./results "gridSize=50 useTxrp=True levelHeight=3 force"
+
+care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data /my/output/dir 50 0.5 "mode=souple saturateFirst=True pluPriority=False"
