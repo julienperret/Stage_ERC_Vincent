@@ -471,9 +471,9 @@ def statGridIris(buildings, grid, iris, outdir):
                      'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
     for csvLayer in csvGrid:
-        join(grid, 'id', csv, 'id_2', statBlackList)
+        join(grid, 'id', csvLayer, 'id_2', statBlackList)
     for csvLayer in csvIris:
-        join(iris, 'CODE_IRIS', csv, 'CODE_IRIS', statBlackList)
+        join(iris, 'CODE_IRIS', csvLayer, 'CODE_IRIS', statBlackList)
 
     to_shp(grid, outdir + '/stat_grid.shp')
 
@@ -521,11 +521,11 @@ def restrictGrid(layerList, grid, ratio, outdir):
             outdir + 'csv/restriction_' + name + '.csv')
         csvLayer.addExpressionField(
             'to_real("sum")', QgsField(name, QVariant.Double))
-        csvList.append(csv)
+        csvList.append(csvLayer)
         del layer, res
 
     for csvLayer in csvList:
-        join(grid, 'id', csv, 'id_2', statBlackList)
+        join(grid, 'id', csvLayer, 'id_2', statBlackList)
     cpt = 0
     # Expression pour écarter complètement les cellules qui intersectent
     if ratio == 0:
@@ -549,7 +549,7 @@ def restrictGrid(layerList, grid, ratio, outdir):
 
     grid.addExpressionField(expr, QgsField('restrict', QVariant.Int))
     to_shp(grid, outdir + 'restrict_grid.shp')
-    del fieldList, csvList
+    del fieldList, csvList, csvLayer
 
 # Jointure avec données INSEE et extraction des IRIS dans la zone
 def irisExtractor(iris, overlay, csvdir, outdir):
