@@ -115,14 +115,14 @@ if force and os.path.exists(outputDataPath):
     rmtree(outputDataPath)
 studyAreaName = localDataPath.split('/')[len(localDataPath.split('/'))-1]
 
-if not wisdom:
+if wisdom:
+    workspacePath = outputDataPath  + '/tmp/'
+    if os.path.exists(workspacePath) :
+        rmtree(outputDataPath + '/tmp')
+    projectPath = outputDataPath + '/'
+else:
     workspacePath = outputDataPath  + '/' + codeDept + '/' + studyAreaName + '/'
     projectPath = workspacePath + 'simulation/' + gridSize + 'm/'
-else:
-    if os.path.exists(outputDataPath + '/tmp') :
-        rmtree(outputDataPath + '/tmp')
-    workspacePath = outputDataPath  + '/tmp/'
-    projectPath = outputDataPath + '/'
 
 if not os.path.exists(workspacePath):
     os.makedirs(workspacePath)
@@ -1205,105 +1205,106 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
 # Mise en forme finale des données raster pour le modèle
 if not os.path.exists(projectPath):
     os.makedirs(projectPath)
-if os.path.exists(projectPath) or wisdom:
-    # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
-    iris = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp')
-    contiguityMatrix(iris, projectPath + 'iris.csv')
-    del iris
 
-    grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', 'grid')
-    extent = grid.extent()
-    xMin = extent.xMinimum()
-    yMin = extent.yMinimum()
-    xMax = extent.xMaximum()
-    yMax = extent.yMaximum()
-    extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
+# Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
+iris = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp')
+contiguityMatrix(iris, projectPath + 'iris.csv')
+del iris
 
-    # Rasterisations
-    rasterize(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population.tif', 'pop')
-    rasterize(workspacePath + 'data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
+grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', 'grid')
+extent = grid.extent()
+xMin = extent.xMinimum()
+yMin = extent.yMinimum()
+xMax = extent.xMaximum()
+yMax = extent.yMaximum()
+extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
-    # Création des variables GDAL indispensables pour la fonction to_tif()
-    ds = gdal.Open(projectPath + 'population.tif')
-    cols = ds.RasterXSize
-    rows = ds.RasterYSize
-    proj = ds.GetProjection()
-    geot = ds.GetGeoTransform()
-    driver = gdal.GetDriverByName('GTiff')
-    population = ds.ReadAsArray()
-    ds = None
+# Rasterisations
+rasterize(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population.tif', 'pop')
+rasterize(workspacePath + 'data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
 
-    # Conversion des raster de distance
-    distance_routes = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
-    routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
-    to_tif(routes, gdal.GDT_Float32, projectPath + 'routes.tif')
+# Création des variables GDAL indispensables pour la fonction to_tif()
+ds = gdal.Open(projectPath + 'population.tif')
+cols = ds.RasterXSize
+rows = ds.RasterYSize
+proj = ds.GetProjection()
+geot = ds.GetGeoTransform()
+driver = gdal.GetDriverByName('GTiff')
+population = ds.ReadAsArray()
+ds = None
 
-    distance_transport = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
-    transport = np.where(distance_transport > -1, 1 - (distance_transport / np.amax(distance_transport)), 0)
-    to_tif(transport, gdal.GDT_Float32, projectPath + 'transport.tif')
+# Conversion des raster de distance
+distance_routes = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
+routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
+to_tif(routes, gdal.GDT_Float32, projectPath + 'routes.tif')
 
-    # Conversion et aggrégation des rasters de densité SIRENE
-    dicSirene = {row[0]: row[1] for _, row in pd.read_csv(globalDataPath + '/sirene/poids.csv').iterrows()}
+distance_transport = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
+transport = np.where(distance_transport > -1, 1 - (distance_transport / np.amax(distance_transport)), 0)
+to_tif(transport, gdal.GDT_Float32, projectPath + 'transport.tif')
 
-    administratif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_administratif.tif', 'float32')
-    commercial = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_commercial.tif', 'float32')
-    enseignement = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_enseignement.tif', 'float32')
-    medical = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_medical.tif', 'float32')
-    recreatif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_recreatif.tif', 'float32')
+# Conversion et aggrégation des rasters de densité SIRENE
+dicSirene = {row[0]: row[1] for _, row in pd.read_csv(globalDataPath + '/sirene/poids.csv').iterrows()}
 
-    # Normalisation des valeurs entre 0 et 1
-    copyfile(localDataPath + '/poids.csv', projectPath + '/poids.csv')
+administratif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_administratif.tif', 'float32')
+commercial = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_commercial.tif', 'float32')
+enseignement = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_enseignement.tif', 'float32')
+medical = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_medical.tif', 'float32')
+recreatif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_recreatif.tif', 'float32')
 
-    administratif = np.where(administratif != -9999, administratif / np.amax(administratif), 0)
-    commercial = np.where(commercial != -9999, commercial / np.amax(commercial), 0)
-    enseignement = np.where(enseignement != -9999, enseignement / np.amax(enseignement), 0)
-    medical = np.where(medical != -9999, medical / np.amax(medical), 0)
-    recreatif = np.where(recreatif != -9999, recreatif / np.amax(recreatif), 0)
+# Normalisation des valeurs entre 0 et 1
+copyfile(localDataPath + '/poids.csv', projectPath + '/poids.csv')
 
-    sirene = ((administratif * dicSirene['administratif']) + (commercial * dicSirene['commercial']) +
-               (enseignement * dicSirene['enseignement']) + (medical * dicSirene['medical']) +
-               (recreatif * dicSirene['recreatif'])) / sum(dicSirene.values())
-    sirene = sirene / np.amax(sirene)
-    to_tif(sirene, gdal.GDT_Float32, projectPath + 'sirene.tif')
-    del dicSirene, administratif, commercial, enseignement, medical, recreatif, sirene
+administratif = np.where(administratif != -9999, administratif / np.amax(administratif), 0)
+commercial = np.where(commercial != -9999, commercial / np.amax(commercial), 0)
+enseignement = np.where(enseignement != -9999, enseignement / np.amax(enseignement), 0)
+medical = np.where(medical != -9999, medical / np.amax(medical), 0)
+recreatif = np.where(recreatif != -9999, recreatif / np.amax(recreatif), 0)
+
+sirene = ((administratif * dicSirene['administratif']) + (commercial * dicSirene['commercial']) +
+           (enseignement * dicSirene['enseignement']) + (medical * dicSirene['medical']) +
+           (recreatif * dicSirene['recreatif'])) / sum(dicSirene.values())
+sirene = sirene / np.amax(sirene)
+to_tif(sirene, gdal.GDT_Float32, projectPath + 'sirene.tif')
+del dicSirene, administratif, commercial, enseignement, medical, recreatif, sirene
 
 
-    # Création du raster de restriction (sans PLU)
-    irisMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/masque.tif')
-    exclusionMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/exclusion.tif')
-    surfActivMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif')
-    gridMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/restrict_grid.tif')
-    zonageMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/zonages_protection.tif')
-    highwayMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
-    pprMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif')
-    slope = to_array(workspacePath + 'data/' + gridSize + 'm/tif/slope.tif')
-    slopeMask = np.where(slope > maxSlope, 1, 0)
+# Création du raster de restriction (sans PLU)
+irisMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/masque.tif')
+exclusionMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/exclusion.tif')
+surfActivMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif')
+gridMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/restrict_grid.tif')
+zonageMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/zonages_protection.tif')
+highwayMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
+pprMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif')
+slope = to_array(workspacePath + 'data/' + gridSize + 'm/tif/slope.tif')
+slopeMask = np.where(slope > maxSlope, 1, 0)
 
-    restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (
-        zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
-    to_tif(restriction, gdal.GDT_Byte, projectPath + 'restriction.tif')
-    del surfActivMask, exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
+restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (
+    zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
+to_tif(restriction, gdal.GDT_Byte, projectPath + 'restriction.tif')
+del surfActivMask, exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
 
-    if os.path.exists(workspacePath + 'data/plu.shp'):
-        pluRestrict = to_array(workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif')
-        pluPriority = to_array(workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif')
-        to_tif(pluRestrict, gdal.GDT_Byte, projectPath + 'plu_restriction.tif')
-        to_tif(pluPriority, gdal.GDT_Byte, projectPath + 'plu_priorite.tif')
-        del pluRestrict, pluPriority
+if os.path.exists(workspacePath + 'data/plu.shp'):
+    pluRestrict = to_array(workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif')
+    pluPriority = to_array(workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif')
+    to_tif(pluRestrict, gdal.GDT_Byte, projectPath + 'plu_restriction.tif')
+    to_tif(pluPriority, gdal.GDT_Byte, projectPath + 'plu_priorite.tif')
+    del pluRestrict, pluPriority
 
-    ecologie = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif')
-    ecologie = np.where((ecologie == 0) & (irisMask != 1), 1, ecologie)
-    to_tif(ecologie, gdal.GDT_Float32, projectPath + 'ecologie.tif')
-    del ecologie
+ecologie = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif')
+ecologie = np.where((ecologie == 0) & (irisMask != 1), 1, ecologie)
+to_tif(ecologie, gdal.GDT_Float32, projectPath + 'ecologie.tif')
+del ecologie
 
-    nb_m2 = to_array(workspacePath + 'data/' + gridSize + 'm/tif/nb_m2_iris.tif')
-    s_planch = to_array(workspacePath + 'data/' + gridSize + 'm/tif/s_planch_grid.tif')
-    seuil = to_array(workspacePath + 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
-    capa_m2 = np.where(seuil - s_planch >= 0, seuil - s_planch, 0)
-    capacite = np.where((irisMask != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
-    to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite.tif')
+nb_m2 = to_array(workspacePath + 'data/' + gridSize + 'm/tif/nb_m2_iris.tif')
+s_planch = to_array(workspacePath + 'data/' + gridSize + 'm/tif/s_planch_grid.tif')
+seuil = to_array(workspacePath + 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
+capa_m2 = np.where(seuil - s_planch >= 0, seuil - s_planch, 0)
+capacite = np.where((irisMask != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
+to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite.tif')
 
 print('Terminé  à ' + strftime('%H:%M:%S'))
+
 if wisdom:
     print('Suppression des données temporaires')
     rmtree(workspacePath)
