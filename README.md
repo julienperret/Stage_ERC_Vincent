@@ -1,8 +1,3 @@
-./insee_to_csv.py  
-Convertir les données XLS de l'INSEE en CSV en supprimant les champs inutiles, à lancer une seule fois pour toute la région  
-Dépendances pour python3 :  
-    pandas + xlrd (pour manipuler les .xls)  
-
 ./prepare.py  
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  
     1 : répertoire des données globales  
@@ -15,8 +10,7 @@ Mots magiques :
 force = suppression du répertoire de sortie si il existe  
 wisdom = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires  
 
-
-**N.B.** Depuis qu'on utilise plus pandas les CSV doivent être sans headers ni guillemets
+**N.B.** Depuis qu'on utilise plus pandas les CSV doivent être sans headers ni guillemets  
 
 Exemple :  
 python3 prepare.py ./global_data 34 ./mtp ./results "gridSize=50 useTxrp=True levelHeight=3 force"   
@@ -44,5 +38,13 @@ care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data 
 
 care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data /my/output/dir 50 0.5 "mode=souple saturateFirst=True pluPriority=False"
 
+./insee_to_csv.py  
+Convertir les données XLS de l'INSEE en CSV en supprimant les champs inutiles, à lancer une seule fois pour toute la région  
+Dépendances pour python3 :  
+    pandas + xlrd (pour manipuler les .xls)  
 
+./tif_to_gif.py  
+Génère un GIF à partir des tifs de population générés pour chaque année de la simulation.  
 
+Usage :  
+    ./tif_to_gif.py ./results/souple_tx0.5/snapshots ./output 'delay=10 maxValue=500' (facultatif)  
