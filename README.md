@@ -51,4 +51,4 @@ Usage :
 Génère un GIF à partir des tifs de population générés pour chaque année de la simulation.  
 
 Usage :  
-    ./tif_to_gif.py ./results/souple_tx0.5/snapshots/ ./output 'delay=10 maxValue=500' (facultatif)  
+    ./tif_to_gif.py ./results/souple_tx0.5/snapshots/ ./output/ 'delay=10 maxValue=500' (facultatif)  
