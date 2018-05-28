@@ -14,8 +14,8 @@ from ast import literal_eval
 np.seterr(divide='ignore', invalid='ignore')
 
 # Stockage et contrôle de la validité des paramètres utilisateur
-dataPath = sys.argv[1] + '/'
-outputPath = sys.argv[2] + '/'
+dataPath = sys.argv[1]
+outputPath = sys.argv[2]
 gridSize = int(sys.argv[3])
 rate = float(sys.argv[4])
 if rate > 4:

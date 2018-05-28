@@ -1,4 +1,6 @@
-./prepare.py  
+**N.B.** Depuis qu'on utilise plus pandas les CSV doivent être sans headers ni guillemets  *** Tous les répertoires passés en arguments doivent désormais contenir le '/' final  
+
+**./prepare.py**  
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  
     1 : répertoire des données globales  
     2 : n° de département dans lequel la zone d'étude est située  
@@ -10,15 +12,13 @@ Mots magiques :
 force = suppression du répertoire de sortie si il existe  
 wisdom = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires  
 
-**N.B.** Depuis qu'on utilise plus pandas les CSV doivent être sans headers ni guillemets  
-
 Exemple :  
-python3 prepare.py ./global_data 34 ./mtp ./results "gridSize=50 useTxrp=True levelHeight=3 force"   
+python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "gridSize=50 useTxrp=True levelHeight=3 force"  
 
 Dépendances pour python3 :  
     PyQt5.QtCore.QVariant, qgis, gdal, numpy  
 
-./simulation.py  
+**./simulate.py**  
 Deux paramètres au minimum :  
     1 : répertoire contenant la donnée  
     2 : répertoire des résultats (créé si besoin)  
@@ -27,24 +27,27 @@ Deux paramètres au minimum :
     5 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
 
 Exemple :  
-    ./simulation.py ./workspace/mtp/simulation_50m ./results 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
+    ./simulate.py ./workspace/mtp/simulation_50m/ ./results/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
 
 Dépendances pour python3 :  
-    gdal, numpy, pandas  
+    gdal, numpy  
 
 Commande CARE qui semble marcher  
 
-care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data 34  ./mtp ./results "gridSize=50 useTxrp=True levelHeight=3 force"
+care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data/ 34  ./mtp/ ./results/ "gridSize=50 useTxrp=True levelHeight=3 force"  
 
-care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data /my/output/dir 50 0.5 "mode=souple saturateFirst=True pluPriority=False"
+care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data/ /my/output/dir/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
 
-./insee_to_csv.py  
+**./insee_to_csv.py**  
 Convertir les données XLS de l'INSEE en CSV en supprimant les champs inutiles, à lancer une seule fois pour toute la région  
 Dépendances pour python3 :  
     pandas + xlrd (pour manipuler les .xls)  
 
-./tif_to_gif.py  
+Usage :  
+./insee_to_csv.py ../global_data/insee/  
+
+**./tif_to_gif.py**  
 Génère un GIF à partir des tifs de population générés pour chaque année de la simulation.  
 
 Usage :  
-    ./tif_to_gif.py ./results/souple_tx0.5/snapshots ./output 'delay=10 maxValue=500' (facultatif)  
+    ./tif_to_gif.py ./results/souple_tx0.5/snapshots/ ./output 'delay=10 maxValue=500' (facultatif)  
