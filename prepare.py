@@ -331,14 +331,14 @@ def buildCsvGrid(buildingsDic, year, iris, grid, outCsvDir):
             'INPUT': buildings,
             'VALUES_FIELD_NAME': 'AIRE',
             'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-            'OUTPUT': outCsvDir + year + '_' + name + '_srf_iris.csv'
+            'OUTPUT': outCsvDir + year + '_' + name + '_ssol_iris.csv'
         }
         processing.run('qgis:statisticsbycategories', params, feedback=feedback)
         params = {
             'INPUT': buildings,
             'VALUES_FIELD_NAME': 'AIRE',
             'CATEGORIES_FIELD_NAME': 'id_2',
-            'OUTPUT': outCsvDir + year + '_' + name + '_srf_grid.csv'
+            'OUTPUT': outCsvDir + year + '_' + name + '_ssol_grid.csv'
         }
         processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
@@ -452,7 +452,7 @@ def statGridIris(buildings, csvDir, ratio, grid, iris, outdir):
     gridFields2 = []
 
     for path in os.listdir(csvDir):
-        res = re.search('([0-9]{2})_([a-z]*)_srf_([a-z]{4})\.csv', path)
+        res = re.search('([0-9]{2})_([a-z]*)_ssol_([a-z]{4})\.csv', path)
         if res:
             year = res.group(1)
             name = res.group(2)
@@ -483,24 +483,24 @@ def statGridIris(buildings, csvDir, ratio, grid, iris, outdir):
     for field in gridFields1:
         cpt += 1
         if cpt != len(gridFields1):
-            expr += '"' + field + '" + '
+            expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
         else:
-            expr += '"' + field + '"'
-    grid.addExpressionField(expr, QgsField('srfsol_09', QVariant.Double))
+            xpr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
+    grid.addExpressionField(expr, QgsField('ssol_09', QVariant.Double))
 
     cpt = 0
     expr = ''
     for field in gridFields2:
         cpt += 1
         if cpt != len(gridFields2):
-            expr += '"' + field + '" + '
+            expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
         else:
-            expr += '"' + field + '"'
-    grid.addExpressionField(expr, QgsField('srfsol_16', QVariant.Double))
+            xpr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
+    grid.addExpressionField(expr, QgsField('ssol_16', QVariant.Double))
 
-    expr = 'IF("srfsol_09" >= $area * ' + str(ratio) + ', 1, 0)'
+    expr = 'IF("ssol_09" >= $area * ' + str(ratio) + ', 1, 0)'
     grid.addExpressionField(expr, QgsField('built_09', QVariant.Int, len=1))
-    expr = 'IF("srfsol_16" >= $area * ' + str(ratio) + ', 1, 0)'
+    expr = 'IF("ssol_16" >= $area * ' + str(ratio) + ', 1, 0)'
     grid.addExpressionField(expr, QgsField('built_16', QVariant.Int, len=1))
     to_shp(grid, outdir + '/stat_grid.shp')
 
@@ -509,9 +509,9 @@ def statGridIris(buildings, csvDir, ratio, grid, iris, outdir):
     for field in irisFields1:
         cpt += 1
         if cpt != len(irisFields1):
-            expr += '"' + field + '" + '
+            expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
         else:
-            expr += '"' + field + '"'
+            xpr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
     iris.addExpressionField(expr, QgsField('ssol_09', QVariant.Double))
 
     cpt = 0
@@ -519,9 +519,9 @@ def statGridIris(buildings, csvDir, ratio, grid, iris, outdir):
     for field in irisFields2:
         cpt += 1
         if cpt != len(irisFields2):
-            expr += '"' + field + '" + '
+            expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
         else:
-            expr += '"' + field + '"'
+            xpr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
     iris.addExpressionField(expr, QgsField('ssol_16', QVariant.Double))
 
     iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
