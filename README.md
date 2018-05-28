@@ -1,5 +1,5 @@
-**N.B.** Depuis qu'on utilise plus pandas les CSV doivent être sans headers ni guillemets  
-         Tous les répertoires passés en arguments doivent désormais contenir le '/' final  
+**N.B.** Après modif de Julien, il faut conserver - réécrire les headers dans les CSV !
+******** Tous les répertoires passés en arguments doivent désormais contenir le '/' final  
 
 **./prepare.py**  
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  

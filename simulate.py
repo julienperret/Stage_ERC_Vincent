@@ -160,7 +160,7 @@ print("Commencé à " + time.strftime('%H:%M:%S'))
 with open(dataPath + 'population.csv') as csvFile:
     reader = csv.reader(csvFile)
     pop = {rows[0]:rows[1] for rows in reader}
-pop=int(pop['population'])
+pop = int(pop['population'])
 
 dicPop = {}
 year = 2015
@@ -180,6 +180,7 @@ log.write("Population à loger d'ici à " + str(finalYear) + ", " + str(sumPopAL
 # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
 with open(dataPath + 'poids.csv') as csvFile:
     reader = csv.reader(csvFile)
+    next(reader, None)
     poids = {rows[0]:int(rows[1]) for rows in reader}
 
 coefficients = open(projectPath + 'coefficients.csv', 'x')
@@ -196,8 +197,6 @@ proj = ds.GetProjection()
 geot = ds.GetGeoTransform()
 driver = gdal.GetDriverByName('GTiff')
 ds = None
-
-
 
 # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
 restriction = to_array(dataPath + 'restriction.tif')

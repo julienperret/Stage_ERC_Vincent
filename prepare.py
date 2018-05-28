@@ -1213,7 +1213,7 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
     projwin = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax)
     with open(globalDataPath + 'sirene/distances.csv') as csvFile:
         reader = csv.reader(csvFile)
-        next(reader, None)  # skip the headers
+        next(reader, None)
         distancesSirene = {rows[0]:int(rows[1]) for rows in reader}
 
     for key in distancesSirene.keys():
@@ -1287,7 +1287,7 @@ to_tif(transport, gdal.GDT_Float32, projectPath + 'transport.tif')
 # Conversion et aggrégation des rasters de densité SIRENE
 with open(globalDataPath + 'sirene/poids.csv') as csvFile:
     reader = csv.reader(csvFile)
-    next(reader, None)  # skip the headers
+    next(reader, None)
     poidsSirene = {rows[0]:int(rows[1]) for rows in reader}
 
 administratif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_administratif.tif', 'float32')
