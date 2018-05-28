@@ -485,7 +485,7 @@ def statGridIris(buildings, csvDir, ratio, grid, iris, outdir):
         if cpt != len(gridFields1):
             expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
         else:
-            xpr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
+            expr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
     grid.addExpressionField(expr, QgsField('ssol_09', QVariant.Double))
 
     cpt = 0
@@ -495,7 +495,7 @@ def statGridIris(buildings, csvDir, ratio, grid, iris, outdir):
         if cpt != len(gridFields2):
             expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
         else:
-            xpr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
+            expr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
     grid.addExpressionField(expr, QgsField('ssol_16', QVariant.Double))
 
     expr = 'IF("ssol_09" >= $area * ' + str(ratio) + ', 1, 0)'
@@ -511,7 +511,7 @@ def statGridIris(buildings, csvDir, ratio, grid, iris, outdir):
         if cpt != len(irisFields1):
             expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
         else:
-            xpr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
+            expr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
     iris.addExpressionField(expr, QgsField('ssol_09', QVariant.Double))
 
     cpt = 0
@@ -521,7 +521,7 @@ def statGridIris(buildings, csvDir, ratio, grid, iris, outdir):
         if cpt != len(irisFields2):
             expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
         else:
-            xpr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
+            expr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
     iris.addExpressionField(expr, QgsField('ssol_16', QVariant.Double))
 
     iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
