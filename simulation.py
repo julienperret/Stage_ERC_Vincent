@@ -35,6 +35,8 @@ if len(sys.argv) > 5:
             pluPriority = literal_eval(arg.split('=')[1])
         if 'finalYear' in arg:
             finalYear = int(arg.split('=')[1])
+        if 'capaPlus' in arg:
+            capaPlus = int(arg.split('=')[1])
 
 # Valeurs de paramètres par défaut
 if 'mode' not in globals():
@@ -45,6 +47,8 @@ if 'pluPriority' not in globals():
     pluPriority = True
 if 'finalYear' not in globals():
     finalYear = 2040
+if 'capaPlus' not in globals():
+    capaPlus = 100
 
 cellSurf = gridSize * gridSize
 projectPath = outputPath + str(gridSize) + 'm_' + mode + '_tx' + str(rate) + '/'
@@ -193,6 +197,8 @@ geot = ds.GetGeoTransform()
 driver = gdal.GetDriverByName('GTiff')
 ds = None
 
+
+
 # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
 restriction = to_array(dataPath + 'restriction.tif')
 capacite = to_array(dataPath + 'capacite.tif', 'uint16')
@@ -204,6 +210,10 @@ if os.path.exists(dataPath + 'plu_restriction.tif') and os.path.exists(dataPath 
     capacite = np.where(plu_restriction != 1, capacite, 0)
 else:
     hasPlu = False
+
+# Augmentation de la capacité selon une valeur utilisateur
+if capaPlus > 100:
+    capacite = capacite * (capaPlus/100)
 
 # On vérifie que la capcité d'accueil est suffisante, ici on pourrait modifier la couche de restriction pour augmenter la capacité
 f = 0
