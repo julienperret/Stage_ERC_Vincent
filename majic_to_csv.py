@@ -68,25 +68,26 @@ for dep in depList:
             if tab == 'BATI' :
                 enreg = ['00','10','30','36','40','50','60']
                 for line in file.readlines():
-                    e = line[30:32]
-                    if e in enreg:
-                        done += 1
-                        writer = open(path + tab + e + '.csv', 'a')
-                        i = 1
-                        for field in modelSorted[tab + e]:
-                            deb = int(model[tab + e][field][0])
-                            fin = int(model[tab + e][field][1])
-                            if len(line) >= fin:
-                                val = line[deb:fin]
-                            else:
-                                val = 'NULL'
-                            if i < len(modelSorted[tab + e]):
-                                val += ','
-                            else:
-                                val += '\n'
-                            writer.write(val)
-                            i += 1
-                        writer.close()
+                    if len(line) >= 82:
+                        e = line[30:32]
+                        if e in enreg:
+                            done += 1
+                            writer = open(path + tab + e + '.csv', 'a')
+                            i = 1
+                            for field in modelSorted[tab + e]:
+                                deb = int(model[tab + e][field][0])
+                                fin = int(model[tab + e][field][1])
+                                if len(line) >= fin:
+                                    val = line[deb:fin]
+                                else:
+                                    val = 'NULL'
+                                if i < len(modelSorted[tab + e]):
+                                    val += ','
+                                else:
+                                    val += '\n'
+                                writer.write(val)
+                                i += 1
+                            writer.close()
             if tab == 'LLOC':
                 for line in file.readlines():
                     if len(line) >= 60:
@@ -110,47 +111,49 @@ for dep in depList:
             if tab == 'NBAT':
                 enreg = ['10','21','30','36']
                 for line in file.readlines():
-                    e = line[30:32]
-                    if e in enreg:
-                        done += 1
-                        writer = open(path + tab + e + '.csv', 'a')
-                        i = 1
-                        for field in modelSorted[tab + e]:
-                            deb = int(model[tab + e][field][0])
-                            fin = int(model[tab + e][field][1])
-                            if len(line) >= fin:
-                                val = line[deb:fin]
-                            else:
-                                val = 'NULL'
-                            if i < len(modelSorted[tab + e]):
-                                val += ','
-                            else:
-                                val += '\n'
-                            writer.write(val)
-                            i += 1
-                        writer.close()
+                    if len(line) >= 89:
+                        e = line[19:21]
+                        if e in enreg:
+                            done += 1
+                            writer = open(path + tab + e + '.csv', 'a')
+                            i = 1
+                            for field in modelSorted[tab + e]:
+                                deb = int(model[tab + e][field][0])
+                                fin = int(model[tab + e][field][1])
+                                if len(line) >= fin:
+                                    val = line[deb:fin]
+                                else:
+                                    val = 'NULL'
+                                if i < len(modelSorted[tab + e]):
+                                    val += ','
+                                else:
+                                    val += '\n'
+                                writer.write(val)
+                                i += 1
+                            writer.close()
             if tab == 'PDLL':
                 enreg = ['10','20','30']
                 for line in file.readlines():
-                    e = line[30:32]
-                    if e in enreg:
-                        done += 1
-                        writer = open(path + tab + e + '.csv', 'a')
-                        i = 1
-                        for field in modelSorted[tab + e]:
-                            deb = int(model[tab + e][field][0])
-                            fin = int(model[tab + e][field][1])
-                            if len(line) >= fin:
-                                val = line[deb:fin]
-                            else:
-                                val = 'NULL'
-                            if i < len(modelSorted[tab + e]):
-                                val += ','
-                            else:
-                                val += '\n'
-                            writer.write(val)
-                            i += 1
-                        writer.close()
+                    if len(line) >= 98:
+                        e = line[25:27]
+                        if e in enreg:
+                            done += 1
+                            writer = open(path + tab + e + '.csv', 'a')
+                            i = 1
+                            for field in modelSorted[tab + e]:
+                                deb = int(model[tab + e][field][0])
+                                fin = int(model[tab + e][field][1])
+                                if len(line) >= fin:
+                                    val = line[deb:fin]
+                                else:
+                                    val = 'NULL'
+                                if i < len(modelSorted[tab + e]):
+                                    val += ','
+                                else:
+                                    val += '\n'
+                                writer.write(val)
+                                i += 1
+                            writer.close()
             if tab == 'PROP':
                 for line in file.readlines():
                     if len(line) >= 55:
@@ -172,6 +175,8 @@ for dep in depList:
                             i += 1
                         writer.close()
 
+execTime = round(time.time() - start_time, 2)
 print('Terminé  à ' + time.strftime('%H:%M:%S'))
-print("Temps d'execution : " + str(round(time.time() - start_time, 2)))
+print("Temps d'execution : " + str(execTime) + ' secondes')
 print(str(done) + ' lignes traitées')
+print(str(round(done/execTime)) + " lignes par secondes")
