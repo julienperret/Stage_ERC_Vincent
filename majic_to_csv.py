@@ -189,9 +189,13 @@ for dep in depList:
                             writer.write(val)
                         writer.close()
 
-execTime = round(time.time() - start_time, 2)
-nbLineSec = round(done/execTime)
 print('Terminé  à ' + time.strftime('%H:%M:%S'))
-print("Temps d'execution : " + str(execTime) + " secondes")
-print(str(done) + ' lignes traitées')
+end_time = time.time()
+execTime = end_time - start_time
+execMin = round(execTime // 60)
+execSec = round(execTime % 60)
+nbLineSec = round(countLines // execTime)
+
+print("Temps d'execution : " + str(round(execMin)) + "m " + str(execSec) + "s")
+print(str(countLines) + ' lignes traitées')
 print(str(nbLineSec) + ' lignes par secondes')
