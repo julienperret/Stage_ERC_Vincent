@@ -47,8 +47,14 @@ Dépendances pour python3 :
 Usage :  
 ./insee_to_csv.py ../global_data/insee/  
 
+**./majic_to_csv.py**  
+Convertir les données positionnelles MAJIC III en CSV, à lancer une seule fois, nécéssite les csv de positions dans /models/  
+
+Usage :  
+./majic_to_csv.py ./majic/ ./output/ ./models/  
+
 **./tif_to_gif.py**  
 Génère un GIF à partir des tifs de population générés pour chaque année de la simulation.  
 
 Usage :  
-    ./tif_to_gif.py ./results/souple_tx0.5/snapshots/ ./output/ 'delay=10 maxValue=500' (facultatif)  
+./tif_to_gif.py ./results/souple_tx0.5/snapshots/ ./output/ 'delay=10 maxValue=500' (facultatif)  

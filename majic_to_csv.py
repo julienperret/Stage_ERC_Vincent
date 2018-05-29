@@ -4,8 +4,8 @@ import os
 import re
 import sys
 import time
+import csv
 import operator
-import pandas as pd
 
 inputDir = sys.argv[1]
 outputDir = sys.argv[2]
@@ -20,9 +20,11 @@ model = {}
 tabList=os.listdir(modelDir)
 tabList.sort()
 for tab in tabList:
-    df = pd.read_csv(modelDir + tab)
-    tab = tab.replace('.csv','')
-    model[tab]={str(row[4]):[row[0]-1,row[1]] for _, row in df.iterrows()}
+    with open(modelDir + tab) as file:
+        reader = csv.reader(file)
+        next(reader, None)
+        tab = tab.replace('.csv','')
+        model[tab]={str(row[4]):[int(row[0])-1,int(row[1])] for row in reader}
 
 tmpModel = {}
 for tab in model.keys():
