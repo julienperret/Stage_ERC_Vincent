@@ -10,7 +10,6 @@ import pandas as pd
 inputDir = sys.argv[1]
 outputDir = sys.argv[2]
 modelDir = sys.argv[3]
-
 if not os.path.exists(outputDir):
     os.makedirs(outputDir)
 
@@ -28,7 +27,6 @@ for tab in tabList:
 tmpModel = {}
 for tab in model.keys():
     tmpModel[tab] = sorted(model[tab].items(), key=operator.itemgetter(1))
-
 modelSorted = {tab:[field[0] for field in tmpModel[tab]] for tab in tmpModel.keys()}
 del tmpModel
 
@@ -65,7 +63,6 @@ for dep in depList:
 
     for tab in tables :
         with open(inputDir + 'ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671') as file:
-
             if tab == 'BATI' :
                 enreg = ['00','10','30','36','40','50','60']
                 for line in file.readlines():
@@ -88,7 +85,6 @@ for dep in depList:
                             writer.write(val)
                             i += 1
                         writer.close()
-
             if tab == 'LLOC':
                 for line in file.readlines():
                     if len(line) >= 60:
@@ -109,7 +105,6 @@ for dep in depList:
                             writer.write(val)
                             i += 1
                         writer.close()
-
             if tab == 'NBAT':
                 enreg = ['10','21','30','36']
                 for line in file.readlines():
@@ -132,7 +127,6 @@ for dep in depList:
                             writer.write(val)
                             i += 1
                         writer.close()
-
             if tab == 'PDLL':
                 enreg = ['10','20','30']
                 for line in file.readlines():
@@ -155,7 +149,6 @@ for dep in depList:
                             writer.write(val)
                             i += 1
                         writer.close()
-
             if tab == 'PROP':
                 for line in file.readlines():
                     if len(line) >= 55:
