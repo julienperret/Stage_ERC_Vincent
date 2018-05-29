@@ -51,7 +51,7 @@ Usage :
 Convertir les données positionnelles MAJIC III en CSV, à lancer une seule fois, nécéssite les csv de positions dans /models/  
 
 Usage :  
-./majic_to_csv.py ./majic/ ./output/ ./models/  
+./majic_to_csv.py ./majic/ ./models/ ./output/ 
 
 **./tif_to_gif.py**  
 Génère un GIF à partir des tifs de population générés pour chaque année de la simulation.  
