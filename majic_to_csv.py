@@ -47,6 +47,7 @@ done = 0
 tables = ['BATI','LLOC','NBAT','PDLL','PROP']
 
 for dep in depList:
+    print("Traitement du département n° " + dep)
     path = outputDir + dep + '/'
     if not os.path.exists(path):
         os.makedirs(path)
@@ -176,7 +177,8 @@ for dep in depList:
                         writer.close()
 
 execTime = round(time.time() - start_time, 2)
+nbLineSec = round(done/execTime)
 print('Terminé  à ' + time.strftime('%H:%M:%S'))
-print("Temps d'execution : " + str(execTime) + ' secondes')
+print("Temps d'execution : " + str(execTime) + " secondes")
 print(str(done) + ' lignes traitées')
-print(str(round(done/execTime)) + " lignes par secondes")
+print(str(nbLineSec) + ' lignes par secondes')
