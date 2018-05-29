@@ -43,11 +43,13 @@ for f in fileList:
         if dep not in depList:
             depList.append(dep)
 
-done = 0
 tables = ['BATI','LLOC','NBAT','PDLL','PROP']
+countLines = 0
+countDep = 0
 
 for dep in depList:
-    print("Traitement du département n° " + dep)
+    countDep += 1
+    print("Traitement " + str(countDep) + "/" + str(len(depList)) + " : département n°" + dep)
     path = outputDir + dep + '/'
     if not os.path.exists(path):
         os.makedirs(path)
@@ -69,7 +71,7 @@ for dep in depList:
             if tab == 'BATI' :
                 enreg = ['00','10','30','36','40','50','60']
                 for line in file.readlines():
-                    done += 1
+                    countLines += 1
                     if len(line) >= 82:
                         e = line[30:32]
                         if e in enreg:
@@ -93,7 +95,7 @@ for dep in depList:
                             writer.close()
             if tab == 'LLOC':
                 for line in file.readlines():
-                    done += 1
+                    countLines += 1
                     if len(line) >= 61:
                         i = 0
                         writer = open(path + tab + '.csv', 'a')
@@ -116,7 +118,7 @@ for dep in depList:
             if tab == 'NBAT':
                 enreg = ['10','21','30','36']
                 for line in file.readlines():
-                    done += 1
+                    countLines += 1
                     if len(line) >= 89:
                         e = line[19:21]
                         if e in enreg:
@@ -142,7 +144,7 @@ for dep in depList:
             if tab == 'PDLL':
                 enreg = ['10','20','30']
                 for line in file.readlines():
-                    done += 1
+                    countLines += 1
                     if len(line) >= 98:
                         e = line[25:27]
                         if e in enreg:
@@ -166,7 +168,7 @@ for dep in depList:
                             writer.close()
             if tab == 'PROP':
                 for line in file.readlines():
-                    done += 1
+                    countLines += 1
                     if len(line) >= 121:
                         i = 0
                         writer = open(path + tab + '.csv', 'a')
