@@ -52,16 +52,16 @@ for dep in depList:
     if not os.path.exists(path):
         os.makedirs(path)
     for tab in model.keys():
+        i = 0
         writer = open(path + tab + '.csv', 'w')
-        i = 1
         for field in modelSorted[tab]:
+            i += 1
             val = field
             if i < len(modelSorted[tab]):
                 val += ','
             else:
                 val += '\n'
             writer.write(val)
-            i += 1
         writer.close()
 
     for tab in tables :
@@ -73,13 +73,16 @@ for dep in depList:
                     if len(line) >= 82:
                         e = line[30:32]
                         if e in enreg:
+                            i = 0
                             writer = open(path + tab + e + '.csv', 'a')
-                            i = 1
                             for field in modelSorted[tab + e]:
+                                i += 1
                                 deb = int(model[tab + e][field][0])
                                 fin = int(model[tab + e][field][1])
                                 if len(line) >= fin:
                                     val = line[deb:fin]
+                                    if '\n' in val:
+                                        val = val.replace('\n','')
                                 else:
                                     val = 'NULL'
                                 if i < len(modelSorted[tab + e]):
@@ -87,19 +90,21 @@ for dep in depList:
                                 else:
                                     val += '\n'
                                 writer.write(val)
-                                i += 1
                             writer.close()
             if tab == 'LLOC':
                 for line in file.readlines():
                     done += 1
                     if len(line) >= 61:
+                        i = 0
                         writer = open(path + tab + '.csv', 'a')
-                        i = 1
                         for field in modelSorted[tab]:
+                            i += 1
                             deb = int(model[tab][field][0])
                             fin = int(model[tab][field][1])
                             if len(line) >= fin:
                                 val = line[deb:fin]
+                                if '\n' in val:
+                                    val = val.replace('\n','')
                             else:
                                 val = 'NULL'
                             if i < len(modelSorted[tab]):
@@ -107,7 +112,6 @@ for dep in depList:
                             else:
                                 val += '\n'
                             writer.write(val)
-                            i += 1
                         writer.close()
             if tab == 'NBAT':
                 enreg = ['10','21','30','36']
@@ -116,13 +120,16 @@ for dep in depList:
                     if len(line) >= 89:
                         e = line[19:21]
                         if e in enreg:
+                            i = 0
                             writer = open(path + tab + e + '.csv', 'a')
-                            i = 1
                             for field in modelSorted[tab + e]:
+                                i += 1
                                 deb = int(model[tab + e][field][0])
                                 fin = int(model[tab + e][field][1])
                                 if len(line) >= fin:
                                     val = line[deb:fin]
+                                    if '\n' in val:
+                                        val = val.replace('\n','')
                                 else:
                                     val = 'NULL'
                                 if i < len(modelSorted[tab + e]):
@@ -139,13 +146,16 @@ for dep in depList:
                     if len(line) >= 98:
                         e = line[25:27]
                         if e in enreg:
+                            i = 0
                             writer = open(path + tab + e + '.csv', 'a')
-                            i = 1
                             for field in modelSorted[tab + e]:
+                                i += 1
                                 deb = int(model[tab + e][field][0])
                                 fin = int(model[tab + e][field][1])
                                 if len(line) >= fin:
                                     val = line[deb:fin]
+                                    if '\n' in val:
+                                        val = val.replace('\n','')
                                 else:
                                     val = 'NULL'
                                 if i < len(modelSorted[tab + e]):
@@ -153,19 +163,21 @@ for dep in depList:
                                 else:
                                     val += '\n'
                                 writer.write(val)
-                                i += 1
                             writer.close()
             if tab == 'PROP':
                 for line in file.readlines():
                     done += 1
                     if len(line) >= 121:
+                        i = 0
                         writer = open(path + tab + '.csv', 'a')
-                        i = 1
                         for field in modelSorted[tab]:
+                            i += 1
                             deb = int(model[tab][field][0])
                             fin = int(model[tab][field][1])
                             if len(line) >= fin:
                                 val = line[deb:fin]
+                                if '\n' in val:
+                                    val = val.replace('\n','')
                             else:
                                 val = 'NULL'
                             if i < len(modelSorted[tab]):
@@ -173,7 +185,6 @@ for dep in depList:
                             else:
                                 val += '\n'
                             writer.write(val)
-                            i += 1
                         writer.close()
 
 execTime = round(time.time() - start_time, 2)
