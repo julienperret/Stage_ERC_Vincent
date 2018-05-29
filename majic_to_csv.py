@@ -68,10 +68,10 @@ for dep in depList:
             if tab == 'BATI' :
                 enreg = ['00','10','30','36','40','50','60']
                 for line in file.readlines():
+                    done += 1
                     if len(line) >= 82:
                         e = line[30:32]
                         if e in enreg:
-                            done += 1
                             writer = open(path + tab + e + '.csv', 'a')
                             i = 1
                             for field in modelSorted[tab + e]:
@@ -90,8 +90,8 @@ for dep in depList:
                             writer.close()
             if tab == 'LLOC':
                 for line in file.readlines():
-                    if len(line) >= 60:
-                        done += 1
+                    done += 1
+                    if len(line) >= 61:
                         writer = open(path + tab + '.csv', 'a')
                         i = 1
                         for field in modelSorted[tab]:
@@ -111,10 +111,10 @@ for dep in depList:
             if tab == 'NBAT':
                 enreg = ['10','21','30','36']
                 for line in file.readlines():
+                    done += 1
                     if len(line) >= 89:
                         e = line[19:21]
                         if e in enreg:
-                            done += 1
                             writer = open(path + tab + e + '.csv', 'a')
                             i = 1
                             for field in modelSorted[tab + e]:
@@ -134,10 +134,10 @@ for dep in depList:
             if tab == 'PDLL':
                 enreg = ['10','20','30']
                 for line in file.readlines():
+                    done += 1
                     if len(line) >= 98:
                         e = line[25:27]
                         if e in enreg:
-                            done += 1
                             writer = open(path + tab + e + '.csv', 'a')
                             i = 1
                             for field in modelSorted[tab + e]:
@@ -156,8 +156,8 @@ for dep in depList:
                             writer.close()
             if tab == 'PROP':
                 for line in file.readlines():
-                    if len(line) >= 55:
-                        done += 1
+                    done += 1
+                    if len(line) >= 121:
                         writer = open(path + tab + '.csv', 'a')
                         i = 1
                         for field in modelSorted[tab]:
