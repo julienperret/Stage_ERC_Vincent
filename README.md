@@ -1,4 +1,4 @@
-**N.B.** Après modif de Julien, il faut conserver - réécrire les headers dans les CSV !
+**N.B.** Après modif de Julien, il faut conserver - réécrire les headers dans les CSV !  
 ******** Tous les répertoires passés en arguments doivent désormais contenir le '/' final  
 
 **./prepare.py**  
