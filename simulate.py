@@ -61,6 +61,12 @@ os.mkdir(projectPath + '/snapshots')
 log = open(projectPath + 'log.csv', 'x')
 mesures = open(projectPath + 'mesures.csv', 'x')
 
+# Pour affichage dynamique de la progression
+class Printer():
+	def __init__(self,data):
+		sys.stdout.write("\r\x1b[K"+data.__str__())
+		sys.stdout.flush()
+
 # Convertit un tif en numpy array
 def to_array(tif, dtype=None):
     ds = gdal.Open(tif)
@@ -154,8 +160,6 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
     return popALoger - popLogee
 
 start_time = time.time()
-print("Commencé à " + time.strftime('%H:%M:%S'))
-
 # Création des dataframes contenant les informations par IRIS
 with open(dataDir + 'population.csv') as csvFile:
     reader = csv.reader(csvFile)
@@ -268,7 +272,8 @@ to_tif(interet, gdal.GDT_Float32, projectPath + 'interet.tif')
 del poids, restriction, ocsol, routes, transport, sirene
 
 for year in range(2015, finalYear + 1):
-    print(str(year))
+    progress = "%i/%i" %(year, finalYear)
+    Printer(progress)
     popALoger = dicPop[year]
     if hasPlu:
         popRestante = urbanize(mode, popALoger, saturateFirst, pluPriority)
@@ -277,6 +282,8 @@ for year in range(2015, finalYear + 1):
     else:
         urbanize(mode, popALoger, saturateFirst)
 
+end_time = time.time()
+execTime = round(end_time - start_time, 2)
 # Calcul et export des résultats
 urbain40 = np.where(population > 0, 1, 0)
 popNouvelle = population - populationDepart
@@ -300,9 +307,8 @@ mesures.write("Taux de saturation, " + str(capaSaturee.sum() / nbCapaCell) + "\n
 mesures.write("Expansion totale en m2, " + str(expansionSum * cellSurf) + "\n")
 mesures.write("Impact environnemental cumulé, " + str(impactEnvironnemental) + "\n")
 log.write("Nombre de personnes final, " + str(population.sum()) + '\n')
-log.write("Temps d'execution, " + str(round(time.time() - start_time, 2)))
-
-print('Terminé  à ' + time.strftime('%H:%M:%S'))
+log.write("Temps d'execution, " + str(execTime))
+print("Temps d'execution, " + str(execTime))
 mesures.close()
 log.close()
 sys.exit()

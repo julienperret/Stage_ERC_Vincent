@@ -30,6 +30,12 @@ if len(sys.argv) > 5:
 if not os.path.exists(outputDir):
     os.makedirs(outputDir)
 
+# Pour affichage dynamique de la progression
+class Printer():
+	def __init__(self,data):
+		sys.stdout.write("\r\x1b[K"+data.__str__())
+		sys.stdout.flush()
+
 # Fonctions
 def writeHeaders(prefix, tab):
     with open(prefix + tab + '.csv', 'w') as w:
@@ -144,9 +150,12 @@ for dep in depList:
         else:
             for e in eDic[tab]:
                 writeHeaders(prefix, tab + e)
-
+cj = 0
 for j in jobs:
     j.get()
+    cj += 1
+    progress = "%i tâches terminées sur %i au total" %(cj, len(jobs))
+    Printer(progress)
 pool.close()
 pool.join()
 

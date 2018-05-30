@@ -135,6 +135,12 @@ if not os.path.exists(workspacePath):
 statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum',
                  'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
+# Pour affichage dynamique de la progression
+class Printer():
+	def __init__(self,data):
+		sys.stdout.write("\r\x1b[K"+data.__str__())
+		sys.stdout.flush()
+
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
     if type(file) == QgsVectorLayer:
@@ -781,6 +787,11 @@ print('Commencé à ' + strftime('%H:%M:%S'))
 
 # Découpe et reprojection de la donnée en l'absence du dossier ./data
 if not os.path.exists(workspacePath + 'data'):
+    etape = 1
+    description = 'extraction et reprojection des données'
+    progress = "Etape %i sur 8 : %s" %(etape, description)
+    Printer(progress)
+
     os.mkdir(workspacePath + 'data')
     # Tampon de 1000m autour de la zone pour extractions des quartiers et des PAI
     zone = QgsVectorLayer(localDataPath + 'zone.shp', 'zone')
@@ -1028,6 +1039,11 @@ if not os.path.exists(workspacePath + 'data'):
     }
     processing.run('native:mergevectorlayers', params, feedback=feedback)
 
+    etape = 2
+    description = "nettoyage du bâti pour l'estimation de la population"
+    progress = "Etape %i sur 8 : %s" %(etape, description)
+    Printer(progress)
+
     # Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
     bati_indif = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_indifferencie.shp', 'bati_indif_2016')
     bati_indif.dataProvider().createSpatialIndex()
@@ -1069,6 +1085,11 @@ if not os.path.exists(workspacePath + 'data'):
     processing.run('qgis:intersection', params, feedback=feedback)
 
 if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
+    etape = 3
+    description =  "création d'une grille de " + gridSize + "m de côté"
+    progress = "Etape %i sur 8 : %s" %(etape, description)
+    Printer(progress)
+
     os.mkdir(workspacePath + 'data/' + gridSize + 'm/')
     os.mkdir(workspacePath + 'data/' + gridSize + 'm/tif')
     os.mkdir(workspacePath + 'data/' + gridSize + 'm/csv')
@@ -1096,6 +1117,11 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
     iris = QgsVectorLayer(workspacePath + 'data/iris.shp')
     iris.dataProvider().createSpatialIndex()
 
+    etape = 4
+    description = "analyse de l'évolution des zones bâties"
+    progress = "Etape %i sur 8 : %s" %(etape, description)
+    Printer(progress)
+
     buildStatDic = {
         'indif': workspacePath + 'data/2016_bati/bati_indifferencie.shp',
         'indus': workspacePath + 'data/2016_bati/bati_industriel.shp',
@@ -1110,10 +1136,20 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
         buildStatDic[key] = buildStatDic[key].replace('2016','2009')
     buildCsvGrid(buildStatDic, '09', iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
 
+    etape = 5
+    description = "estimation de la population dans la grille de départ"
+    progress = "Etape %i sur 8 : %s" %(etape, description)
+    Printer(progress)
+
     batiInterIris = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_inter_iris.shp')
     statGridIris(batiInterIris, workspacePath + 'data/' + gridSize + 'm/csv/', minBuiltRatio,
                  grid, iris, workspacePath + 'data/' + gridSize + 'm/')
     del batiInterIris
+
+    etape = 6
+    description = "calcul des restrictions"
+    progress = "Etape %i sur 8 : %s" %(etape, description)
+    Printer(progress)
 
     # Création de la grille de restriction
     b_removed = QgsVectorLayer(workspacePath + 'data/restriction/bati_removed.shp', 'b_removed')
@@ -1162,6 +1198,10 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
         'slope', format='GTiff',
         slopeFormat='percent')
 
+    etape = 7
+    description = "création des rasters de restriction et d'intérêt"
+    progress = "Etape %i sur 8 : %s" %(etape, description)
+    Printer(progress)
     # Chaîne à passer à QGIS pour l'étendue des rasterisations
     extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
@@ -1238,6 +1278,11 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
         }
         processing.run('gdal:cliprasterbyextent', params, feedback=feedback)
     del projwin, distancesSirene
+
+etape = 8
+description = "mise en forme des données pour la simulation"
+progress = "Etape %i sur 8 : %s" %(etape, description)
+Printer(progress)
 
 # Mise en forme finale des données raster pour le modèle
 if not os.path.exists(projectPath):
