@@ -12,17 +12,25 @@ inputDir = sys.argv[1]
 modelDir = sys.argv[2]
 outputDir  = sys.argv[3]
 if len(sys.argv) > 4:
-    echo = literal_eval(sys.argv[4])
+    param = sys.argv[4]
+    if param != 'all':
+        if '[' in param:
+            tables = literal_eval(param)
+        else:
+            tables = []
+            tables.append(param)
 if len(sys.argv) > 5:
-    depList = literal_eval(sys.argv[5])
-if len(sys.argv) > 6:
-    uTable = sys.argv[6]
+    param = sys.argv[5]
+    if '[' in param:
+        depList = literal_eval(param)
+    else:
+        depList = []
+        depList.append(param)
 if not os.path.exists(outputDir):
     os.makedirs(outputDir)
 
 start_time = time.time()
-if not echo:
-    print("Commencé à " + time.strftime('%H:%M:%S'))
+print("Commencé à " + time.strftime('%H:%M:%S'))
 
 if 'depList' not in globals():
     depList = []
@@ -87,8 +95,7 @@ eCutDic = {
 minLenDic = { 'BATI': 82, 'LLOC': 61, 'NBAT': 89, 'PDLL': 98, 'PROP': 121 }
 modList = os.listdir(modelDir)
 modList.sort()
-tables = []
-if 'uTable' not in globals():
+if 'tables' not in globals():
     tables = ['BATI','LLOC','NBAT','PDLL','PROP']
 else:
     tables.append(uTable)
@@ -111,12 +118,10 @@ del tmpModel
 # Boucle centrale
 for dep in depList:
     countDep += 1
-    if not echo:
-        print("Traitement " + str(countDep) + "/" + str(len(depList)) + " : département n°" + dep)
+    print("Traitement " + str(countDep) + "/" + str(len(depList)) + " : département n°" + dep)
     prefix = outputDir + dep + '/'
     if not os.path.exists(prefix):
         os.makedirs(prefix)
-
 
     # Ecriture des fichiers avec headers dans le dossier outputDir + dep
     for tab in model.keys():
@@ -151,10 +156,9 @@ execMin = round(execTime // 60)
 execSec = round(execTime % 60)
 nbLineSec = round(countLines // execTime)
 
-if not echo:
-    print('Terminé  à ' + time.strftime('%H:%M:%S'))
-    print("Temps d'execution : " + str(round(execMin)) + "m " + str(execSec) + "s")
-    print(str(countLines) + ' lignes traitées')
-    print(str(nbLineSec) + ' lignes par secondes')
+print('Terminé  à ' + time.strftime('%H:%M:%S'))
+print("Temps d'execution : " + str(round(execMin)) + "m " + str(execSec) + "s")
+print(str(countLines) + ' lignes traitées')
+print(str(nbLineSec) + ' lignes par secondes')
 
 sys.exit()

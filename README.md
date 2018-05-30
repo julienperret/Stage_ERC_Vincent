@@ -48,10 +48,17 @@ Usage :
 ./insee_to_csv.py ../global_data/insee/  
 
 **./majic_to_csv.py**  
-Convertir les données positionnelles MAJIC III en CSV, à lancer une seule fois, nécéssite les csv de positions dans /models/  
+Convertir les données positionnelles MAJIC III en CSV, à lancer une seule fois
+3 paramètres au minimum:
+    1 : répertoire contenant la donnée  
+    2 : répertoire des modèles (parse)
+    3 : répertoire de sortie (créé si besoin)
+    4 : table ou liste de tables à convertir
+    5 : département ou liste de département à traiter
 
 Usage :  
-./majic_to_csv.py ./majic/ ./models/ ./output/ 
+./majic_to_csv.py ./majic/ ./models/ ./output/ 'BATI' '34'
+./majic_to_csv.py ./majic/ ./models/ ./output/ "['BATI','PROP']" "['11', '34']"
 
 **./tif_to_gif.py**  
 Génère un GIF à partir des tifs de population générés pour chaque année de la simulation.  
