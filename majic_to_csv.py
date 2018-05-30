@@ -88,7 +88,7 @@ minLenDic = { 'BATI': 82, 'LLOC': 61, 'NBAT': 89, 'PDLL': 98, 'PROP': 121 }
 modList = os.listdir(modelDir)
 modList.sort()
 tables = []
-if 'uTable' not in globals:
+if 'uTable' not in globals():
     tables = ['BATI','LLOC','NBAT','PDLL','PROP']
 else:
     tables.append(uTable)
