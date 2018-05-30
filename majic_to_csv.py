@@ -5,7 +5,6 @@ import re
 import sys
 import csv
 import time
-import mmap
 import operator
 from ast import literal_eval
 import multiprocessing as mp
@@ -18,14 +17,14 @@ if len(sys.argv) > 4:
     if param != 'all':
         if '[' in param:
             tables = literal_eval(param)
-        else:
+        elif len(param) == 4:
             tables = []
             tables.append(param)
 if len(sys.argv) > 5:
     param = sys.argv[5]
     if '[' in param:
         depList = literal_eval(param)
-    else:
+    elif len(param) == 2:
         depList = []
         depList.append(param)
 if not os.path.exists(outputDir):
@@ -72,8 +71,8 @@ def writeLine(prefix, tab, line, minLen, eCutList):
 def parseTable(prefix, tab, dep):
     count = 0
     global countLines
+    minLen = minLenDic[tab]
     with open(inputDir + 'ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671', 'r') as r:
-        minLen = minLenDic[tab]
         if tab in eCutDic.keys():
             eCutList = eCutDic[tab]
             for line in r:
@@ -87,6 +86,7 @@ def parseTable(prefix, tab, dep):
                     if len(line) >= minLen:
                         w.write(getTuple(line, tab))
     countLines += count
+
 
 # Variables globales
 countLines = 0
@@ -106,8 +106,6 @@ modList = os.listdir(modelDir)
 modList.sort()
 if 'tables' not in globals():
     tables = ['BATI','LLOC','NBAT','PDLL','PROP']
-else:
-    tables.append(uTable)
 
 if 'depList' not in globals():
     depList = []
@@ -148,11 +146,12 @@ for dep in depList:
         os.makedirs(prefix)
     for tab in tables:
         jobs.append(pool.apply_async(parseTable,(prefix, tab, dep)))
-        if tab in eDic.keys():
+        if tab not in eDic.keys():
+            writeHeaders(prefix, tab)
+        else:
             for e in eDic[tab]:
                 writeHeaders(prefix, tab + e)
-        else:
-            writeHeaders(prefix, tab)
+
 c = 0
 for j in jobs:
     j.get()
