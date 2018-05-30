@@ -5,8 +5,10 @@ import re
 import sys
 import csv
 import time
+import mmap
 import operator
 from ast import literal_eval
+import multiprocessing as mp
 
 inputDir = sys.argv[1]
 modelDir = sys.argv[2]
@@ -51,7 +53,7 @@ def getTuple(l, tab):
         i += 1
         deb = int(model[tab][field][0])
         fin = int(model[tab][field][1])
-        if fin <= len(line):
+        if fin <= len(l):
             v = l[deb:fin]
             if '\n' in v:
                 v = v.replace('\n','')
@@ -62,25 +64,41 @@ def getTuple(l, tab):
         tuple += v
     return tuple + '\n'
 
-# Lecture d'une table t depuis un flux open() r, écriture d'une table w
-def wLine(line, tab, minLen, w=None, eCutList=None):
-    if eCutList and not w:
+# Pour les tables avec enregistrements : traitement d'une ligne et écriture dans le csv
+def writeLine(prefix, tab, line, minLen, eCutList):
+    if eCutList :
         res = None
         if len(line) >= minLen:
             e = line[eCutList[0]:eCutList[1]]
             res = re.search('[0-9]{2}', e)
             if res and e in eDic[tab]:
-                with open(prefix + tab + e + '.csv', 'a', 65536) as w:
+                with open(prefix + tab + e + '.csv', 'r+') as w:
                     t = getTuple(line, tab + e)
                     w.write(t)
-    elif w:
-        if len(line) >= minLen:
-            t = getTuple(line, tab)
-            w.write(t)
+
+# Boucle centrale de lecture d'une table
+def parseTable(prefix, tab, dep):
+    global countLines
+    with open(inputDir + 'ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671', 'r') as r:
+        with mmap.mmap(r.fileno(), 0, access=mmap.ACCESS_READ) as mr:
+            minLen = minLenDic[tab]
+            if tab in eCutDic.keys():
+                eCutList = eCutDic[tab]
+                for line in mr:
+                    countLines += 1
+                    writeLine(prefix, tab, line, minLen, eCutList)
+            # Si table sans enregistrements : traitements de n lignes puis écriture
+            else:
+                buffer = []
+                bufferSize = 100000
+                with open(prefix + tab + '.csv', 'r+') as w:
+                    for line in mr:
+                        countLines += 1
+                        if len(line) >= minLen:
+                            w.write(getTuple(line, tab))
 
 # Variables globales
 model = {}
-countDep = 0
 countLines = 0
 eDic = {
     'BATI': ['00','10','30','36','40','50','60'],
@@ -115,14 +133,14 @@ for tab in model.keys():
 modelSorted = {tab:[field[0] for field in tmpModel[tab]] for tab in tmpModel.keys()}
 del tmpModel
 
-# Boucle centrale
+# Variables pour multithreading
+pool = mp.Pool()
+jobs = []
+# Itération dans les départements
 for dep in depList:
-    countDep += 1
-    print("Traitement " + str(countDep) + "/" + str(len(depList)) + " : département n°" + dep)
     prefix = outputDir + dep + '/'
     if not os.path.exists(prefix):
         os.makedirs(prefix)
-
     # Ecriture des fichiers avec headers dans le dossier outputDir + dep
     for tab in model.keys():
         with open(prefix + tab + '.csv', 'w') as w:
@@ -136,19 +154,17 @@ for dep in depList:
                     h += '\n'
                 w.write(h)
 
+    # Ajout des tâches pour multithreading
     for tab in tables:
-        with open(inputDir + 'ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671', 'r', 65536) as r:
-            minLen = minLenDic[tab]
-            if tab in eCutDic.keys():
-                eCutList = eCutDic[tab]
-                for line in r:
-                    countLines += 1
-                    wLine(line, tab, minLen, None, eCutList)
-            else:
-                with open(prefix + tab + '.csv', 'a', 65536) as w:
-                    for line in r:
-                        countLines += 1
-                        wLine(line, tab, minLen, w, None)
+        jobs.append(pool.apply_async(parseTable,(prefix, tab, dep)))
+
+c = 0
+for j in jobs:
+    j.get()
+    c += 1
+    print('Taches restantes : ' + str(len(jobs) - c))
+pool.close()
+pool.join()
 
 end_time = time.time()
 execTime = end_time - start_time
