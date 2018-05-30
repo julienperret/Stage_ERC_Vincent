@@ -101,7 +101,6 @@ modList = os.listdir(modelDir)
 modList.sort()
 if 'tables' not in globals():
     tables = ['BATI','LLOC','NBAT','PDLL','PROP']
-
 if 'depList' not in globals():
     depList = []
     fileList = os.listdir(inputDir)
