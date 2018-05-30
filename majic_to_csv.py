@@ -30,6 +30,7 @@ if len(sys.argv) > 5:
 if not os.path.exists(outputDir):
     os.makedirs(outputDir)
 
+# Fonctions
 def writeHeaders(prefix, tab):
     with open(prefix + tab + '.csv', 'w') as w:
         i = 0
@@ -86,7 +87,6 @@ def parseTable(prefix, tab, dep):
                     if len(line) >= minLen:
                         w.write(getTuple(line, tab))
     countLines += count
-
 
 # Variables globales
 countLines = 0
@@ -157,7 +157,6 @@ for j in jobs:
     j.get()
     c += 1
     print('Tâches restantes : ' + str(len(jobs) - c))
-
 pool.close()
 pool.join()
 
