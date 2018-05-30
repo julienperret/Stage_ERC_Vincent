@@ -14,8 +14,8 @@ from ast import literal_eval
 np.seterr(divide='ignore', invalid='ignore')
 
 # Stockage et contrôle de la validité des paramètres utilisateur
-dataPath = sys.argv[1]
-outputPath = sys.argv[2]
+dataDir = sys.argv[1]
+outputDir = sys.argv[2]
 gridSize = int(sys.argv[3])
 rate = float(sys.argv[4])
 if rate > 4:
@@ -51,7 +51,7 @@ if 'capaPlus' not in globals():
     capaPlus = 100
 
 cellSurf = gridSize * gridSize
-projectPath = outputPath + str(gridSize) + 'm_' + mode + '_tx' + str(rate) + '/'
+projectPath = outputDir + str(gridSize) + 'm_' + mode + '_tx' + str(rate) + '/'
 if os.path.exists(projectPath):
     rmtree(projectPath)
 os.makedirs(projectPath)
@@ -157,7 +157,7 @@ start_time = time.time()
 print("Commencé à " + time.strftime('%H:%M:%S'))
 
 # Création des dataframes contenant les informations par IRIS
-with open(dataPath + 'population.csv') as csvFile:
+with open(dataDir + 'population.csv') as csvFile:
     reader = csv.reader(csvFile)
     pop = {rows[0]:rows[1] for rows in reader}
 pop = int(pop['population'])
@@ -178,7 +178,7 @@ sumPopALoger = sum(dicPop.values())
 log.write("Population à loger d'ici à " + str(finalYear) + ", " + str(sumPopALoger) + "\n")
 
 # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
-with open(dataPath + 'poids.csv') as csvFile:
+with open(dataDir + 'poids.csv') as csvFile:
     reader = csv.reader(csvFile)
     next(reader, None)
     poids = {rows[0]:int(rows[1]) for rows in reader}
@@ -189,7 +189,7 @@ for key in poids:
     coefficients.write(key + ', ' + str(poids[key]))
 
 # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-ds = gdal.Open(dataPath + 'population.tif')
+ds = gdal.Open(dataDir + 'population.tif')
 population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
 cols = ds.RasterXSize
 rows = ds.RasterYSize
@@ -198,14 +198,17 @@ geot = ds.GetGeoTransform()
 driver = gdal.GetDriverByName('GTiff')
 ds = None
 
+urbain14 = np.where(population > 0, 1, 0)
+to_tif(urbain14, gdal.GDT_Byte, projectPath + 'urbain_2014.tif' )
+
 # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
-restriction = to_array(dataPath + 'restriction.tif')
-capacite = to_array(dataPath + 'capacite.tif', 'uint16')
+restriction = to_array(dataDir + 'restriction.tif')
+capacite = to_array(dataDir + 'capacite.tif', 'uint16')
 capacite = np.where(restriction != 1, capacite, 0)
-if os.path.exists(dataPath + 'plu_restriction.tif') and os.path.exists(dataPath + 'plu_priorite.tif'):
+if os.path.exists(dataDir + 'plu_restriction.tif') and os.path.exists(dataDir + 'plu_priorite.tif'):
     hasPlu = True
-    plu_priorite = to_array(dataPath + 'plu_priorite.tif')
-    plu_restriction = to_array(dataPath + 'plu_restriction.tif')
+    plu_priorite = to_array(dataDir + 'plu_priorite.tif')
+    plu_restriction = to_array(dataDir + 'plu_restriction.tif')
     capacite = np.where(plu_restriction != 1, capacite, 0)
 else:
     hasPlu = False
@@ -222,13 +225,13 @@ if capaciteAccueil < sumPopALoger:
     f += 100
     if hasPlu:
         print("La capacité d'accueil étant insuffisante, on retire les restrictions issues du PLU.")
-        capacite = to_array(dataPath + 'capacite.tif', 'uint16')
+        capacite = to_array(dataDir + 'capacite.tif', 'uint16')
         capacite = np.where(restriction != 1, capacite, 0)
         capaciteAccueil = np.sum(capacite)
         if capaciteAccueil < sumPopALoger:
             while capaciteAccueil < sumPopALoger:
                 f += 5
-                capacite = to_array(dataPath + 'capacite.tif', 'uint16')
+                capacite = to_array(dataDir + 'capacite.tif', 'uint16')
                 capacite = np.where(restriction != 1, capacite, 0)
                 capacite = capacite * (f/100)
                 capaciteAccueil = np.sum(capacite)
@@ -238,7 +241,7 @@ if capaciteAccueil < sumPopALoger:
         while capaciteAccueil < sumPopALoger:
             f += 5
             print("Capacite  " + str(f) + ' %')
-            capacite = to_array(dataPath + 'capacite.tif', 'uint16')
+            capacite = to_array(dataDir + 'capacite.tif', 'uint16')
             capacite = np.where(restriction != 1, capacite, 0)
             capacite = capacite * (f/100)
             capaciteAccueil = np.sum(capacite)
@@ -252,11 +255,11 @@ capaciteDepart = capacite.copy()
 populationDepart = population.copy()
 
 # Conversion des autres raster d'entrée en numpy array
-ecologie = to_array(dataPath + 'ecologie.tif', 'float32')
-ocsol = to_array(dataPath + 'ocsol.tif', 'float32')
-routes = to_array(dataPath + 'routes.tif', 'float32')
-transport = to_array(dataPath + 'transport.tif', 'float32')
-sirene = to_array(dataPath + 'sirene.tif', 'float32')
+ecologie = to_array(dataDir + 'ecologie.tif', 'float32')
+ocsol = to_array(dataDir + 'ocsol.tif', 'float32')
+routes = to_array(dataDir + 'routes.tif', 'float32')
+transport = to_array(dataDir + 'transport.tif', 'float32')
+sirene = to_array(dataDir + 'sirene.tif', 'float32')
 
 # Création du raster final d'intérêt avec pondération
 interet = np.where((restriction != 1), (ecologie * poids['ecologie']) + (ocsol * poids['ocsol']) + (routes * poids['routes']) + (transport * poids['transport']) + (
@@ -275,6 +278,7 @@ for year in range(2015, finalYear + 1):
         urbanize(mode, popALoger, saturateFirst)
 
 # Calcul et export des résultats
+urbain40 = np.where(population > 0, 1, 0)
 popNouvelle = population - populationDepart
 capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
 expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
@@ -287,6 +291,7 @@ to_tif(population, gdal.GDT_UInt16, projectPath + 'population_future.tif')
 to_tif(expansion, gdal.GDT_Byte, projectPath + 'expansion.tif')
 to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
 to_tif(capaSaturee, gdal.GDT_Byte, projectPath + 'capacite_saturee')
+to_tif(urbain40, gdal.GDT_Byte, projectPath + 'urbain_2040.tif' )
 
 nbCapaCell = np.where(capaciteDepart != 0, 1, 0).sum()
 mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
@@ -294,11 +299,10 @@ mesures.write("Taux d'expansion, " + str(expansionSum / nbCapaCell) + "\n")
 mesures.write("Taux de saturation, " + str(capaSaturee.sum() / nbCapaCell) + "\n")
 mesures.write("Expansion totale en m2, " + str(expansionSum * cellSurf) + "\n")
 mesures.write("Impact environnemental cumulé, " + str(impactEnvironnemental) + "\n")
-
 log.write("Nombre de personnes final, " + str(population.sum()) + '\n')
 log.write("Temps d'execution, " + str(round(time.time() - start_time, 2)))
 
-log.close()
-mesures.close()
-
 print('Terminé  à ' + time.strftime('%H:%M:%S'))
+mesures.close()
+log.close()
+sys.exit()

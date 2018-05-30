@@ -70,26 +70,21 @@ def writeLine(prefix, tab, line, minLen, eCutList):
             w.write(getTuple(line, tab + e))
 
 def parseTable(prefix, tab, dep):
-    count = 0
     global countLines
     minLen = minLenDic[tab]
     with open(inputDir + 'ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671', 'r') as r:
         if tab in eCutDic.keys():
             eCutList = eCutDic[tab]
             for line in r:
-                count += 1
                 if len(line) >= minLen:
                     writeLine(prefix, tab, line, minLen, eCutList)
         else:
             with open(prefix + tab + '.csv', 'a') as w:
                 for line in r:
-                    count += 1
                     if len(line) >= minLen:
                         w.write(getTuple(line, tab))
-    countLines += count
 
 # Variables globales
-countLines = 0
 model = {}
 eDic = {
     'BATI': ['00','10','30','36','40','50','60'],
@@ -152,11 +147,8 @@ for dep in depList:
             for e in eDic[tab]:
                 writeHeaders(prefix, tab + e)
 
-c = 0
 for j in jobs:
     j.get()
-    c += 1
-    print('Tâches restantes : ' + str(len(jobs) - c))
 pool.close()
 pool.join()
 
@@ -164,7 +156,6 @@ end_time = time.time()
 execTime = end_time - start_time
 execMin = round(execTime // 60)
 execSec = round(execTime % 60)
-nbLineSec = round(countLines // execTime)
 
 print('Terminé  à ' + time.strftime('%H:%M:%S'))
 print("Temps d'execution : " + str(round(execMin)) + "m " + str(execSec) + "s")
