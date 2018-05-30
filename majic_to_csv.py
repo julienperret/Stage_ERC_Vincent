@@ -70,7 +70,6 @@ def writeLine(prefix, tab, line, minLen, eCutList):
             w.write(getTuple(line, tab + e))
 
 def parseTable(prefix, tab, dep):
-    global countLines
     minLen = minLenDic[tab]
     with open(inputDir + 'ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671', 'r') as r:
         if tab in eCutDic.keys():
@@ -158,7 +157,5 @@ execSec = round(execTime % 60)
 
 print('Terminé  à ' + time.strftime('%H:%M:%S'))
 print("Temps d'execution : " + str(round(execMin)) + "m " + str(execSec) + "s")
-print(str(countLines) + ' lignes traitées')
-print(str(nbLineSec) + ' lignes par secondes')
 
 sys.exit()
