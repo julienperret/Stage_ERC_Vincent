@@ -1137,7 +1137,7 @@ if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
     buildCsvGrid(buildStatDic, '09', iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
 
     etape = 5
-    description = "estimation de la population dans la grille de départ"
+    description = "estimation de la population dans la grille"
     progress = "Etape %i sur 8 : %s" %(etape, description)
     Printer(progress)
 
