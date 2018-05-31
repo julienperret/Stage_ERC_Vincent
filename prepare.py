@@ -544,8 +544,7 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
                 expr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
         iris.addExpressionField(expr, QgsField('ssol_16', QVariant.Double))
 
-        iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
-
+    iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
     to_shp(grid, outdir + '/stat_grid.shp')
     to_shp(iris, outdir + '/stat_iris.shp')
 
