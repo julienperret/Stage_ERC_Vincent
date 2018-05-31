@@ -59,7 +59,7 @@ try:
 
     os.system('convert -delay ' + delay + ' -loop 0 ' + outDir + '/tmp/*.tif ' + outDir + '/evo_demo.gif')
     rmtree(outDir + '/tmp')
-    
+
 except:
-    print sys.exc_info()
+    print(sys.exc_info())
     sys.exit()

@@ -148,8 +148,8 @@ def printer(string):
 	sys.stdout.flush()
 
 # Calcul le temps d'exécution d'une étape
-def trace(t):
-    execTime = time() - t
+def trace(start):
+    execTime = time() - start
     execMin = round(execTime // 60)
     execSec = round(execTime % 60)
     return '%im %is' %(execMin, execSec)
@@ -802,7 +802,7 @@ try:
     # Découpe et reprojection de la donnée en l'absence du dossier ./data
     if not os.path.exists(workspacePath + 'data'):
         etape = 1
-        description = 'extraction et reprojection des données'
+        description = 'extraction et reprojection des données '
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         start_time = time()
@@ -1058,7 +1058,7 @@ try:
 
         start_time = time()
         etape = 2
-        description = "nettoyage du bâti pour l'estimation de la population"
+        description = "nettoyage du bâti pour l'estimation de la population "
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         log.write(description + ' : ')
@@ -1107,7 +1107,7 @@ try:
         log.write(trace(start_time) + '\n')
         start_time = time()
         etape = 3
-        description =  "création d'une grille de " + gridSize + "m de côté"
+        description =  "création d'une grille de " + gridSize + "m de côté "
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         log.write(description + ' : ')
@@ -1143,7 +1143,7 @@ try:
         if not speed:
             start_time = time()
             etape = 4
-            description = "analyse de l'évolution des zones bâties"
+            description = "analyse de l'évolution des zones bâties "
             progres = "Etape %i sur 8 : %s" %(etape, description)
             printer(progres)
             log.write(description + ' : ')
@@ -1165,7 +1165,7 @@ try:
 
         start_time = time()
         etape = 5
-        description = "estimation de la population dans la grille"
+        description = "estimation de la population dans la grille "
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         log.write(description + ' : ')
@@ -1181,7 +1181,7 @@ try:
         log.write(trace(start_time) + '\n')
         start_time = time()
         etape = 6
-        description = "calcul des restrictions"
+        description = "calcul des restrictions "
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         log.write(description + ' : ')
@@ -1236,7 +1236,7 @@ try:
         log.write(trace(start_time) + '\n')
         start_time = time()
         etape = 7
-        description = "création des rasters de restriction et d'intérêt"
+        description = "création des rasters de restriction et d'intérêt "
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         log.write(description + ' : ')
@@ -1321,7 +1321,7 @@ try:
 
     start_time = time()
     etape = 8
-    description = "finalisation"
+    description = "finalisation "
     progres = "Etape %i sur 8 : %s" %(etape, description)
     printer(progres)
     log.write(description + ' : ')
@@ -1442,9 +1442,9 @@ try:
         rmtree(workspacePath)
 except:
     print('\n' + sys.exc_info())
-    log.close()
     qgs.exitQgis()
+    log.close()
     sys.exit()
 
-log.close()
 qgs.exitQgis()
+log.close()

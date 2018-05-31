@@ -35,8 +35,8 @@ if len(sys.argv) > 5:
             pluPriority = literal_eval(arg.split('=')[1])
         if 'finalYear' in arg:
             finalYear = int(arg.split('=')[1])
-        if 'capaPlus' in arg:
-            capaPlus = int(arg.split('=')[1])
+        if 'adjustCapa' in arg:
+            adjustCapa = int(arg.split('=')[1])
 
 # Valeurs de paramètres par défaut
 if 'mode' not in globals():
@@ -47,19 +47,24 @@ if 'pluPriority' not in globals():
     pluPriority = True
 if 'finalYear' not in globals():
     finalYear = 2040
-if 'capaPlus' not in globals():
-    capaPlus = 100
+if 'adjustCapa' not in globals():
+    adjustCapa = 100
 
 cellSurf = gridSize * gridSize
-projectPath = outputDir + str(gridSize) + 'm_' + mode + '_tx' + str(rate) + '/'
+projectPath = outputDir + str(gridSize) + 'm_' + mode + '_tx' + str(rate)
+if adjustCapa != 100:
+    projectPath += '_adjust' + str(adjustCapa)
+if saturateFirst:
+    projectPath += '_satFirst'
+if pluPriority:
+    projectPath += '_pluPrio'
+if finalYear != 2040:
+    projectPath += '_' + str(finalYear)
+projectPath += '/'
+
 if os.path.exists(projectPath):
     rmtree(projectPath)
-os.makedirs(projectPath)
-os.mkdir(projectPath + '/snapshots')
-
-# Création d'un fichier journal
-log = open(projectPath + 'log.csv', 'x')
-mesures = open(projectPath + 'mesures.csv', 'x')
+os.makedirs(projectPath + 'snapshots')
 
 # Pour affichage dynamique de la progression
 def printer(string):
@@ -158,7 +163,11 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
     to_tif(population, gdal.GDT_UInt16, projectPath + 'snapshots/pop_' + str(year) + '.tif')
     return popALoger - popLogee
 
+# Création d'un fichier journal
+log = open(projectPath + 'log.csv', 'x')
+mesures = open(projectPath + 'mesures.csv', 'x')
 start_time = time()
+
 try:
     # Création des dataframes contenant les informations par IRIS
     with open(dataDir + 'population.csv') as csvFile:
@@ -169,12 +178,8 @@ try:
     dicPop = {}
     year = 2015
     while year <= finalYear:
-        if year == 2015:
-            dicPop[year] = int(pop * (rate / 100))
-            pop += int(pop * (rate / 100))
-        else:
-            dicPop[year] = int(pop * (rate / 100))
-            pop += int(pop * (rate / 100))
+        dicPop[year] = round(pop * (rate / 100))
+        pop += round(pop * (rate / 100))
         year += 1
 
     # Nombre total de personnes à loger - permet de vérifier si le raster capacité permet d'accueillir tout le monde
@@ -202,8 +207,9 @@ try:
     driver = gdal.GetDriverByName('GTiff')
     ds = None
 
-    urbain14 = np.where(population > 0, 1, 0)
-    to_tif(urbain14, gdal.GDT_Byte, projectPath + 'urbain_2014.tif' )
+    urb14 = np.where(population > 0, 1, 0)
+    to_tif(urb14, gdal.GDT_Byte, projectPath + 'urbain_2014.tif' )
+    del urb14
 
     # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
     restriction = to_array(dataDir + 'restriction.tif')
@@ -217,9 +223,9 @@ try:
     else:
         hasPlu = False
 
-    # Augmentation de la capacité selon une valeur utilisateur
-    if capaPlus > 100:
-        capacite = capacite * (capaPlus/100)
+    # Modification de la capacité selon une valeur utilisateur en %
+    if adjustCapa > 0:
+        capacite = capacite * (adjustCapa/100)
 
     # On vérifie que la capcité d'accueil est suffisante, ici on pourrait modifier la couche de restriction pour augmenter la capacité
     f = 0
@@ -282,10 +288,8 @@ try:
         else:
             urbanize(mode, popALoger, saturateFirst)
 
-    end_time = time()
-    execTime = round(end_time - start_time, 2)
     # Calcul et export des résultats
-    urbain40 = np.where(population > 0, 1, 0)
+    urb40 = np.where(population > 0, 1, 0)
     popNouvelle = population - populationDepart
     capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
     expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
@@ -298,7 +302,7 @@ try:
     to_tif(expansion, gdal.GDT_Byte, projectPath + 'expansion.tif')
     to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
     to_tif(capaSaturee, gdal.GDT_Byte, projectPath + 'capacite_saturee')
-    to_tif(urbain40, gdal.GDT_Byte, projectPath + 'urbain_2040.tif' )
+    to_tif(urb40, gdal.GDT_Byte, projectPath + 'urbain_2040.tif' )
 
     nbCapaCell = np.where(capaciteDepart != 0, 1, 0).sum()
     mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
@@ -307,11 +311,14 @@ try:
     mesures.write("Expansion totale en m2, " + str(expansionSum * cellSurf) + "\n")
     mesures.write("Impact environnemental cumulé, " + str(impactEnvironnemental) + "\n")
     log.write("Nombre de personnes final, " + str(population.sum()) + '\n')
+
+    end_time = time()
+    execTime = round(end_time - start_time, 2)
     log.write("Temps d'execution, " + str(execTime))
-    print("Temps d'execution, " + str(execTime))
+    print("\nTemps d'execution : " + str(execTime) + ' secondes')
 
 except:
-    print(sys.exc_info())
+    print('\n' + sys.exc_info())
     mesures.close()
     log.close()
     sys.exit()
