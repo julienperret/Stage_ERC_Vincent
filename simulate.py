@@ -5,6 +5,7 @@ import re
 import sys
 import csv
 import gdal
+import traceback
 import numpy as np
 from shutil import rmtree
 from ast import literal_eval
@@ -138,10 +139,10 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
         if pluPriority:
             capaciteTmp = np.where(plu_priorite == 1, capaciteTmp, 0)
         while popLogee < popALoger and capaciteTmp.sum() > 0:
-            i = 0
             weight = np.where(capaciteTmp > 0, interet, 0)
             flatWeight = weight.flatten()
             choices = np.random.choice(flatWeight.size, popALoger - popLogee, p=flatWeight / flatWeight.sum())
+            i = 0
             while i < choices.size:
                 row = choices[i] // weight.shape[1]
                 col = choices[i] % weight.shape[1]
@@ -318,7 +319,9 @@ try:
     print("\nTemps d'execution : " + str(execTime) + ' secondes')
 
 except:
-    print('\n' + sys.exc_info())
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    print("\n*** Erreur :")
+    traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
     mesures.close()
     log.close()
     sys.exit()

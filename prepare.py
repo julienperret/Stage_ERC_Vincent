@@ -5,6 +5,7 @@ import re
 import sys
 import csv
 import gdal
+import traceback
 import numpy as np
 from ast import literal_eval
 from time import strftime, time
@@ -1441,7 +1442,9 @@ try:
         print('Suppression des données temporaires !')
         rmtree(workspacePath)
 except:
-    print('\n' + sys.exc_info())
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    print("\n*** Erreur :")
+    traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
     qgs.exitQgis()
     log.close()
     sys.exit()

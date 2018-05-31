@@ -5,6 +5,7 @@ import re
 import sys
 import csv
 import operator
+import traceback
 from ast import literal_eval
 import multiprocessing as mp
 from time import strftime, time
@@ -87,7 +88,7 @@ def parseTable(prefix, tab, dep):
                 for line in r:
                     if len(line) >= minLen:
                         w.write(getTuple(line, tab))
-                        
+
 try:
     # Variables globales
     model = {}
@@ -167,5 +168,7 @@ try:
     print("\nTemps d'execution : %im %is" %(execMin, execSec))
 
 except:
-    print sys.exc_info()
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    print("\n*** Erreur :")
+    traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
     sys.exit()

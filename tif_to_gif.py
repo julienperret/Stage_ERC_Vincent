@@ -3,6 +3,7 @@
 import os
 import sys
 import gdal
+import traceback
 import numpy as np
 from shutil import rmtree
 
@@ -38,7 +39,7 @@ def to_tif(array, dtype, path):
 
 try:
     # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-    ds = gdal.Open(inDir + '/pop_2040.tif')
+    ds = gdal.Open(inDir + 'pop_2040.tif')
     population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
     cols = ds.RasterXSize
     rows = ds.RasterYSize
@@ -49,7 +50,7 @@ try:
         maxValue = population.max()
     del population
 
-    os.mkdir(outDir + '/tmp')
+    os.mkdir(outDir + 'tmp')
     for tifPath in os.listdir(inDir):
         if os.path.splitext(tifPath)[1] == '.tif':
             basename = os.path.splitext(tifPath.split('/')[len(tifPath.split('/'))-1])[0]
@@ -57,9 +58,11 @@ try:
             array = (array * 65535 / maxValue).astype(np.uint16)
             to_tif(array, gdal.GDT_UInt16, outDir + '/tmp/' + basename + '.tif')
 
-    os.system('convert -delay ' + delay + ' -loop 0 ' + outDir + '/tmp/*.tif ' + outDir + '/evo_demo.gif')
-    rmtree(outDir + '/tmp')
+    os.system('convert -delay ' + delay + ' -loop 0 ' + outDir + 'tmp/*.tif ' + outDir + 'evo_demo.gif')
+    rmtree(outDir + 'tmp')
 
 except:
-    print(sys.exc_info())
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    print("\n*** Erreur :")
+    traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
     sys.exit()
