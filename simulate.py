@@ -264,6 +264,7 @@ try:
 
     capaciteDepart = capacite.copy()
     populationDepart = population.copy()
+    to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite_depart.tif')
 
     # Conversion des autres raster d'entrée en numpy array
     ecologie = to_array(dataDir + 'ecologie.tif', 'float32')
