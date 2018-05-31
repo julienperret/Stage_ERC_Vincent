@@ -36,25 +36,30 @@ def to_tif(array, dtype, path):
     ds_out.GetRasterBand(1).WriteArray(array)
     ds_out = None
 
-# Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-ds = gdal.Open(inDir + '/pop_2040.tif')
-population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
-cols = ds.RasterXSize
-rows = ds.RasterYSize
-driver = gdal.GetDriverByName('GTiff')
-ds = None
+try:
+    # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
+    ds = gdal.Open(inDir + '/pop_2040.tif')
+    population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
+    cols = ds.RasterXSize
+    rows = ds.RasterYSize
+    driver = gdal.GetDriverByName('GTiff')
+    ds = None
 
-if 'maxValue' not in globals():
-    maxValue = population.max()
-del population
+    if 'maxValue' not in globals():
+        maxValue = population.max()
+    del population
 
-os.mkdir(outDir + '/tmp')
-for tifPath in os.listdir(inDir):
-    if os.path.splitext(tifPath)[1] == '.tif':
-        basename = os.path.splitext(tifPath.split('/')[len(tifPath.split('/'))-1])[0]
-        array = to_array(inDir + '/' + tifPath).astype(np.uint32)
-        array = (array * 65535 / maxValue).astype(np.uint16)
-        to_tif(array, gdal.GDT_UInt16, outDir + '/tmp/' + basename + '.tif')
+    os.mkdir(outDir + '/tmp')
+    for tifPath in os.listdir(inDir):
+        if os.path.splitext(tifPath)[1] == '.tif':
+            basename = os.path.splitext(tifPath.split('/')[len(tifPath.split('/'))-1])[0]
+            array = to_array(inDir + '/' + tifPath).astype(np.uint32)
+            array = (array * 65535 / maxValue).astype(np.uint16)
+            to_tif(array, gdal.GDT_UInt16, outDir + '/tmp/' + basename + '.tif')
 
-os.system('convert -delay ' + delay + ' -loop 0 ' + outDir + '/tmp/*.tif ' + outDir + '/evo_demo.gif')
-rmtree(outDir + '/tmp')
+    os.system('convert -delay ' + delay + ' -loop 0 ' + outDir + '/tmp/*.tif ' + outDir + '/evo_demo.gif')
+    rmtree(outDir + '/tmp')
+    
+except:
+    print sys.exc_info()
+    sys.exit()
