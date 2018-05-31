@@ -226,7 +226,7 @@ try:
 
     # Modification de la capacité selon une valeur utilisateur en %
     if adjustCapa > 0:
-        capacite = capacite * (adjustCapa/100)
+        capacite = (capacite * (adjustCapa/100)).astype(np.uint16)
 
     # On vérifie que la capcité d'accueil est suffisante, ici on pourrait modifier la couche de restriction pour augmenter la capacité
     f = 0
@@ -273,8 +273,8 @@ try:
     sirene = to_array(dataDir + 'sirene.tif', 'float32')
 
     # Création du raster final d'intérêt avec pondération
-    interet = np.where((restriction != 1), (ecologie * poids['ecologie']) + (ocsol * poids['ocsol']) + (routes * poids['routes']) + (transport * poids['transport']) + (
-        sirene * poids['sirene']), 0)
+    interet = np.where((restriction != 1), (ecologie * poids['ecologie']) + (ocsol * poids['ocsol']) +
+     (routes * poids['routes']) + (transport * poids['transport']) + (sirene * poids['sirene']), 0)
     to_tif(interet, gdal.GDT_Float32, projectPath + 'interet.tif')
     del poids, restriction, ocsol, routes, transport, sirene
 
@@ -320,7 +320,7 @@ try:
 
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
-    print("\n*** Erreur :")
+    print("\n*** Error :")
     traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
     mesures.close()
     log.close()

@@ -63,6 +63,6 @@ try:
 
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
-    print("\n*** Erreur :")
+    print("\n*** Error :")
     traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
     sys.exit()

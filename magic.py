@@ -13,16 +13,17 @@ from time import strftime, time
 inputDir = sys.argv[1]
 modelDir = sys.argv[2]
 outputDir  = sys.argv[3]
-if len(sys.argv) > 4:
-    param = sys.argv[4]
+nbCores  = int(sys.argv[4])
+if len(sys.argv) > 5:
+    param = sys.argv[5]
     if param != 'all':
         if '[' in param:
             tables = literal_eval(param)
         elif len(param) == 4:
             tables = []
             tables.append(param)
-if len(sys.argv) > 5:
-    param = sys.argv[5]
+if len(sys.argv) > 6:
+    param = sys.argv[6]
     if '[' in param:
         depList = literal_eval(param)
     elif len(param) == 2:
@@ -128,9 +129,9 @@ try:
             reader = csv.reader(file)
             next(reader, None)
             tab = tab.replace('.csv','')
-            model[tab]={str(row[4]):[int(row[0])-1,int(row[1])] for row in reader}
+            model[tab] = { str(row[4]) : [int(row[0]) - 1, int(row[1])] for row in reader }
 
-    # Tri du dictionnaire en fonction de la première valeur début de getTuple, utilisée pour créer la ligne dans le bon ordre
+    # Tri du dictionnaire en fonction de la première valeur début, utilisée pour créer la ligne CSV dans le bon ordre
     tmpModel = {}
     for tab in model.keys():
         tmpModel[tab] = sorted(model[tab].items(), key=operator.itemgetter(1))
@@ -138,7 +139,7 @@ try:
     del tmpModel
 
     # Variables pour multithreading
-    pool = mp.Pool()
+    pool = mp.Pool(nbCores)
     jobs = []
     # Itération dans les départements
     for dep in depList:
@@ -169,6 +170,6 @@ try:
 
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
-    print("\n*** Erreur :")
+    print("\n*** Error :")
     traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
     sys.exit()

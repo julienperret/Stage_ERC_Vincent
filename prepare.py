@@ -807,7 +807,7 @@ try:
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         start_time = time()
-        log.write(description + ' : ')
+        log.write(description + ': ')
 
         os.mkdir(workspacePath + 'data')
         # Tampon de 1000m autour de la zone pour extractions des quartiers et des PAI
@@ -1062,7 +1062,7 @@ try:
         description = "nettoyage du bâti pour l'estimation de la population "
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
-        log.write(description + ' : ')
+        log.write(description + ': ')
 
         # Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
         bati_indif = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_indifferencie.shp', 'bati_indif_2016')
@@ -1111,7 +1111,7 @@ try:
         description =  "création d'une grille de " + gridSize + "m de côté "
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
-        log.write(description + ' : ')
+        log.write(description + ': ')
 
         os.mkdir(workspacePath + 'data/' + gridSize + 'm/')
         os.mkdir(workspacePath + 'data/' + gridSize + 'm/tif')
@@ -1147,7 +1147,7 @@ try:
             description = "analyse de l'évolution des zones bâties "
             progres = "Etape %i sur 8 : %s" %(etape, description)
             printer(progres)
-            log.write(description + ' : ')
+            log.write(description + ': ')
 
             buildStatDic = {
                 'indif': workspacePath + 'data/2016_bati/bati_indifferencie.shp',
@@ -1169,7 +1169,7 @@ try:
         description = "estimation de la population dans la grille "
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
-        log.write(description + ' : ')
+        log.write(description + ': ')
 
         batiInterIris = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_inter_iris.shp')
         if not speed:
@@ -1185,7 +1185,7 @@ try:
         description = "calcul des restrictions "
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
-        log.write(description + ' : ')
+        log.write(description + ': ')
 
         # Création de la grille de restriction
         b_removed = QgsVectorLayer(workspacePath + 'data/restriction/bati_removed.shp', 'b_removed')
@@ -1240,7 +1240,7 @@ try:
         description = "création des rasters de restriction et d'intérêt "
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
-        log.write(description + ' : ')
+        log.write(description + ': ')
         # Chaîne à passer à QGIS pour l'étendue des rasterisations
         extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
@@ -1325,7 +1325,7 @@ try:
     description = "finalisation "
     progres = "Etape %i sur 8 : %s" %(etape, description)
     printer(progres)
-    log.write(description + ' : ')
+    log.write(description + ': ')
 
     # Mise en forme finale des données raster pour le modèle
     if not os.path.exists(projectPath):
@@ -1443,7 +1443,7 @@ try:
         rmtree(workspacePath)
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
-    print("\n*** Erreur :")
+    print("\n*** Error :")
     traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
     qgs.exitQgis()
     log.close()
