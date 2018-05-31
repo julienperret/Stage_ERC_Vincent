@@ -1,6 +1,3 @@
-**N.B.** Après modif de Julien, il faut conserver - réécrire les headers dans les CSV !  
-******** Tous les répertoires passés en arguments doivent désormais contenir le '/' final  
-
 **./prepare.py**  
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  
     1 : répertoire des données globales  
@@ -10,11 +7,12 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
     5 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
 
 Mots magiques :  
-force = suppression du répertoire de sortie si il existe  
-wisdom = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires  
+* force = suppression du répertoire de sortie si il existe  
+* speed = éviter de calculer l'évolution toutes couches de bâti, divise le temps par 2
+* truth = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires  
 
 Exemple :  
-python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "gridSize=50 useTxrp=True levelHeight=3 force"  
+python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "gridSize=50 speed"  
 
 Dépendances pour python3 :  
     PyQt5.QtCore.QVariant, qgis, gdal, numpy  
@@ -46,19 +44,6 @@ Dépendances pour python3 :
 
 Usage :  
 ./insee_to_csv.py ../global_data/insee/  
-
-**./majic_to_csv.py**  
-Convertir les données positionnelles MAJIC III en CSV, à lancer une seule fois
-3 paramètres au minimum:
-    1 : répertoire contenant la donnée  
-    2 : répertoire des modèles (parse)
-    3 : répertoire de sortie (créé si besoin)
-    4 : table ou liste de tables à convertir
-    5 : département ou liste de département à traiter
-
-Usage :  
-./majic_to_csv.py ./majic/ ./models/ ./output/ 'BATI' '34'
-./majic_to_csv.py ./majic/ ./models/ ./output/ "['BATI','PROP']" "['11', '34']"
 
 **./tif_to_gif.py**  
 Génère un GIF à partir des tifs de population générés pour chaque année de la simulation.  
