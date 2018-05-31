@@ -522,7 +522,7 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
         grid.addExpressionField(expr, QgsField('built_09', QVariant.Int, len=1))
         expr = 'IF("ssol_16" >= $area * ' + str(ratio) + ', 1, 0)'
         grid.addExpressionField(expr, QgsField('built_16', QVariant.Int, len=1))
-        to_shp(grid, outdir + '/stat_grid.shp')
+
 
         cpt = 0
         expr = ''
@@ -545,7 +545,9 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
         iris.addExpressionField(expr, QgsField('ssol_16', QVariant.Double))
 
         iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
-        to_shp(iris, outdir + '/stat_iris.shp')
+
+    to_shp(grid, outdir + '/stat_grid.shp')
+    to_shp(iris, outdir + '/stat_iris.shp')
 
 # Crée une grille avec des statistiques par cellule sur la surface couverte pour chaque couche en entrée
 def restrictGrid(layerList, grid, ratio, outdir):
@@ -801,7 +803,7 @@ try:
     # Découpe et reprojection de la donnée en l'absence du dossier ./data
     if not os.path.exists(workspacePath + 'data'):
         etape = 1
-        description = 'extraction et reprojection des données'
+        description = 'extraction et reprojection des données\n'
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         start_time = time()
@@ -1057,7 +1059,7 @@ try:
 
         start_time = time()
         etape = 2
-        description = "nettoyage du bâti pour l'estimation de la population"
+        description = "nettoyage du bâti pour l'estimation de la population\n"
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         log.write(description + ' : ')
@@ -1106,7 +1108,7 @@ try:
         log.write(trace(start_time) + '\n')
         start_time = time()
         etape = 3
-        description =  "création d'une grille de " + gridSize + "m de côté"
+        description =  "création d'une grille de " + gridSize + "m de côté\n"
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         log.write(description + ' : ')
@@ -1142,7 +1144,7 @@ try:
         if not speed:
             start_time = time()
             etape = 4
-            description = "analyse de l'évolution des zones bâties"
+            description = "analyse de l'évolution des zones bâties\n"
             progres = "Etape %i sur 8 : %s" %(etape, description)
             printer(progres)
             log.write(description + ' : ')
@@ -1164,7 +1166,7 @@ try:
 
         start_time = time()
         etape = 5
-        description = "estimation de la population dans la grille"
+        description = "estimation de la population dans la grille\n"
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         log.write(description + ' : ')
@@ -1172,16 +1174,15 @@ try:
         batiInterIris = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_inter_iris.shp')
         if not speed:
             statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath +
-                         'data/' + gridSize + 'm/')
+                         'data/' + gridSize + 'm/', workspacePath + 'data/' + gridSize + 'm/csv/')
         else:
             statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath +
-                         'data/' + gridSize + 'm/', workspacePath + 'data/' + gridSize + 'm/csv/')
-        del batiInterIris
+                         'data/' + gridSize + 'm/')
 
         log.write(trace(start_time) + '\n')
         start_time = time()
         etape = 6
-        description = "calcul des restrictions"
+        description = "calcul des restrictions\n"
         progres = "Etape %i sur 8 : %s" %(etape, description)
         printer(progres)
         log.write(description + ' : ')
