@@ -89,6 +89,8 @@ def to_tif(array, dtype, path):
     ds_out.SetProjection(proj)
     ds_out.SetGeoTransform(geot)
     ds_out.GetRasterBand(1).WriteArray(array)
+    if dtype == gdal.GDT_UInt16:
+        ds_out.GetRasterBand(1).SetNoDataValue(65535)
     ds_out = None
 
 # Fonction de répartition de la population
@@ -208,8 +210,8 @@ try:
     driver = gdal.GetDriverByName('GTiff')
     ds = None
 
-    urb14 = np.where(population > 0, 1, 0)
-    to_tif(urb14, gdal.GDT_Byte, projectPath + 'urbain_2014.tif' )
+    urb14 = np.where(population > 0, 1, 65535)
+    to_tif(urb14, gdal.GDT_UInt16, projectPath + 'urbain_2014.tif' )
     del urb14
 
     # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
@@ -291,7 +293,7 @@ try:
             urbanize(mode, popALoger, saturateFirst)
 
     # Calcul et export des résultats
-    urb40 = np.where(population > 0, 1, 0)
+    urb40 = np.where(population > 0, 1, 65535)
     popNouvelle = population - populationDepart
     capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
     expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
@@ -304,7 +306,7 @@ try:
     to_tif(expansion, gdal.GDT_Byte, projectPath + 'expansion.tif')
     to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
     to_tif(capaSaturee, gdal.GDT_Byte, projectPath + 'capacite_saturee')
-    to_tif(urb40, gdal.GDT_Byte, projectPath + 'urbain_2040.tif' )
+    to_tif(urb40, gdal.GDT_UInt16, projectPath + 'urbain_2040.tif' )
 
     nbCapaCell = np.where(capaciteDepart != 0, 1, 0).sum()
     mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
