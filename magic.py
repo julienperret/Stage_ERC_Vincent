@@ -39,7 +39,7 @@ def printer(string):
 	sys.stdout.flush()
 
 # Fonctions
-def writeHeaders(prefix, tab):
+def writeHeaders(prefix, dep, tab):
     if fileType == 'csv':
         with open(prefix + tab + '.csv', 'w') as w:
             i = 0
@@ -54,7 +54,7 @@ def writeHeaders(prefix, tab):
     elif fileType == 'sql':
         with open(prefix + tab + '.sql', 'w') as w:
             i = 0
-            h = 'create table majic.' + tab.lower() + '('
+            h = 'CREATE TABLE majic.d' + dep + '_' + tab.lower() + '('
             for field in modelSorted[tab]:
                 i += 1
                 lgr = model[tab][field][2]
@@ -87,7 +87,7 @@ def getTuple(l, tab):
         tuple += v
     return tuple
 
-def writeLine(prefix, tab, line, minLen, eCutList):
+def writeLine(prefix, dep, tab, line, minLen, eCutList):
     res = None
     e = line[eCutList[0]:eCutList[1]]
     res = re.search('[0-9]{2}', e)
@@ -98,16 +98,16 @@ def writeLine(prefix, tab, line, minLen, eCutList):
         elif fileType == 'sql':
             with open(prefix + tab + e + '.sql', 'a') as w:
                 t = getTuple(line, tab + e)
-                w.write('INSERT INTO majic.' + tab.lower() + e + ' VALUES (' + t + ')\n' )
+                w.write('INSERT INTO majic.d' + dep + '_' + tab.lower() + e + ' VALUES (' + t + ')\n' )
 
-def parseTable(prefix, tab, dep):
+def parseTable(prefix, dep, tab):
     minLen = minLenDic[tab]
     with open(inputDir + 'ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671', 'r') as r:
         if tab in eCutDic.keys():
             eCutList = eCutDic[tab]
             for line in r:
                 if len(line) >= minLen:
-                    writeLine(prefix, tab, line, minLen, eCutList)
+                    writeLine(prefix, dep, tab, line, minLen, eCutList)
         else:
             if fileType == 'csv':
                 with open(prefix + tab + '.csv', 'a') as w:
@@ -119,7 +119,7 @@ def parseTable(prefix, tab, dep):
                     for line in r:
                         if len(line) >= minLen:
                             t = getTuple(line, tab)
-                            w.write('INSERT INTO majic.' + tab.lower() + 'VALUES (' + t + ')\n')
+                            w.write('INSERT INTO majic.d' + dep + '_' + tab.lower() + 'VALUES (' + t + ')\n')
 try:
     # Variables globales
     model = {}
@@ -177,12 +177,12 @@ try:
         if not os.path.exists(prefix):
             os.makedirs(prefix)
         for tab in tables:
-            jobs.append(pool.apply_async(parseTable,(prefix, tab, dep)))
+            jobs.append(pool.apply_async(parseTable,(prefix, dep, tab)))
             if tab not in eDic.keys():
-                writeHeaders(prefix, tab)
+                writeHeaders(prefix, dep, tab)
             else:
                 for e in eDic[tab]:
-                    writeHeaders(prefix, tab + e)
+                    writeHeaders(prefix, dep, tab + e)
     c = 0
     for j in jobs:
         j.get()
