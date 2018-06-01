@@ -145,7 +145,7 @@ print('Commencé à ' + strftime('%H:%M:%S'))
 
 # Pour affichage dynamique de la progression
 def printer(string):
-	sys.stdout.write("\r\x1b[K" + string)
+	sys.stdout.write('\r' + string)
 	sys.stdout.flush()
 
 # Calcul le temps d'exécution d'une étape
