@@ -85,7 +85,7 @@ def getTuple(l, tab):
                     v = v.replace("'","''")
             v = quote + v + quote
         else:
-            v = quote + 'NULL' + quote
+            v = 'NULL'
         if i < len(modelSorted[tab]):
             v += ','
         tuple += v
