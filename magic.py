@@ -62,7 +62,7 @@ def writeHeaders(prefix, dep, tab):
                 if i < len(modelSorted[tab]):
                     h += ','
                 else:
-                    h += ')\n'
+                    h += ');\n'
             w.write(h)
 
 def getTuple(l, tab):
@@ -98,7 +98,7 @@ def writeLine(prefix, dep, tab, line, minLen, eCutList):
         elif fileType == 'sql':
             with open(prefix + tab + e + '.sql', 'a') as w:
                 t = getTuple(line, tab + e)
-                w.write('INSERT INTO majic.d' + dep + '_' + tab.lower() + e + ' VALUES (' + t + ')\n' )
+                w.write('INSERT INTO majic.d' + dep + '_' + tab.lower() + e + ' VALUES (' + t + ');\n' )
 
 def parseTable(prefix, dep, tab):
     minLen = minLenDic[tab]
