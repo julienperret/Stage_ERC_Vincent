@@ -83,7 +83,11 @@ def getTuple(l, tab):
             if fileType == 'sql':
                 if "'" in v:
                     v = v.replace("'","''")
-            v = quote + v + quote
+            res = re.search('\s*', v)
+            if not res:
+                v = quote + v + quote
+            else:
+                v = 'NULL'
         else:
             v = 'NULL'
         if i < len(modelSorted[tab]):
