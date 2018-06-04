@@ -43,9 +43,10 @@ def writeHeaders(prefix, dep, tab):
     if fileType == 'csv':
         with open(prefix + tab + '.csv', 'w') as w:
             i = 0
+            h = ''
             for field in modelSorted[tab]:
                 i += 1
-                h = field
+                h += field
                 if i < len(modelSorted[tab]):
                     h += ','
                 else:
