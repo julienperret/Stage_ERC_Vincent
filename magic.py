@@ -77,9 +77,13 @@ def getTuple(l, tab):
         deb = int(model[tab][field][0])
         fin = int(model[tab][field][1])
         if fin <= len(l):
-            v = quote + l[deb:fin] + quote
+            v = l[deb:fin]
             if '\n' in v:
                 v = v.replace('\n','')
+            if fileType == 'sql':
+                if "'" in v:
+                    v = v.replace("'","''")
+            v = quote + v + quote
         else:
             v = quote + 'NULL' + quote
         if i < len(modelSorted[tab]):
