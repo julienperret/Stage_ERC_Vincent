@@ -140,12 +140,12 @@ if not os.path.exists(workspacePath):
 statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum',
                  'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
-log = open(workspacePath + 'log.txt', 'x')
+log = open(workspacePath + strftime('%Y%m%d%H%M') + '_log.txt', 'x')
 print('Commencé à ' + strftime('%H:%M:%S'))
 
 # Pour affichage dynamique de la progression
 def printer(string):
-	sys.stdout.write('\r' + string)
+	sys.stdout.write("\r\x1b[K" + string)
 	sys.stdout.flush()
 
 # Calcul le temps d'exécution d'une étape
@@ -1103,9 +1103,9 @@ try:
             'OUTPUT': workspacePath + 'data/2016_bati/bati_inter_iris.shp'
         }
         processing.run('qgis:intersection', params, feedback=feedback)
+        log.write(trace(start_time) + '\n')
 
     if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
-        log.write(trace(start_time) + '\n')
         start_time = time()
         etape = 3
         description =  "création d'une grille de " + gridSize + "m de côté "
@@ -1328,8 +1328,9 @@ try:
     log.write(description + ': ')
 
     # Mise en forme finale des données raster pour le modèle
-    if not os.path.exists(projectPath):
-        os.makedirs(projectPath)
+    if os.path.exists(projectPath):
+        rmtree(projectPath)
+    os.makedirs(projectPath)
 
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
     population = 0

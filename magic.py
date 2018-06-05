@@ -34,7 +34,7 @@ if not os.path.exists(outputDir):
 
 # Pour affichage dynamique de la progression
 def printer(string):
-	sys.stdout.write('\r' + string)
+	sys.stdout.write("\r\x1b[K" + string)
 	sys.stdout.flush()
 
 # Fonctions
@@ -73,11 +73,14 @@ def getTuple(l, tab):
         fin = int(model[tab][field][1])
         if deb <= len(l):
             if fin <= len(l):
-                v = '"' + l[deb:fin] + '"'
+                v = l[deb:fin]
             else:
-                v = '"' + l[deb:len(l)-1] + '"'
+                v = l[deb:len(l)-1]
             if '\n' in v:
                 v = v.replace('\n','')
+            if '"' in v:
+                v = v.replace('"','')
+            v = '"' + v + '"'
         else:
             v = ''
         if i < len(modelSorted[tab]):
@@ -110,7 +113,7 @@ try:
     # Variables globales
     model = {}
     eDic = {
-        'BATI': ['00','10','30','36','40','50','60'],
+        'BATI': ['00','10','21','30','36','40','50','60'],
         'NBAT': ['10','21','30','36'],
         'PDLL': ['10','20','30']
     }

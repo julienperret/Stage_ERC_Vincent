@@ -69,7 +69,7 @@ os.makedirs(projectPath + 'snapshots')
 
 # Pour affichage dynamique de la progression
 def printer(string):
-	sys.stdout.write('\r' + string)
+	sys.stdout.write("\r\x1b[K" + string)
 	sys.stdout.flush()
 
 # Convertit un tif en numpy array
