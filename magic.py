@@ -71,8 +71,11 @@ def getTuple(l, tab):
         i += 1
         deb = int(model[tab][field][0])
         fin = int(model[tab][field][1])
-        if fin <= len(l):
-            v = '"' + l[deb:fin] + '"'
+        if deb <= len(l):
+            if fin <= len(l):
+                v = '"' + l[deb:fin] + '"'
+            else:
+                v = '"' + l[deb:len(l)-1] + '"'
             if '\n' in v:
                 v = v.replace('\n','')
         else:
