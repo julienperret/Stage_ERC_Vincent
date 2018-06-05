@@ -14,17 +14,16 @@ nbCores  = int(sys.argv[1])
 inputDir = sys.argv[2]
 modelDir = sys.argv[3]
 outputDir = sys.argv[4]
-fileType = sys.argv[5]
-if len(sys.argv) > 6:
-    param = sys.argv[6]
+if len(sys.argv) > 5:
+    param = sys.argv[5]
     if param != 'all':
         if '[' in param:
             tables = literal_eval(param)
         elif len(param) == 4:
             tables = []
             tables.append(param)
-if len(sys.argv) > 7:
-    param = sys.argv[7]
+if len(sys.argv) > 6:
+    param = sys.argv[6]
     if '[' in param:
         depList = literal_eval(param)
     elif len(param) == 2:
@@ -40,70 +39,56 @@ def printer(string):
 
 # Fonctions
 def writeHeaders(prefix, dep, tab):
-    if fileType == 'csv':
-        with open(prefix + tab + '.csv', 'w') as w:
-            i = 0
-            h = ''
-            for field in modelSorted[tab]:
-                i += 1
-                h += field
-                if i < len(modelSorted[tab]):
-                    h += ','
-                else:
-                    h += '\n'
-            w.write(h)
-    elif fileType == 'sql':
-        with open(prefix + tab + '.sql', 'w') as w:
-            i = 0
-            h = 'CREATE TABLE majic.d' + dep + '_' + tab.lower() + '('
-            for field in modelSorted[tab]:
-                i += 1
-                lgr = model[tab][field][2]
-                h += '"' + field + '" varchar(' + str(lgr) + ')'
-                if i < len(modelSorted[tab]):
-                    h += ','
-                else:
-                    h += ');\n'
-            w.write(h)
+    with open(prefix + tab + '.csv', 'w') as w:
+        i = 0
+        h = ''
+        for field in modelSorted[tab]:
+            i += 1
+            h += field
+            if i < len(modelSorted[tab]):
+                h += ','
+            else:
+                h += '\n'
+        w.write(h)
+    with open(prefix + 'copy_csv.sql', 'a') as w:
+        i = 0
+        h = 'CREATE TABLE majic.d' + dep + '_' + tab.lower() + '('
+        for field in modelSorted[tab]:
+            i += 1
+            lgr = model[tab][field][2]
+            h += '"' + field + '" varchar(' + str(lgr) + ')'
+            if i < len(modelSorted[tab]):
+                h += ','
+            else:
+                h += ');\n'
+        w.write(h)
+        w.write('\COPY majic.d' + dep + '_' + tab.lower() + ' FROM ' + tab + """.csv CSV HEADER QUOTE '"' DELIMITER ','; \n""")
 
 def getTuple(l, tab):
     i = 0
     tuple = ''
-    if fileType == 'csv':
-        quote = '"'
-    elif fileType == 'sql':
-        quote = "'"
     for field in modelSorted[tab]:
         i += 1
         deb = int(model[tab][field][0])
         fin = int(model[tab][field][1])
         if fin <= len(l):
-            v = l[deb:fin]
+            v = '"' + l[deb:fin] + '"'
             if '\n' in v:
                 v = v.replace('\n','')
-            if fileType == 'sql':
-                if "'" in v:
-                    v = v.replace("'","''")
-            v = quote + v + quote
         else:
-            v = 'NULL'
+            v = ''
         if i < len(modelSorted[tab]):
             v += ','
         tuple += v
-    return tuple
+    return tuple + '\n'
 
 def writeLine(prefix, dep, tab, line, minLen, eCutList):
     res = None
     e = line[eCutList[0]:eCutList[1]]
     res = re.search('[0-9]{2}', e)
     if res and e in eDic[tab]:
-        if fileType == 'csv':
-            with open(prefix + tab + e + '.csv', 'a') as w:
-                w.write(getTuple(line, tab + e) + '\n')
-        elif fileType == 'sql':
-            with open(prefix + tab + e + '.sql', 'a') as w:
-                t = getTuple(line, tab + e)
-                w.write('INSERT INTO majic.d' + dep + '_' + tab.lower() + e + ' VALUES (' + t + ');\n' )
+        with open(prefix + tab + e + '.csv', 'a') as w:
+            w.write(getTuple(line, tab + e))
 
 def parseTable(prefix, dep, tab):
     minLen = minLenDic[tab]
@@ -114,17 +99,10 @@ def parseTable(prefix, dep, tab):
                 if len(line) >= minLen:
                     writeLine(prefix, dep, tab, line, minLen, eCutList)
         else:
-            if fileType == 'csv':
-                with open(prefix + tab + '.csv', 'a') as w:
-                    for line in r:
-                        if len(line) >= minLen:
-                            w.write(getTuple(line, tab))
-            elif fileType == 'sql':
-                with open(prefix + tab + '.sql', 'a') as w:
-                    for line in r:
-                        if len(line) >= minLen:
-                            t = getTuple(line, tab)
-                            w.write('INSERT INTO majic.d' + dep + '_' + tab.lower() + 'VALUES (' + t + ')\n')
+            with open(prefix + tab + '.csv', 'a') as w:
+                for line in r:
+                    if len(line) >= minLen:
+                        w.write(getTuple(line, tab))
 try:
     # Variables globales
     model = {}
