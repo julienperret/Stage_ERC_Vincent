@@ -7,8 +7,14 @@ import traceback
 import numpy as np
 from shutil import rmtree
 
-inDir = sys.argv[1]
-outDir = sys.argv[2]
+def slashify(path):
+    if path[len(path)-1] != '/':
+        return path + '/'
+    else:
+        return path
+
+inDir = slashify(sys.argv[1])
+outDir = slashify(sys.argv[2])
 if len(sys.argv) > 3:
     argStr = sys.argv[3].split()
     for arg in argStr:

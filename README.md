@@ -8,8 +8,11 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 
 Mots magiques :  
 * force = suppression du répertoire de sortie si il existe  
-* speed = éviter de calculer l'évolution toutes couches de bâti, divise le temps par 2 (de 20 à 10mn)
+* speed = éviter de calculer l'évolution toutes couches de bâti, divise le temps par 2 (de 20 à 10mn)  
 * truth = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires  
+* multiproc = utilisation de plusieurs threads (uniquement pour calculer l'évolution du bâti)  
+
+**Les chemins peuvent désormais être passés en arguments avec ou sans slash final**  
 
 Exemple :  
 python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "gridSize=50 speed"  

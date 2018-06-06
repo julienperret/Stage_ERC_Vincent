@@ -10,10 +10,16 @@ from ast import literal_eval
 import multiprocessing as mp
 from time import strftime, time
 
+def slashify(path):
+    if path[len(path)-1] != '/':
+        return path + '/'
+    else:
+        return path
+
 nbCores  = int(sys.argv[1])
-inputDir = sys.argv[2]
-modelDir = sys.argv[3]
-outputDir = sys.argv[4]
+inputDir = slashify(sys.argv[2])
+modelDir = slashify(sys.argv[3])
+outputDir = slashify(sys.argv[4])
 if len(sys.argv) > 5:
     param = sys.argv[5]
     if param != 'all':
@@ -180,6 +186,7 @@ try:
         printer(progres)
     pool.close()
     pool.join()
+
 
     end_time = time()
     execTime = end_time - start_time

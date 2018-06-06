@@ -4,7 +4,13 @@ import os
 import sys
 import pandas as pd
 
-inseeDataPath = sys.argv[1]
+def slashify(path):
+    if path[len(path)-1] != '/':
+        return path + '/'
+    else:
+        return path
+
+inseeDataPath = slashify(sys.argv[1])
 try:
     if not os.path.exists(inseeDataPath + 'csv'):
         os.mkdir(inseeDataPath + 'csv')

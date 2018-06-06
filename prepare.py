@@ -10,6 +10,7 @@ import numpy as np
 from ast import literal_eval
 from time import strftime, time
 from shutil import rmtree, copyfile
+from multiprocessing import Process
 
 from qgis.core import (
     QgsApplication,
@@ -41,11 +42,17 @@ feedback = QgsProcessingFeedback()
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
 
+def slashify(path):
+    if path[len(path)-1] != '/':
+        return path + '/'
+    else:
+        return path
+
 # Import des paramètres d'entrée
-globalData = sys.argv[1]
+globalData = slashify(sys.argv[1])
 codeDept = sys.argv[2]
-localData = sys.argv[3]
-outputDir = sys.argv[4]
+localData = slashify(sys.argv[3])
+outputDir = slashify(sys.argv[4])
 if len(sys.argv) > 5:
     argList = sys.argv[5].split()
     # Interprétation de la chaîne de paramètres
@@ -90,6 +97,8 @@ if len(sys.argv) > 5:
             speed = True
         if 'truth' in arg:
             truth = True
+        if 'multiproc' in arg:
+            multiproc = True
 
 # Valeurs de paramètres par défaut
 if 'gridSize' not in globals():
@@ -120,6 +129,8 @@ if 'speed' not in globals():
     speed = False
 if 'truth' not in globals():
     truth = False
+if 'multiproc' not in globals():
+    multiproc = False
 
 if force and os.path.exists(outputDir):
     rmtree(outputDir)
@@ -149,7 +160,7 @@ def printer(string):
 	sys.stdout.flush()
 
 # Calcul le temps d'exécution d'une étape
-def trace(start):
+def getTime(start):
     execTime = time() - start
     execMin = round(execTime // 60)
     execSec = round(execTime % 60)
@@ -311,56 +322,54 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
     del buildings, polygons, points, layer
 
 # Génère les statistiques de construction entre deux dates pour la grille et les IRIS
-def buildCsvGrid(buildingsDic, year, iris, grid, outCsvDir):
-    if not os.path.exists(outCsvDir):
-        os.mkdir(outCsvDir)
-    for name in buildingsDic.keys():
-        hasId = False
-        layerPath = buildingsDic[name]
-        buildings = QgsVectorLayer(layerPath, name)
-        buildings.dataProvider().createSpatialIndex()
+def buildCsvGrid(name, path, iris, grid, outCsvDir):
+    res = re.search('.*/20([0-9]{2})_bati/.*\.shp', path)
+    year = res.group(1)
+    hasId = False
+    buildings = QgsVectorLayer(path, name)
+    buildings.dataProvider().createSpatialIndex()
 
-        for field in buildings.fields():
-            if field.name() == 'ID' or field.name() == 'id':
-                hasId=True
-        if not hasId:
-            buildings.addExpressionField('$id', QgsField('ID', QVariant.Int))
+    for field in buildings.fields():
+        if field.name() == 'ID' or field.name() == 'id':
+            hasId=True
+    if not hasId:
+        buildings.addExpressionField('$id', QgsField('ID', QVariant.Int))
 
-        params = {
-            'INPUT': buildings,
-            'OVERLAY': iris,
-            'INPUT_FIELDS': [],
-            'OVERLAY_FIELDS': ['CODE_IRIS'],
-            'OUTPUT': 'memory:' + name
-        }
-        res = processing.run('qgis:intersection', params, feedback=feedback)
-        buildings = res['OUTPUT']
-        buildings.dataProvider().createSpatialIndex()
-        params = {
-            'INPUT': buildings,
-            'OVERLAY': grid,
-            'INPUT_FIELDS': [],
-            'OVERLAY_FIELDS': ['id'],
-            'OUTPUT': 'memory:' + name
-        }
-        res = processing.run('qgis:intersection', params, feedback=feedback)
-        buildings = res['OUTPUT']
-        buildings.dataProvider().createSpatialIndex()
-        buildings.addExpressionField('$area', QgsField('AIRE', QVariant.Double))
-        params = {
-            'INPUT': buildings,
-            'VALUES_FIELD_NAME': 'AIRE',
-            'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-            'OUTPUT': outCsvDir + year + '_' + name + '_ssol_iris.csv'
-        }
-        processing.run('qgis:statisticsbycategories', params, feedback=feedback)
-        params = {
-            'INPUT': buildings,
-            'VALUES_FIELD_NAME': 'AIRE',
-            'CATEGORIES_FIELD_NAME': 'id_2',
-            'OUTPUT': outCsvDir + year + '_' + name + '_ssol_grid.csv'
-        }
-        processing.run('qgis:statisticsbycategories', params, feedback=feedback)
+    params = {
+        'INPUT': buildings,
+        'OVERLAY': iris,
+        'INPUT_FIELDS': [],
+        'OVERLAY_FIELDS': ['CODE_IRIS'],
+        'OUTPUT': 'memory:' + name
+    }
+    res = processing.run('qgis:intersection', params, feedback=feedback)
+    buildings = res['OUTPUT']
+    buildings.dataProvider().createSpatialIndex()
+    params = {
+        'INPUT': buildings,
+        'OVERLAY': grid,
+        'INPUT_FIELDS': [],
+        'OVERLAY_FIELDS': ['id'],
+        'OUTPUT': 'memory:' + name
+    }
+    res = processing.run('qgis:intersection', params, feedback=feedback)
+    buildings = res['OUTPUT']
+    buildings.dataProvider().createSpatialIndex()
+    buildings.addExpressionField('$area', QgsField('AIRE', QVariant.Double))
+    params = {
+        'INPUT': buildings,
+        'VALUES_FIELD_NAME': 'AIRE',
+        'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
+        'OUTPUT': outCsvDir + year + '_' + name + '_ssol_iris.csv'
+    }
+    processing.run('qgis:statisticsbycategories', params, feedback=feedback)
+    params = {
+        'INPUT': buildings,
+        'VALUES_FIELD_NAME': 'AIRE',
+        'CATEGORIES_FIELD_NAME': 'id_2',
+        'OUTPUT': outCsvDir + year + '_' + name + '_ssol_grid.csv'
+    }
+    processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
 # Intersection entre la couche de bâti nettoyée jointe aux iris et la grille avec calcul et jointure des statistiques
 def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
@@ -373,11 +382,9 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
     expr = ' ("area_i" * "NB_NIV") '
     if useTxrp :
         expr +=  '* "TXRP14"'
-    buildings.addExpressionField(expr, QgsField(
-        'planch', QVariant.Double, len=10, prec=2))
+    buildings.addExpressionField(expr, QgsField('planch', QVariant.Double, len=10, prec=2))
     expr = ' ("planch" / sum("planch", group_by:="CODE_IRIS")) * "POP14" '
-    buildings.addExpressionField(expr, QgsField(
-        'pop_bati', QVariant.Double, len=10, prec=2))
+    buildings.addExpressionField(expr, QgsField('pop_bati', QVariant.Double, len=10, prec=2))
     params = {
         'INPUT': buildings,
         'OVERLAY': grid,
@@ -389,19 +396,15 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
     buildings = res['OUTPUT']
 
     # Calcul de stat sur la bâti dans la grille
-    buildings.addExpressionField('$area', QgsField(
-        'area_g', QVariant.Double, len=10, prec=2))
+    buildings.addExpressionField('$area', QgsField('area_g', QVariant.Double, len=10, prec=2))
     expr = ' ("area_g" * "NB_NIV") '
     if useTxrp:
         expr += '* "TXRP14"'
-    buildings.addExpressionField(expr, QgsField(
-        'planch_g', QVariant.Int, len=10))
+    buildings.addExpressionField(expr, QgsField('planch_g', QVariant.Int, len=10))
     expr = ' "area_g" / "area_i" * "pop_bati" '
-    buildings.addExpressionField(expr, QgsField(
-        'pop_cell', QVariant.Int, len=10))
+    buildings.addExpressionField(expr, QgsField('pop_cell', QVariant.Int, len=10))
     expr = ' "planch_g" / "pop_cell" '
-    buildings.addExpressionField(expr, QgsField(
-        'nb_m2_hab', QVariant.Int, len=10))
+    buildings.addExpressionField(expr, QgsField('nb_m2_hab', QVariant.Int, len=10))
 
     params = {
         'INPUT': buildings,
@@ -438,32 +441,22 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
     del buildings, res
 
     # Correction et changement de nom pour jointure des stat sur la grille et les IRIS
-    csvIplanch = QgsVectorLayer(
-        outdir + 'csv/srf_pl_iris.csv')
-    csvIplanch.addExpressionField(
-        'to_real("q3")', QgsField('SP_Q3', QVariant.Double))
-    csvIplanch.addExpressionField(
-        'to_real("max")', QgsField('SP_MAX', QVariant.Double))
-    csvIplanch.addExpressionField(
-        'to_real("sum")', QgsField('SP_SUM', QVariant.Double))
+    csvIplanch = QgsVectorLayer(outdir + 'csv/srf_pl_iris.csv')
+    csvIplanch.addExpressionField('to_real("q3")', QgsField('SP_Q3', QVariant.Double))
+    csvIplanch.addExpressionField('to_real("max")', QgsField('SP_MAX', QVariant.Double))
+    csvIplanch.addExpressionField('to_real("sum")', QgsField('SP_SUM', QVariant.Double))
     csvIris.append(csvIplanch)
 
-    csvGplanch = QgsVectorLayer(
-        outdir + 'csv/srf_pl_grid.csv')
-    csvGplanch.addExpressionField(
-        'to_real("sum")', QgsField('srf_p', QVariant.Double))
+    csvGplanch = QgsVectorLayer(outdir + 'csv/srf_pl_grid.csv')
+    csvGplanch.addExpressionField('to_real("sum")', QgsField('srf_p', QVariant.Double))
     csvGrid.append(csvGplanch)
 
-    csvIm2 = QgsVectorLayer(
-        outdir + 'csv/nb_m2_iris.csv')
-    csvIm2.addExpressionField(
-        'to_real("mean")', QgsField('M2_HAB', QVariant.Double))
+    csvIm2 = QgsVectorLayer(outdir + 'csv/nb_m2_iris.csv')
+    csvIm2.addExpressionField('to_real("mean")', QgsField('M2_HAB', QVariant.Double))
     csvIris.append(csvIm2)
 
-    csvGpop = QgsVectorLayer(
-        outdir + 'csv/pop_grid.csv')
-    csvGpop.addExpressionField(
-        'to_real("sum")', QgsField('pop', QVariant.Double))
+    csvGpop = QgsVectorLayer(outdir + 'csv/pop_grid.csv')
+    csvGpop.addExpressionField('to_real("sum")', QgsField('pop', QVariant.Double))
     csvGrid.append(csvGpop)
 
     if csvDir:
@@ -504,9 +497,9 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
         for field in gridFields1:
             cpt += 1
             if cpt != len(gridFields1):
-                expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
+                expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
             else:
-                expr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
+                expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
         grid.addExpressionField(expr, QgsField('ssol_09', QVariant.Double))
 
         cpt = 0
@@ -514,9 +507,9 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
         for field in gridFields2:
             cpt += 1
             if cpt != len(gridFields2):
-                expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
+                expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
             else:
-                expr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
+                expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
         grid.addExpressionField(expr, QgsField('ssol_16', QVariant.Double))
 
         expr = 'IF("ssol_09" >= $area * ' + str(ratio) + ', 1, 0)'
@@ -530,9 +523,9 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
         for field in irisFields1:
             cpt += 1
             if cpt != len(irisFields1):
-                expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
+                expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
             else:
-                expr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
+                expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
         iris.addExpressionField(expr, QgsField('ssol_09', QVariant.Double))
 
         cpt = 0
@@ -540,9 +533,9 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
         for field in irisFields2:
             cpt += 1
             if cpt != len(irisFields2):
-                expr += 'IF("' + field + '" != NULL, "' + field + '", 0) + '
+                expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
             else:
-                expr += 'IF("' + field + '" != NULL, "' + field + '", 0)'
+                expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
         iris.addExpressionField(expr, QgsField('ssol_16', QVariant.Double))
 
     iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
@@ -605,8 +598,7 @@ def restrictGrid(layerList, grid, ratio, outdir):
             if cpt != len(fieldList):
                 expr += '"' + field + '" >= ($area * ' + str(ratio) + ')  OR '
             else:
-                expr += '"' + field + \
-                    '" >= ($area * ' + str(ratio) + '), 1, 0)'
+                expr += '"' + field + '" >= ($area * ' + str(ratio) + '), 1, 0)'
 
     grid.addExpressionField(expr, QgsField('restrict', QVariant.Int))
     to_shp(grid, outdir + 'restrict_grid.shp')
@@ -896,8 +888,7 @@ try:
             'OUTPUT': workspacePath + 'data/transport/transport_pai.shp',
             'FAIL_OUTPUT': 'memory:'
         }
-        res = processing.run('native:extractbyexpression',
-                             params, feedback=feedback)
+        res = processing.run('native:extractbyexpression', params, feedback=feedback)
         transports.append(res['OUTPUT'])
 
         gare = QgsVectorLayer(workspacePath + 'data/transport/gare.shp', 'gare')
@@ -1055,7 +1046,7 @@ try:
             'OUTPUT': workspacePath + 'data/pai/pai_merged.shp'
         }
         processing.run('native:mergevectorlayers', params, feedback=feedback)
-        log.write(trace(start_time) + '\n')
+        log.write(getTime(start_time) + '\n')
 
         start_time = time()
         etape = 2
@@ -1103,7 +1094,7 @@ try:
             'OUTPUT': workspacePath + 'data/2016_bati/bati_inter_iris.shp'
         }
         processing.run('qgis:intersection', params, feedback=feedback)
-        log.write(trace(start_time) + '\n')
+        log.write(getTime(start_time) + '\n')
 
     if not os.path.exists(workspacePath + 'data/' + gridSize + 'm/'):
         start_time = time()
@@ -1139,7 +1130,7 @@ try:
         grid.dataProvider().createSpatialIndex()
         iris = QgsVectorLayer(workspacePath + 'data/iris.shp')
         iris.dataProvider().createSpatialIndex()
-        log.write(trace(start_time) + '\n')
+        log.write(getTime(start_time) + '\n')
 
         if not speed:
             start_time = time()
@@ -1155,14 +1146,26 @@ try:
                 'remarq': workspacePath + 'data/2016_bati/bati_remarquable.shp',
                 'surfac': workspacePath + 'data/2016_bati/construction_surfacique.shp',
                 'aerodr': workspacePath + 'data/2016_bati/piste_aerodrome.shp',
-                'sport': workspacePath + 'data/2016_bati/terrain_sport.shp'}
+                'sport': workspacePath + 'data/2016_bati/terrain_sport.shp'
+            }
+            if multiproc:
+                arguments = []
+                for key in buildStatDic.keys():
+                    arguments.append((key, buildStatDic[key], iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
+                    arguments.append((key, buildStatDic[key].replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
+                processes = []
+                for a in arguments:
+                    p = Process(target=buildCsvGrid, args=a)
+                    processes.append(p)
+                    p.start()
+                for p in processes:
+                    p.join()
+            else:
+                for key in buildStatDic.keys():
+                    buildCsvGrid(key, buildStatDic[key], iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
+                    buildCsvGrid(key, buildStatDic[key].replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
 
-            buildCsvGrid(buildStatDic, '16', iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
-
-            for key in buildStatDic.keys():
-                buildStatDic[key] = buildStatDic[key].replace('2016','2009')
-            buildCsvGrid(buildStatDic, '09', iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
-            log.write(trace(start_time) + '\n')
+            log.write(getTime(start_time) + '\n')
 
         start_time = time()
         etape = 5
@@ -1178,8 +1181,9 @@ try:
         else:
             statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath +
                          'data/' + gridSize + 'm/')
+        del grid, iris
 
-        log.write(trace(start_time) + '\n')
+        log.write(getTime(start_time) + '\n')
         start_time = time()
         etape = 6
         description = "calcul des restrictions "
@@ -1188,6 +1192,7 @@ try:
         log.write(description + ': ')
 
         # Création de la grille de restriction
+        grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/grid.shp', 'grid')
         b_removed = QgsVectorLayer(workspacePath + 'data/restriction/bati_removed.shp', 'b_removed')
         cimetiere = QgsVectorLayer(workspacePath + 'data/2016_bati/cimetiere.shp', 'cimetiere')
         s_eau = QgsVectorLayer(workspacePath + 'data/restriction/surface_eau.shp', 's_eau')
@@ -1234,7 +1239,7 @@ try:
             'slope', format='GTiff',
             slopeFormat='percent')
 
-        log.write(trace(start_time) + '\n')
+        log.write(getTime(start_time) + '\n')
         start_time = time()
         etape = 7
         description = "création des rasters de restriction et d'intérêt "
@@ -1318,7 +1323,7 @@ try:
             processing.run('gdal:cliprasterbyextent', params, feedback=feedback)
         del projwin, distancesSirene
 
-        log.write(trace(start_time) + '\n')
+        log.write(getTime(start_time) + '\n')
 
     start_time = time()
     etape = 8
@@ -1436,7 +1441,7 @@ try:
     capacite = np.where((irisMask != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
     to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite.tif')
 
-    log.write(trace(start_time) + '\n')
+    log.write(getTime(start_time) + '\n')
     print('\nTerminée à ' + strftime('%H:%M:%S'))
 
     if truth:

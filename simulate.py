@@ -14,9 +14,15 @@ from time import strftime, time
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
 
+def slashify(path):
+    if path[len(path)-1] != '/':
+        return path + '/'
+    else:
+        return path
+
 # Stockage et contrôle de la validité des paramètres utilisateur
-dataDir = sys.argv[1]
-outputDir = sys.argv[2]
+dataDir = slashify(sys.argv[1])
+outputDir = slashify(sys.argv[2])
 gridSize = int(sys.argv[3])
 rate = float(sys.argv[4])
 if rate > 4:
