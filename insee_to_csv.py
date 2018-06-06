@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import traceback
 import pandas as pd
 
 def slashify(path):
