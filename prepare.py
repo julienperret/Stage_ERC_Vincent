@@ -63,42 +63,42 @@ if len(sys.argv) > 5:
                     log.write('Erreur : ' + error)
                 sys.exit()
         # Taille du tampon utilisé pour extraire les iris et pour extraire la donnée utile au delà des limites de la zone (comme les points SIRENE)
-        if 'bufferDistance' in arg:
+        elif 'bufferDistance' in arg:
             bufferDistance = int(arg.split('=')[1])
         # Surfaces au sol minimales et maximales pour considérer un bâtiment comme habitable
-        if 'minSurf' in arg:
+        elif 'minSurf' in arg:
             minSurf = int(arg.split('=')[1])
-        if 'maxSurf' in arg:
+        elif 'maxSurf' in arg:
             maxSurf = int(arg.split('=')[1])
         # Utilisation du taux de résidence principales pour réduire la surface plancher estimée
-        if 'useTxrp' in arg:
+        elif 'useTxrp' in arg:
             useTxrp = literal_eval(arg.split('=')[1])
         # Hauteur théorique d'un étage pour l'estimation du nombre de niveaux
-        if 'levelHeight' in arg:
+        elif 'levelHeight' in arg:
             levelHeight = int(arg.split('=')[1])
         # Taux maximum de chevauchement entre les cellules et des couches à exclure (ex: bati industriel)
-        if 'maxOverlapRes' in arg:
+        elif 'maxOverlapRes' in arg:
             maxOverlapRatio = float(arg.split('=')[1])
         # Taux minimum pour considérer qu'une cellule est déjà construite
-        if 'minBuiltRatio' in arg:
+        elif 'minBuiltRatio' in arg:
             minBuiltRatio = float(arg.split('=')[1])
         # Paramètres variables pour la création des rasters de distance
-        if 'roadDist' in arg:
+        elif 'roadDist' in arg:
             roadDist = int(arg.split('=')[1])
-        if 'transDist' in arg:
+        elif 'transDist' in arg:
             transDist = int(arg.split('=')[1])
         # Seuil de pente en % pour interdiction à la construction
-        if 'maxSlope' in arg:
+        elif 'maxSlope' in arg:
             maxSlope = int(arg.split('=')[1])
-        if 'force' in arg:
+        elif 'force' in arg:
             force = True
-        if 'speed' in arg:
+        elif 'speed' in arg:
             speed = True
-        if 'truth' in arg:
+        elif 'truth' in arg:
             truth = True
-        if 'multiproc' in arg:
+        elif 'multiproc' in arg:
             multiproc = True
-        if 'silent' in arg:
+        elif 'silent' in arg:
             silent = True
 
 # Valeurs de paramètres par défaut
@@ -703,8 +703,7 @@ def pluFixer(plu, overlay, outdir, encoding='utf-8'):
             WHEN "type" = 'ZAC' THEN 'ZAC'
             ELSE '0' END
         """
-        plu.addExpressionField(expr, QgsField(
-            'classe', QVariant.String, len=3))
+        plu.addExpressionField(expr, QgsField('classe', QVariant.String, len=3))
     if 'coment' in fields and 'coment' in fields:
         expr = """
                 IF ("coment" LIKE '%à protéger%'
@@ -716,19 +715,16 @@ def pluFixer(plu, overlay, outdir, encoding='utf-8'):
                 OR "coment" LIKE '% protégée'
                 OR "coment" LIKE '% construction nouvelle est interdite %', 1, 0)
             """
-        plu.addExpressionField(expr, QgsField(
-            'restrict', QVariant.Int, len=1))
+        plu.addExpressionField(expr, QgsField('restrict', QVariant.Int, len=1))
         expr = """
                 IF ("type" LIKE '%AU%'
                 OR "coment" LIKE '%urbanisation future%'
                 OR "coment" LIKE '%ouvert_ à l_urbanisation%'
                 OR "coment" LIKE '% destinée à l_urbanisation%', 1, 0)
             """
-        plu.addExpressionField(expr, QgsField(
-            'priority', QVariant.Int, len=1))
+        plu.addExpressionField(expr, QgsField('priority', QVariant.Int, len=1))
         expr = """ IF ("coment" LIKE '% protection contre risques naturels', 1, 0) """
-        plu.addExpressionField(expr, QgsField(
-            'ppr', QVariant.Int, len=1))
+        plu.addExpressionField(expr, QgsField('ppr', QVariant.Int, len=1))
 
     params = {'INPUT': plu, 'OUTPUT': 'memory:plu' }
     res = processing.run('native:fixgeometries', params, feedback=feedback)
@@ -752,8 +748,7 @@ def sireneSplitter(geosirene, outpath):
         WHEN "CODE_NAF1" = 'Q' THEN 'medical'
         ELSE 'autre' END
     """
-    geosirene.addExpressionField(
-        expr, QgsField('type', QVariant.String, len=20))
+    geosirene.addExpressionField(expr, QgsField('type', QVariant.String, len=20))
 
     params = {'INPUT': geosirene, 'FIELD': 'type', 'OUTPUT': outpath }
     processing.run('qgis:splitvectorlayer', params, feedback=feedback)
@@ -1130,9 +1125,9 @@ try:
             }
             if multiproc:
                 arguments = []
-                for k, v in buildStatDic:
+                for k, v in buildStatDic.items():
                     arguments.append((k, v, iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
-                for k, v in buildStatDic:
+                for k, v in buildStatDic.items():
                     arguments.append((k, v.replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
                 jobs = []
                 for a in arguments:
@@ -1140,7 +1135,7 @@ try:
                 getDone(jobs)
 
             else:
-                for k, v in buildStatDic:
+                for k, v in buildStatDic.items():
                     buildCsvGrid(k, v, iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
                     buildCsvGrid(k, v.replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
 
@@ -1282,7 +1277,7 @@ try:
             next(reader, None)
             distancesSirene = {rows[0]:int(rows[1]) for rows in reader}
 
-        for k, v in distancesSirene:
+        for k, v in distancesSirene.items():
             layer = QgsVectorLayer(workspacePath + 'data/geosirene/type_' + k + '.shp', k)
             layer.setExtent(extent)
             params = {

@@ -18,16 +18,14 @@ def printer(string):
 
 def getDone(jobs):
     c = 0
-    cpct = 0
     while c < len(jobs):
-        for i in range(cpct, cpct + os.cpu_count()):
+        for i in range(c, c + os.cpu_count()):
             if i < len(jobs):
                 jobs[i].start()
-        for i in range(cpct, cpct + os.cpu_count()):
+        for i in range(c, c + os.cpu_count()):
             if i < len(jobs):
                 jobs[i].join()
                 c += 1
-        cpct += os.cpu_count()
 
 # Calcul le temps d'exécution d'une étape
 def getTime(start):
