@@ -9,7 +9,7 @@ import traceback
 import multiprocessing as mp
 from ast import literal_eval
 from time import strftime, time
-from tools import slashify, printer
+from toolbox import slashify, printer
 
 nbCores  = int(sys.argv[1])
 inputDir = slashify(sys.argv[2])

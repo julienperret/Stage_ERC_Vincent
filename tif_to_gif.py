@@ -6,7 +6,7 @@ import gdal
 import traceback
 import numpy as np
 from shutil import rmtree
-from tools import slashify, to_array
+from toolbox import slashify, to_array
 
 inDir = slashify(sys.argv[1])
 outDir = slashify(sys.argv[2])

@@ -4,7 +4,7 @@ import os
 import sys
 import traceback
 import pandas as pd
-from tools import slashify
+from toolbox import slashify
 
 inseeDataPath = slashify(sys.argv[1])
 try:
@@ -23,7 +23,7 @@ try:
         inseeLog14 = pd.read_excel(inseeDataPath + 'base-ic-logement-2014.xls', skiprows=(0, 1, 2, 3, 4))
         inseeLog14['P14_TXRP'] = inseeLog14['P14_RP'] / inseeLog14['P14_LOG']
         inseeLog14.to_csv(inseeDataPath + 'csv/inseeLog14.csv', index=0, columns=['IRIS', 'P14_TXRP'])
-        
+
 except Exception:
     traceback.print_exc(file=sys.stdout)
     sys.exit()
