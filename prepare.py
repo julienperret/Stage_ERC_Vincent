@@ -7,6 +7,7 @@ import csv
 import gdal
 import traceback
 import numpy as np
+from tools import *
 from ast import literal_eval
 from time import strftime, time
 from shutil import rmtree, copyfile
@@ -42,12 +43,6 @@ feedback = QgsProcessingFeedback()
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
 
-def slashify(path):
-    if path[len(path)-1] != '/':
-        return path + '/'
-    else:
-        return path
-
 # Import des paramètres d'entrée
 globalData = slashify(sys.argv[1])
 codeDept = sys.argv[2]
@@ -61,7 +56,11 @@ if len(sys.argv) > 5:
         if 'gridSize' in arg:
             gridSize = arg.split("=")[1]
             if not 200 >= int(gridSize) >= 20:
-                print('La taille de la grille doit être comprise entre 20m et 200m')
+                error = 'La taille de la grille doit être comprise entre 20m et 200m'
+                if not silent:
+                    print(error)
+                else:
+                    log.write('Erreur : ' + error)
                 sys.exit()
         # Taille du tampon utilisé pour extraire les iris et pour extraire la donnée utile au delà des limites de la zone (comme les points SIRENE)
         if 'bufferDistance' in arg:
@@ -99,6 +98,8 @@ if len(sys.argv) > 5:
             truth = True
         if 'multiproc' in arg:
             multiproc = True
+        if 'silent' in arg:
+            silent = True
 
 # Valeurs de paramètres par défaut
 if 'gridSize' not in globals():
@@ -131,6 +132,8 @@ if 'truth' not in globals():
     truth = False
 if 'multiproc' not in globals():
     multiproc = False
+if 'silent' not in globals():
+    silent = False
 
 if force and os.path.exists(outputDir):
     rmtree(outputDir)
@@ -152,19 +155,8 @@ statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum',
                  'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
 log = open(workspacePath + strftime('%Y%m%d%H%M') + '_log.txt', 'x')
-print('Commencé à ' + strftime('%H:%M:%S'))
-
-# Pour affichage dynamique de la progression
-def printer(string):
-	sys.stdout.write("\r\x1b[K" + string)
-	sys.stdout.flush()
-
-# Calcul le temps d'exécution d'une étape
-def getTime(start):
-    execTime = time() - start
-    execMin = round(execTime // 60)
-    execSec = round(execTime % 60)
-    return '%im %is' %(execMin, execSec)
+if not silent:
+    print('Commencé à ' + strftime('%H:%M:%S'))
 
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
@@ -192,22 +184,6 @@ def clip(file, overlay, outdir='memory:'):
         params['OUTPUT'] += '.shp'
     res = processing.run('native:clip', params, feedback=feedback)
     return res['OUTPUT']
-
-# Rasterisation d'un fichier vecteur
-def rasterize(vector, output, field=None, burn=None, inverse=False, touch=False):
-    gdal.Rasterize(
-        output, vector,
-        format='GTiff',
-        outputSRS='EPSG:3035',
-        xRes=int(gridSize),
-        yRes=int(gridSize),
-        initValues=0,
-        burnValues=burn,
-        attribute=field,
-        allTouched=touch,
-        outputBounds=(xMin, yMin, xMax, yMax),
-        inverse=inverse
-    )
 
 # Reprojection en laea par défaut
 def reproj(file, outdir='memory:', crs='EPSG:3035'):
@@ -249,24 +225,21 @@ def to_shp(layer, path):
         path, 'utf-8', layer.fields(), layer.wkbType(), layer.sourceCrs(), 'ESRI Shapefile')
     writer.addFeatures(layer.getFeatures())
 
-# Enregistre un fichier .tif à partir d'un array et de variables GDAL stockée au préalable
-def to_tif(array, dtype, path):
-    ds_out = driver.Create(path, cols, rows, 1, dtype)
-    ds_out.SetProjection(proj)
-    ds_out.SetGeoTransform(geot)
-    ds_out.GetRasterBand(1).WriteArray(array)
-    ds_out = None
-
-# Convertit un tif en numpy array
-def to_array(tif, dtype=None):
-    ds = gdal.Open(tif)
-    if dtype == 'float32':
-        return ds.ReadAsArray().astype(np.float32)
-    elif dtype == 'uint16':
-        return ds.ReadAsArray().astype(np.uint16)
-    else:
-        return ds.ReadAsArray()
-    ds = None
+# Rasterisation d'un fichier vecteur
+def rasterize(vector, output, field=None, burn=None, inverse=False, touch=False):
+    gdal.Rasterize(
+        output, vector,
+        format='GTiff',
+        outputSRS='EPSG:3035',
+        xRes=int(gridSize),
+        yRes=int(gridSize),
+        initValues=0,
+        burnValues=burn,
+        attribute=field,
+        allTouched=touch,
+        outputBounds=(xMin, yMin, xMax, yMax),
+        inverse=inverse
+    )
 
 # Nettoye une couche de bâtiments et génère les champs utiles à l'estimation de population
 def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut, removedOut):
@@ -318,7 +291,6 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
         'OUTPUT': cleanedOut
     }
     res = processing.run('native:saveselectedfeatures', params, feedback=feedback)
-    return res['OUTPUT']
     del buildings, polygons, points, layer
 
 # Génère les statistiques de construction entre deux dates pour la grille et les IRIS
@@ -517,7 +489,6 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
         expr = 'IF("ssol_16" >= $area * ' + str(ratio) + ', 1, 0)'
         grid.addExpressionField(expr, QgsField('built_16', QVariant.Int, len=1))
 
-
         cpt = 0
         expr = ''
         for field in irisFields1:
@@ -613,20 +584,16 @@ def demExtractor(directory, bbox):
             with open(path) as file:
                 for i in range(5):
                     line = file.readline()
+                    res = re.search('[a-z]*\s*([0-9.]*)', line)
                     if i == 0:
-                        res = re.search('[a-z]*\s*([0-9]*)', line)
                         xSize = int(res.group(1))
-                    if i == 1:
-                        res = re.search('[a-z]*\s*([0-9]*)', line)
+                    elif i == 1:
                         ySize = int(res.group(1))
-                    if i == 2:
-                        res = re.search('[a-z]*\s*([0-9.]*)', line)
+                    elif i == 2:
                         xMin = float(res.group(1))
-                    if i == 3:
-                        res = re.search('[a-z]*\s*([0-9.]*)', line)
+                    elif i == 3:
                         yMin = float(res.group(1))
-                    if i == 4:
-                        res = re.search('[a-z]*\s*([0-9.]*)', line)
+                    elif i == 4:
                         cellSize = float(res.group(1))
             xMax = xMin + xSize * cellSize
             yMax = yMin + ySize * cellSize
@@ -797,7 +764,8 @@ try:
         etape = 1
         description = 'extraction et reprojection des données '
         progres = "Etape %i sur 8 : %s" %(etape, description)
-        printer(progres)
+        if not silent:
+            printer(progres)
         start_time = time()
         log.write(description + ': ')
 
@@ -822,6 +790,7 @@ try:
         iris.dataProvider().createSpatialIndex()
         irisExtractor(iris, zone_buffer, globalData + 'insee/csv/', workspacePath + 'data/')
         # Extractions et reprojections
+        os.mkdir(workspacePath + 'data/2009_bati')
         os.mkdir(workspacePath + 'data/2016_bati')
         clipBati = [
             globalData + 'rge/' + codeDept + '/bdtopo_2016/BATI_INDIFFERENCIE.SHP',
@@ -834,19 +803,6 @@ try:
             globalData + 'rge/' + codeDept + '/bdtopo_2016/RESERVOIR.SHP',
             globalData + 'rge/' + codeDept + '/bdtopo_2016/TERRAIN_SPORT.SHP'
         ]
-        for path in clipBati:
-            reproj(clip(path, zone), workspacePath + 'data/2016_bati/')
-
-        os.mkdir(workspacePath + 'data/2009_bati')
-        i = 0
-        for path in clipBati:
-            path = path.replace('2016', '2009')
-            clipBati[i] = path
-            i += 1
-        for path in clipBati:
-            reproj(clip(path, zone), workspacePath + 'data/2009_bati/')
-
-        os.mkdir(workspacePath + 'data/pai')
         clipPai = [
             globalData + 'rge/' + codeDept + '/bdtopo_2016/PAI_ADMINISTRATIF_MILITAIRE.SHP',
             globalData + 'rge/' + codeDept + '/bdtopo_2016/PAI_CULTURE_LOISIRS.SHP',
@@ -858,21 +814,40 @@ try:
             globalData + 'rge/' + codeDept + '/bdtopo_2016/PAI_SPORT.SHP',
             globalData + 'rge/' + codeDept + '/bdtopo_2016/PAI_TRANSPORT.SHP'
         ]
-        for path in clipPai:
-            reproj(clip(path, zone_buffer), workspacePath + 'data/pai/')
-        reproj(clip(globalData + 'rge/' + codeDept +
-                    '/bdtopo_2016/SURFACE_ACTIVITE.SHP', zone), workspacePath + 'data/pai/')
-
-        os.mkdir(workspacePath + 'data/transport')
         clipRes = [
             globalData + 'rge/' + codeDept + '/bdtopo_2016/ROUTE_PRIMAIRE.SHP',
             globalData + 'rge/' + codeDept + '/bdtopo_2016/ROUTE_SECONDAIRE.SHP',
             globalData + 'rge/' + codeDept + '/bdtopo_2016/TRONCON_VOIE_FERREE.SHP',
             globalData + 'rge/' + codeDept + '/bdtopo_2016/GARE.SHP'
         ]
+        jobs = []
+        for path in clipBati:
+            if multiproc:
+                jobs.append(Process(target=reproj, args=(clip(path, zone), workspacePath + 'data/2016_bati/')))
+                jobs.append(Process(target=reproj, args=(clip(path.replace('2016', '2009'), zone), workspacePath + 'data/2009_bati/')))
+            else:
+                reproj(clip(path, zone), workspacePath + 'data/2016_bati/')
+                reproj(clip(path.replace('2016', '2009'), zone), workspacePath + 'data/2009_bati/')
+
+        os.mkdir(workspacePath + 'data/pai')
+
+        for path in clipPai:
+            if multiproc:
+                jobs.append(Process(target=reproj, args=(clip(path, zone_buffer), workspacePath + 'data/pai/')))
+            else:
+                reproj(clip(path, zone_buffer), workspacePath + 'data/pai/')
+
+        os.mkdir(workspacePath + 'data/transport')
         for path in clipRes:
-            reproj(clip(path, zone_buffer), workspacePath + 'data/transport/')
+            if multiproc:
+                jobs.append(Process(target=reproj, args=(clip(path, zone_buffer), workspacePath + 'data/transport/')))
+            else:
+                reproj(clip(path, zone_buffer), workspacePath + 'data/transport/')
         del clipBati, clipRes, clipPai
+        reproj(clip(globalData + 'rge/' + codeDept + '/bdtopo_2016/SURFACE_ACTIVITE.SHP', zone), workspacePath + 'data/pai/')
+
+        if multiproc:
+            getDone(jobs)
 
         # Préparation de la couche arrêts de transport en commun
         transports = []
@@ -952,10 +927,13 @@ try:
             for field in ecologie.fields():
                 ecoFields.append(field.name())
             if 'importance' not in ecoFields:
-                print("Attribut requis 'importance' manquant ou mal nommé dans la couche d'importance écologique")
+                error = "Attribut requis 'importance' manquant ou mal nommé dans la couche d'importance écologique"
+                if not silent:
+                    print(error)
+                else:
+                    log.write('Erreur : ' + error)
                 sys.exit()
-            ecologie.addExpressionField(
-                '1 - ("importance"/100)', QgsField('interet', QVariant.Double))
+            ecologie.addExpressionField('1 - ("importance"/100)', QgsField('interet', QVariant.Double))
 
             params = {'INPUT': ecologie, 'OUTPUT': 'memory:ecologie'}
             res = processing.run('native:fixgeometries', params, feedback=feedback)
@@ -1052,7 +1030,8 @@ try:
         etape = 2
         description = "nettoyage du bâti pour l'estimation de la population "
         progres = "Etape %i sur 8 : %s" %(etape, description)
-        printer(progres)
+        if not silent:
+            printer(progres)
         log.write(description + ': ')
 
         # Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
@@ -1080,7 +1059,6 @@ try:
             cleanPolygons.append(workspacePath + 'data/restriction/exclusion.shp')
         buildingCleaner(bati_indif, minSurf, maxSurf, levelHeight, cleanPolygons, cleanPoints,
                         workspacePath + 'data/2016_bati/bati_clean.shp', workspacePath + 'data/restriction/bati_removed.shp')
-
         del bati_indif, cleanPolygons, cleanPoints
 
         # Intersection du bâti résidentiel avec les quartiers IRIS
@@ -1101,7 +1079,8 @@ try:
         etape = 3
         description =  "création d'une grille de " + gridSize + "m de côté "
         progres = "Etape %i sur 8 : %s" %(etape, description)
-        printer(progres)
+        if not silent:
+            printer(progres)
         log.write(description + ': ')
 
         os.mkdir(workspacePath + 'data/' + gridSize + 'm/')
@@ -1137,7 +1116,8 @@ try:
             etape = 4
             description = "analyse de l'évolution des zones bâties "
             progres = "Etape %i sur 8 : %s" %(etape, description)
-            printer(progres)
+            if not silent:
+                printer(progres)
             log.write(description + ': ')
 
             buildStatDic = {
@@ -1150,20 +1130,19 @@ try:
             }
             if multiproc:
                 arguments = []
-                for key in buildStatDic.keys():
-                    arguments.append((key, buildStatDic[key], iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
-                    arguments.append((key, buildStatDic[key].replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
-                processes = []
+                for k, v in buildStatDic:
+                    arguments.append((k, v, iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
+                for k, v in buildStatDic:
+                    arguments.append((k, v.replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
+                jobs = []
                 for a in arguments:
-                    p = Process(target=buildCsvGrid, args=a)
-                    processes.append(p)
-                    p.start()
-                for p in processes:
-                    p.join()
+                    jobs.append(Process(target=buildCsvGrid, args=a))
+                getDone(jobs)
+
             else:
-                for key in buildStatDic.keys():
-                    buildCsvGrid(key, buildStatDic[key], iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
-                    buildCsvGrid(key, buildStatDic[key].replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
+                for k, v in buildStatDic:
+                    buildCsvGrid(k, v, iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
+                    buildCsvGrid(k, v.replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
 
             log.write(getTime(start_time) + '\n')
 
@@ -1171,16 +1150,16 @@ try:
         etape = 5
         description = "estimation de la population dans la grille "
         progres = "Etape %i sur 8 : %s" %(etape, description)
-        printer(progres)
+        if not silent:
+            printer(progres)
         log.write(description + ': ')
 
         batiInterIris = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_inter_iris.shp')
         if not speed:
-            statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath +
-                         'data/' + gridSize + 'm/', workspacePath + 'data/' + gridSize + 'm/csv/')
+            statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath + 'data/' +
+                         gridSize + 'm/', workspacePath + 'data/' + gridSize + 'm/csv/')
         else:
-            statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath +
-                         'data/' + gridSize + 'm/')
+            statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath + 'data/' + gridSize + 'm/')
         del grid, iris
 
         log.write(getTime(start_time) + '\n')
@@ -1188,7 +1167,8 @@ try:
         etape = 6
         description = "calcul des restrictions "
         progres = "Etape %i sur 8 : %s" %(etape, description)
-        printer(progres)
+        if not silent:
+            printer(progres)
         log.write(description + ': ')
 
         # Création de la grille de restriction
@@ -1230,21 +1210,23 @@ try:
             resampleAlg='cubicspline',
             srcSRS='EPSG:2154', dstSRS='EPSG:3035',
             outputBounds=(xMin, yMin, xMax, yMax),
-            srcNodata=-99999)
-
+            srcNodata=-99999
+        )
         # Calcul de pente en %
         gdal.DEMProcessing(
             workspacePath + 'data/' + gridSize + 'm/tif/slope.tif',
             workspacePath + 'data/' + gridSize + 'm/tif/mnt.tif',
             'slope', format='GTiff',
-            slopeFormat='percent')
+            slopeFormat='percent'
+        )
 
         log.write(getTime(start_time) + '\n')
         start_time = time()
         etape = 7
         description = "création des rasters de restriction et d'intérêt "
         progres = "Etape %i sur 8 : %s" %(etape, description)
-        printer(progres)
+        if not silent:
+            printer(progres)
         log.write(description + ': ')
         # Chaîne à passer à QGIS pour l'étendue des rasterisations
         extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
@@ -1300,25 +1282,25 @@ try:
             next(reader, None)
             distancesSirene = {rows[0]:int(rows[1]) for rows in reader}
 
-        for key in distancesSirene.keys():
-            layer = QgsVectorLayer(workspacePath + 'data/geosirene/type_' + key + '.shp', key)
+        for k, v in distancesSirene:
+            layer = QgsVectorLayer(workspacePath + 'data/geosirene/type_' + k + '.shp', k)
             layer.setExtent(extent)
             params = {
                 'INPUT': layer,
-                'RADIUS': distancesSirene[key],
+                'RADIUS': v,
                 'PIXEL_SIZE': int(gridSize),
                 'KERNEL': 0,
                 'OUTPUT_VALUE': 0,
-                'OUTPUT': workspacePath + 'data/' + gridSize + 'm/tif/tmp/densite_' + key + '.tif'
+                'OUTPUT': workspacePath + 'data/' + gridSize + 'm/tif/tmp/densite_' + k + '.tif'
             }
             processing.run('qgis:heatmapkerneldensityestimation', params, feedback=feedback)
 
             params = {
-                'INPUT': workspacePath + 'data/' + gridSize + 'm/tif/tmp/densite_' + key + '.tif',
+                'INPUT': workspacePath + 'data/' + gridSize + 'm/tif/tmp/densite_' + k + '.tif',
                 'PROJWIN': projwin,
                 'NODATA': -9999,
                 'DATA_TYPE': 5,
-                'OUTPUT': workspacePath + 'data/' + gridSize + 'm/tif/densite_' + key + '.tif'
+                'OUTPUT': workspacePath + 'data/' + gridSize + 'm/tif/densite_' + k + '.tif'
             }
             processing.run('gdal:cliprasterbyextent', params, feedback=feedback)
         del projwin, distancesSirene
@@ -1329,7 +1311,8 @@ try:
     etape = 8
     description = "finalisation "
     progres = "Etape %i sur 8 : %s" %(etape, description)
-    printer(progres)
+    if not silent:
+        printer(progres)
     log.write(description + ': ')
 
     # Mise en forme finale des données raster pour le modèle
@@ -1361,22 +1344,19 @@ try:
 
     # Création des variables GDAL indispensables pour la fonction to_tif()
     ds = gdal.Open(projectPath + 'population.tif')
-    cols = ds.RasterXSize
-    rows = ds.RasterYSize
     proj = ds.GetProjection()
     geot = ds.GetGeoTransform()
-    driver = gdal.GetDriverByName('GTiff')
     population = ds.ReadAsArray()
     ds = None
 
     # Conversion des raster de distance
     distance_routes = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
     routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
-    to_tif(routes, gdal.GDT_Float32, projectPath + 'routes.tif')
+    to_tif(routes, 'float32', proj, geot, projectPath + 'routes.tif')
 
     distance_transport = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
     transport = np.where(distance_transport > -1, 1 - (distance_transport / np.amax(distance_transport)), 0)
-    to_tif(transport, gdal.GDT_Float32, projectPath + 'transport.tif')
+    to_tif(transport, 'float32', proj, geot, projectPath + 'transport.tif')
 
     # Conversion et aggrégation des rasters de densité SIRENE
     with open(globalData + 'sirene/poids.csv') as csvFile:
@@ -1403,7 +1383,7 @@ try:
                (enseignement * poidsSirene['enseignement']) + (medical * poidsSirene['medical']) +
                (recreatif * poidsSirene['recreatif'])) / sum(poidsSirene.values())
     sirene = sirene / np.amax(sirene)
-    to_tif(sirene, gdal.GDT_Float32, projectPath + 'sirene.tif')
+    to_tif(sirene, 'float32', proj, geot, projectPath + 'sirene.tif')
     del poidsSirene, administratif, commercial, enseignement, medical, recreatif, sirene
 
     # Création du raster de restriction (sans PLU)
@@ -1419,19 +1399,19 @@ try:
 
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (
         zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
-    to_tif(restriction, gdal.GDT_Byte, projectPath + 'restriction.tif')
+    to_tif(restriction, 'byte', proj, geot, projectPath + 'restriction.tif')
     del surfActivMask, exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
 
     if os.path.exists(workspacePath + 'data/plu.shp'):
         pluRestrict = to_array(workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif')
         pluPriority = to_array(workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif')
-        to_tif(pluRestrict, gdal.GDT_Byte, projectPath + 'plu_restriction.tif')
-        to_tif(pluPriority, gdal.GDT_Byte, projectPath + 'plu_priorite.tif')
+        to_tif(pluRestrict, 'byte', proj, geot, projectPath + 'plu_restriction.tif')
+        to_tif(pluPriority, 'byte', proj, geot, projectPath + 'plu_priorite.tif')
         del pluRestrict, pluPriority
 
     ecologie = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif')
     ecologie = np.where((ecologie == 0) & (irisMask != 1), 1, ecologie)
-    to_tif(ecologie, gdal.GDT_Float32, projectPath + 'ecologie.tif')
+    to_tif(ecologie, 'float32', proj, geot, projectPath + 'ecologie.tif')
     del ecologie
 
     nb_m2 = to_array(workspacePath + 'data/' + gridSize + 'm/tif/nb_m2_iris.tif')
@@ -1439,18 +1419,24 @@ try:
     seuil = to_array(workspacePath + 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
     capa_m2 = np.where(seuil - s_planch >= 0, seuil - s_planch, 0)
     capacite = np.where((irisMask != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
-    to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite.tif')
+    to_tif(capacite, 'uint16', proj, geot, projectPath + 'capacite.tif')
 
     log.write(getTime(start_time) + '\n')
-    print('\nTerminée à ' + strftime('%H:%M:%S'))
+    if not silent:
+        print('\nTerminée à ' + strftime('%H:%M:%S'))
 
     if truth:
-        print('Suppression des données temporaires !')
         rmtree(workspacePath)
+        if not silent:
+            print('Suppression des données temporaires !')
+
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
-    print("\n*** Error :")
-    traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
+    if not silent:
+        print("\n*** Error :")
+        traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
+    else:
+        log.write('\n*** Error :\n' + str(sys.exc_info()))
     qgs.exitQgis()
     log.close()
     sys.exit()

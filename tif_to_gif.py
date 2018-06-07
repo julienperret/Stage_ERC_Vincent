@@ -6,12 +6,7 @@ import gdal
 import traceback
 import numpy as np
 from shutil import rmtree
-
-def slashify(path):
-    if path[len(path)-1] != '/':
-        return path + '/'
-    else:
-        return path
+from tools import slashify, to_array
 
 inDir = slashify(sys.argv[1])
 outDir = slashify(sys.argv[2])
@@ -26,19 +21,17 @@ if len(sys.argv) > 3:
 if 'delay' not in globals():
     delay = str(len(os.listdir(inDir)))
 
-# Convertit un tif en numpy array
-def to_array(tif, dtype=None):
-    ds = gdal.Open(tif)
-    if dtype == 'float32':
-        return ds.ReadAsArray().astype(np.float32)
-    elif dtype == 'uint16':
-        return ds.ReadAsArray().astype(np.uint16)
-    else:
-        return ds.ReadAsArray()
-    ds = None
-
-# Enregistre un fichier .png à partir d'un array et de variables GDAL stockée au préalable
 def to_tif(array, dtype, path):
+    cols, rows = array.shape[1], array.shape[0] # x, y
+    driver = gdal.GetDriverByName('GTiff')
+    if dtype == 'byte':
+        dtype = gdal.GDT_Byte
+    elif dtype == 'float32':
+        dtype = gdal.GDT_Float32
+    elif dtype == 'uint16':
+        dtype = gdal.GDT_UInt16
+    else :
+        dtype = gdal.GDT_Unknown
     ds_out = driver.Create(path, cols, rows, 1, dtype)
     ds_out.GetRasterBand(1).WriteArray(array)
     ds_out = None
@@ -47,8 +40,6 @@ try:
     # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
     ds = gdal.Open(inDir + 'pop_2040.tif')
     population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
-    cols = ds.RasterXSize
-    rows = ds.RasterYSize
     driver = gdal.GetDriverByName('GTiff')
     ds = None
 
@@ -62,7 +53,7 @@ try:
             basename = os.path.splitext(tifPath.split('/')[len(tifPath.split('/'))-1])[0]
             array = to_array(inDir + '/' + tifPath).astype(np.uint32)
             array = (array * 65535 / maxValue).astype(np.uint16)
-            to_tif(array, gdal.GDT_UInt16, outDir + '/tmp/' + basename + '.tif')
+            to_tif(array, 'uint16', outDir + '/tmp/' + basename + '.tif')
 
     os.system('convert -delay ' + delay + ' -loop 0 ' + outDir + 'tmp/*.tif ' + outDir + 'evo_demo.gif')
     rmtree(outDir + 'tmp')

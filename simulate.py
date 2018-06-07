@@ -7,18 +7,13 @@ import csv
 import gdal
 import traceback
 import numpy as np
+from tools import *
 from shutil import rmtree
 from ast import literal_eval
 from time import strftime, time
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
-
-def slashify(path):
-    if path[len(path)-1] != '/':
-        return path + '/'
-    else:
-        return path
 
 # Stockage et contrôle de la validité des paramètres utilisateur
 dataDir = slashify(sys.argv[1])
@@ -44,6 +39,8 @@ if len(sys.argv) > 5:
             finalYear = int(arg.split('=')[1])
         if 'adjustCapa' in arg:
             adjustCapa = int(arg.split('=')[1])
+        if 'silent' in arg:
+            silent = True
 
 # Valeurs de paramètres par défaut
 if 'mode' not in globals():
@@ -56,6 +53,8 @@ if 'finalYear' not in globals():
     finalYear = 2040
 if 'adjustCapa' not in globals():
     adjustCapa = 100
+if 'silent' not in globals():
+    silent = False
 
 cellSurf = gridSize * gridSize
 projectPath = outputDir + str(gridSize) + 'm_' + mode + '_tx' + str(rate)
@@ -73,37 +72,12 @@ if os.path.exists(projectPath):
     rmtree(projectPath)
 os.makedirs(projectPath + 'snapshots')
 
-# Pour affichage dynamique de la progression
-def printer(string):
-	sys.stdout.write("\r\x1b[K" + string)
-	sys.stdout.flush()
-
-# Convertit un tif en numpy array
-def to_array(tif, dtype=None):
-    ds = gdal.Open(tif)
-    if dtype == 'float32':
-        return ds.ReadAsArray().astype(np.float32)
-    elif dtype == 'uint16':
-        return ds.ReadAsArray().astype(np.uint16)
-    else:
-        return ds.ReadAsArray()
-    ds = None
-
-# Enregistre un fichier .tif à partir d'un array et de variables GDAL stockée au préalable
-def to_tif(array, dtype, path):
-    ds_out = driver.Create(path, cols, rows, 1, dtype)
-    ds_out.SetProjection(proj)
-    ds_out.SetGeoTransform(geot)
-    ds_out.GetRasterBand(1).WriteArray(array)
-    if dtype == gdal.GDT_UInt16:
-        ds_out.GetRasterBand(1).SetNoDataValue(65535)
-    ds_out = None
-
 # Fonction de répartition de la population
 def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
     global population, capacite
     popLogee = 0
     capaciteTmp = capacite.copy()
+    cols, rows = population.shape[1], population.shape[0]
     populationTmp = np.zeros([rows, cols], np.uint16)
 
     if mode == 'souple':
@@ -169,7 +143,7 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
 
     capacite -= populationTmp
     population += populationTmp
-    to_tif(population, gdal.GDT_UInt16, projectPath + 'snapshots/pop_' + str(year) + '.tif')
+    to_tif(population, 'uint16', proj, geot, projectPath + 'snapshots/pop_' + str(year) + '.tif')
     return popALoger - popLogee
 
 # Création d'un fichier journal
@@ -209,15 +183,12 @@ try:
     # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
     ds = gdal.Open(dataDir + 'population.tif')
     population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
-    cols = ds.RasterXSize
-    rows = ds.RasterYSize
     proj = ds.GetProjection()
     geot = ds.GetGeoTransform()
-    driver = gdal.GetDriverByName('GTiff')
     ds = None
 
     urb14 = np.where(population > 0, 1, 65535)
-    to_tif(urb14, gdal.GDT_UInt16, projectPath + 'urbain_2014.tif' )
+    to_tif(urb14, 'uint16', proj, geot, projectPath + 'urbain_2014.tif' )
     del urb14
 
     # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
@@ -238,33 +209,37 @@ try:
 
     # On vérifie que la capcité d'accueil est suffisante, ici on pourrait modifier la couche de restriction pour augmenter la capacité
     f = 0
-    capaciteAccueil = np.sum(capacite)
+    capaciteAccueil = capacite.sum()
     log.write("Capacité d'accueil originale du territoire, " + str(capaciteAccueil) + '\n')
     if capaciteAccueil < sumPopALoger:
         f += 100
         if hasPlu:
-            print("La capacité d'accueil étant insuffisante, on retire les restrictions issues du PLU.")
+            if not silent:
+                print("La capacité d'accueil étant insuffisante, on retire les restrictions issues du PLU.")
             capacite = to_array(dataDir + 'capacite.tif', 'uint16')
             capacite = np.where(restriction != 1, capacite, 0)
-            capaciteAccueil = np.sum(capacite)
+            capaciteAccueil = capacite.sum()
             if capaciteAccueil < sumPopALoger:
                 while capaciteAccueil < sumPopALoger:
                     f += 5
                     capacite = to_array(dataDir + 'capacite.tif', 'uint16')
                     capacite = np.where(restriction != 1, capacite, 0)
                     capacite = capacite * (f/100)
-                    capaciteAccueil = np.sum(capacite)
-                print("Afin de loger tout le monde, la capacite est augmentée de " + str(f) + ' %')
+                    capaciteAccueil = capacite.sum()
+                if not silent:
+                    print("Afin de loger tout le monde, la capacite est augmentée de " + str(f) + ' %')
         # Ici on augmente les valeurs du raster de capacité avec un pas de 5 %
         else:
             while capaciteAccueil < sumPopALoger:
                 f += 5
-                print("Capacite  " + str(f) + ' %')
+                if not silent:
+                    print("Capacite  " + str(f) + ' %')
                 capacite = to_array(dataDir + 'capacite.tif', 'uint16')
                 capacite = np.where(restriction != 1, capacite, 0)
                 capacite = capacite * (f/100)
-                capaciteAccueil = np.sum(capacite)
-            print("Afin de loger tout le monde, la capacite est augmentée de " + str(f) + ' %')
+                capaciteAccueil = capacite.sum()
+            if not silent:
+                print("Afin de loger tout le monde, la capacite est augmentée de " + str(f) + ' %')
 
     log.write("Nouvelle capacité d'accueil du territoire, " + str(capaciteAccueil) + "\n")
     log.write("Pourcentage d'augmentation de la capacite, " + str(f) + "\n")
@@ -272,7 +247,7 @@ try:
 
     capaciteDepart = capacite.copy()
     populationDepart = population.copy()
-    to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite_depart.tif')
+    to_tif(capacite, 'uint16', proj, geot, projectPath + 'capacite_depart.tif')
 
     # Conversion des autres raster d'entrée en numpy array
     ecologie = to_array(dataDir + 'ecologie.tif', 'float32')
@@ -284,12 +259,13 @@ try:
     # Création du raster final d'intérêt avec pondération
     interet = np.where((restriction != 1), (ecologie * poids['ecologie']) + (ocsol * poids['ocsol']) +
      (routes * poids['routes']) + (transport * poids['transport']) + (sirene * poids['sirene']), 0)
-    to_tif(interet, gdal.GDT_Float32, projectPath + 'interet.tif')
+    to_tif(interet, 'float32', proj, geot, projectPath + 'interet.tif')
     del poids, restriction, ocsol, routes, transport, sirene
 
     for year in range(2015, finalYear + 1):
         progress = "Année %i/%i" %(year, finalYear)
-        printer(progress)
+        if not silent:
+            printer(progress)
         popALoger = dicPop[year]
         if hasPlu:
             popRestante = urbanize(mode, popALoger, saturateFirst, pluPriority)
@@ -307,12 +283,12 @@ try:
     impactEnvironnemental = int(np.where(expansion == 1, 1 - ecologie, 0).sum() * cellSurf)
     expansionSum = expansion.sum()
 
-    to_tif(capacite, gdal.GDT_UInt16, projectPath + 'capacite_future.tif')
-    to_tif(population, gdal.GDT_UInt16, projectPath + 'population_future.tif')
-    to_tif(expansion, gdal.GDT_Byte, projectPath + 'expansion.tif')
-    to_tif(popNouvelle, gdal.GDT_UInt16, projectPath + 'population_nouvelle.tif')
-    to_tif(capaSaturee, gdal.GDT_Byte, projectPath + 'capacite_saturee')
-    to_tif(urb40, gdal.GDT_UInt16, projectPath + 'urbain_2040.tif' )
+    to_tif(capacite, 'uint16', proj, geot, projectPath + 'capacite_future.tif')
+    to_tif(population, 'uint16', proj, geot, projectPath + 'population_future.tif')
+    to_tif(expansion, 'byte', proj, geot, projectPath + 'expansion.tif')
+    to_tif(popNouvelle, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
+    to_tif(capaSaturee, 'byte', proj, geot, projectPath + 'capacite_saturee')
+    to_tif(urb40, 'uint16', proj, geot, projectPath + 'urbain_2040.tif' )
 
     nbCapaCell = np.where(capaciteDepart != 0, 1, 0).sum()
     mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
@@ -325,13 +301,16 @@ try:
     end_time = time()
     execTime = round(end_time - start_time, 2)
     log.write("Temps d'execution, " + str(execTime))
-    print("\nTemps d'execution : " + str(execTime) + ' secondes')
+    if not silent:
+        print("\nTemps d'execution : " + str(execTime) + ' secondes')
 
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
-    print("\n*** Error :")
-    traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
-    mesures.close()
+    if not silent:
+        print("\n*** Error :")
+        traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
+    else:
+        log.write('\n*** Error :\n' + str(sys.exc_info()))
     log.close()
     sys.exit()
 

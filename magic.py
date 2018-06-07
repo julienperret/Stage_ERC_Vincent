@@ -6,15 +6,10 @@ import sys
 import csv
 import operator
 import traceback
-from ast import literal_eval
 import multiprocessing as mp
+from ast import literal_eval
 from time import strftime, time
-
-def slashify(path):
-    if path[len(path)-1] != '/':
-        return path + '/'
-    else:
-        return path
+from tools import slashify, printer
 
 nbCores  = int(sys.argv[1])
 inputDir = slashify(sys.argv[2])
@@ -37,11 +32,6 @@ if len(sys.argv) > 6:
         depList.append(param)
 if not os.path.exists(outputDir):
     os.makedirs(outputDir)
-
-# Pour affichage dynamique de la progression
-def printer(string):
-	sys.stdout.write("\r\x1b[K" + string)
-	sys.stdout.flush()
 
 # Fonctions
 def writeHeaders(prefix, dep, tab):
@@ -186,7 +176,6 @@ try:
         printer(progres)
     pool.close()
     pool.join()
-
 
     end_time = time()
     execTime = end_time - start_time
