@@ -1227,30 +1227,39 @@ try:
         extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
         # Rasterisations
-        rasterize(workspacePath + 'data/ecologie.shp', workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif', 'interet')
-        rasterize(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', workspacePath + 'data/' + gridSize + 'm/tif/s_planch_grid.tif', 'srf_p')
-        rasterize(workspacePath + 'data/' + gridSize + 'm/restrict_grid.shp', workspacePath + 'data/' + gridSize + 'm/tif/restrict_grid.tif', 'restrict')
-        rasterize(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif', 'SP_Q3')
-        rasterize(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/seuil_max_iris.tif', 'SP_MAX')
-        rasterize(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/nb_m2_iris.tif', 'M2_HAB')
-        rasterize(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/masque.tif', burn=1, inverse=True)
-
-        rasterize(workspacePath + 'data/restriction/zonages_protection.shp', workspacePath + 'data/' + gridSize + 'm/tif/zonages_protection.tif', burn=1)
-        rasterize(workspacePath + 'data/restriction/tampon_autoroutes.shp', workspacePath + 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif', burn=1)
-        rasterize(workspacePath + 'data/restriction/exclusion.shp', workspacePath + 'data/' + gridSize + 'm/tif/exclusion.tif', burn=1)
-        rasterize(workspacePath + 'data/pai/surf_activ_non_com.shp', workspacePath + 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif', burn=1)
-
+        arguments = [
+            (workspacePath + 'data/ecologie.shp', workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif', 'interet'),
+            (workspacePath + 'data/transport/routes.shp', workspacePath + 'data/' + gridSize + 'm/tif/routes.tif', None, 1),
+            (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', workspacePath + 'data/' + gridSize + 'm/tif/s_planch_grid.tif', 'srf_p'),
+            (workspacePath + 'data/' + gridSize + 'm/restrict_grid.shp', workspacePath + 'data/' + gridSize + 'm/tif/restrict_grid.tif', 'restrict'),
+            (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif', 'SP_Q3'),
+            (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/seuil_max_iris.tif', 'SP_MAX'),
+            (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/nb_m2_iris.tif', 'M2_HAB'),
+            (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/masque.tif', None, 1, True),
+            (workspacePath + 'data/restriction/zonages_protection.shp', workspacePath + 'data/' + gridSize + 'm/tif/zonages_protection.tif', None, 1),
+            (workspacePath + 'data/restriction/tampon_autoroutes.shp', workspacePath + 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif', None, 1),
+            (workspacePath + 'data/restriction/exclusion.shp', workspacePath + 'data/' + gridSize + 'm/tif/exclusion.tif', None, 1),
+            (workspacePath + 'data/pai/surf_activ_non_com.shp', workspacePath + 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif', None, 1)
+        ]
         if os.path.exists(workspacePath + 'data/restriction/ppr.shp'):
-            rasterize(workspacePath + 'data/restriction/ppr.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', burn=1)
+            arguments.append((workspacePath + 'data/restriction/ppr.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', None, 1))
         elif os.path.exists(workspacePath + 'data/plu.shp'):
-            rasterize(workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', 'ppr')
+            arguments.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', 'ppr'))
 
         if os.path.exists(workspacePath + 'data/plu.shp'):
-            rasterize(workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif', 'restrict')
-            rasterize(workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif', 'priority')
+            arguments.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif', 'restrict'))
+            arguments.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif', 'priority'))
+
+        if multiproc:
+            jobs = []
+            for a in arguments:
+                jobs.append(Process(target=rasterize, args=a))
+            getDone(jobs)
+        else:
+            for a in arguments:
+                rasterize(*a)
 
         # Calcul des rasters de distance
-        rasterize(workspacePath + 'data/transport/routes.shp', workspacePath + 'data/' + gridSize + 'm/tif/routes.tif', burn=1)
         params = {
             'INPUT': workspacePath + 'data/' + gridSize + 'm/tif/routes.tif',
             'BAND': 1,
