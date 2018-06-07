@@ -1,9 +1,6 @@
-# ./tools.py   
-Contient les fonctions communes; à déplacer avec tout script sorti du dépôt.  
-
 **__Les chemins peuvent être passés en argument avec ou sans slash final__**  
 
-# ./prepare.py
+## ./prepare.py
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  
     1 : répertoire des données globales  
     2 : n° de département dans lequel la zone d'étude est située  
@@ -24,7 +21,7 @@ python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "gridSize=50 speed"
 Dépendances pour python3 :  
     PyQt5, qgis, gdal, numpy  
 
-# ./simulate.py  
+## ./simulate.py  
 Deux paramètres au minimum :  
     1 : répertoire contenant la donnée  
     2 : répertoire des résultats (créé si besoin)  
@@ -41,13 +38,17 @@ Usage :
 Dépendances pour python3 :  
     gdal, numpy  
 
-# Commandes CARE qui semblent marcher :  
+
+## Commandes CARE qui semblent marcher :  
 
 care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data/ 34  ./mtp/ ./results/ "gridSize=50 useTxrp=True levelHeight=3 force"  
 
 care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data/ /my/output/dir/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
 
-## ./insee_to_csv.py   
+### ./tools.py   
+Contient les fonctions communes; à déplacer avec tout script sorti du dépôt.  
+
+### ./insee_to_csv.py   
 Convertir les données XLS de l'INSEE en CSV en supprimant les champs inutiles, à lancer une seule fois pour toute la région  
 Dépendances pour python3 :  
     pandas + xlrd (pour manipuler les .xls)  
@@ -55,10 +56,10 @@ Dépendances pour python3 :
 Usage :  
 ./insee_to_csv.py ../global_data/insee/  
 
-## ./magic.py  
+### ./magic.py  
 Convertit les fichiers positionnels MAJIC III en CSV
 
-## ./tif_to_gif.py  
+### ./tif_to_gif.py  
 Génère un GIF à partir des tifs de population générés pour chaque année de la simulation.  
 
 Usage :  
