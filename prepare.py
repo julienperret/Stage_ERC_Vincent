@@ -646,13 +646,13 @@ def envRestrict(layerList, overlay, outdir):
 # Jointure avec données INSEE et extraction des IRIS dans la zone
 def irisExtractor(iris, overlay, csvdir, outdir):
     # Conversion des chaînes en nombre
-    expr = 'IF (to_int("P09_POP") != NULL, to_int("P09_POP"), 0)'
+    expr =
     csvPop09 = QgsVectorLayer(csvdir + 'inseePop09.csv')
-    csvPop09.addExpressionField(expr, QgsField('POP09', QVariant.Int))
+    csvPop09.addExpressionField('to_int("P09_POP")', QgsField('POP09', QVariant.Int))
     csvPop12 = QgsVectorLayer(csvdir + 'inseePop12.csv')
-    csvPop12.addExpressionField(expr.replace('09','12'), QgsField('POP12', QVariant.Int))
+    csvPop12.addExpressionField('to_int("P12_POP")', QgsField('POP12', QVariant.Int))
     csvPop14 = QgsVectorLayer(csvdir + 'inseePop14.csv')
-    csvPop14.addExpressionField(expr.replace('12','14'), QgsField('POP14', QVariant.Int))
+    csvPop14.addExpressionField('to_int("P14_POP")', QgsField('POP14', QVariant.Int))
     csvLog14 = QgsVectorLayer(csvdir + 'inseeLog14.csv')
     csvLog14.addExpressionField('to_real("P14_TXRP")', QgsField('TXRP14', QVariant.Double))
 
