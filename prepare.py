@@ -64,7 +64,7 @@ if len(sys.argv) > 5:
         # Taille du tampon utilisé pour extraire les iris et pour extraire la donnée utile au delà des limites de la zone (comme les points SIRENE)
         elif 'bufferDistance' in arg:
             bufferDistance = int(arg.split('=')[1])
-        # Surfaces au sol minimales et maximales pour considérer un bâtiment comme habitable
+        # Surfaces au sol minimales et maximales pour considérer un bâtiment comme habité
         elif 'minSurf' in arg:
             minSurf = int(arg.split('=')[1])
         elif 'maxSurf' in arg:
@@ -110,13 +110,13 @@ if 'minSurf' not in globals():
 if 'maxSurf' not in globals():
     maxSurf = 10000
 if 'usrTxrp' not in globals():
-    useTxrp = True
+    useTxrp = False
 if 'levelHeight' not in globals():
     levelHeight = 3
 if 'maxOverlapRatio' not in globals():
     maxOverlapRatio = 0.2
 if 'minBuiltRatio' not in globals():
-    minBuiltRatio = 0.1
+    minBuiltRatio = 0.01
 if 'roadDist' not in globals():
     roadDist = 200
 if 'transDist' not in globals():
@@ -448,13 +448,13 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
                     csvGrid.append(csvLayer)
                     if year == '09':
                         gridFields1.append(year + '_' + name)
-                    elif year == '16':
+                    elif year == '14':
                         gridFields2.append(year + '_' + name)
                 elif idType == 'iris':
                     csvIris.append(csvLayer)
                     if year == '09':
                         irisFields1.append(year + '_' + name)
-                    elif year == '16':
+                    elif year == '14':
                         irisFields2.append(year + '_' + name)
 
     for csvLayer in csvGrid:
@@ -481,12 +481,12 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
                 expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
             else:
                 expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
-        grid.addExpressionField(expr, QgsField('ssol_16', QVariant.Double))
+        grid.addExpressionField(expr, QgsField('ssol_14', QVariant.Double))
 
         expr = 'IF("ssol_09" >= $area * ' + str(ratio) + ', 1, 0)'
         grid.addExpressionField(expr, QgsField('built_09', QVariant.Int, len=1))
-        expr = 'IF("ssol_16" >= $area * ' + str(ratio) + ', 1, 0)'
-        grid.addExpressionField(expr, QgsField('built_16', QVariant.Int, len=1))
+        expr = 'IF("ssol_14" >= $area * ' + str(ratio) + ', 1, 0)'
+        grid.addExpressionField(expr, QgsField('built_14', QVariant.Int, len=1))
 
         cpt = 0
         expr = ''
@@ -506,7 +506,7 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir=None):
                 expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
             else:
                 expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
-        iris.addExpressionField(expr, QgsField('ssol_16', QVariant.Double))
+        iris.addExpressionField(expr, QgsField('ssol_14', QVariant.Double))
 
     iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
     to_shp(grid, outdir + '/stat_grid.shp')
@@ -646,22 +646,15 @@ def envRestrict(layerList, overlay, outdir):
 # Jointure avec données INSEE et extraction des IRIS dans la zone
 def irisExtractor(iris, overlay, csvdir, outdir):
     # Conversion des chaînes en nombre
-    csvPop09 = QgsVectorLayer(
-        csvdir + 'inseePop09.csv')
-    csvPop09.addExpressionField(
-        'round(to_real("P09_POP"))', QgsField('POP09', QVariant.Int))
-    csvPop12 = QgsVectorLayer(
-        csvdir + 'inseePop12.csv')
-    csvPop12.addExpressionField(
-        'round(to_real("P12_POP"))', QgsField('POP12', QVariant.Int))
-    csvPop14 = QgsVectorLayer(
-        csvdir + 'inseePop14.csv')
-    csvPop14.addExpressionField(
-        'round(to_real("P14_POP"))', QgsField('POP14', QVariant.Int))
-    csvLog14 = QgsVectorLayer(
-        csvdir + 'inseeLog14.csv')
-    csvLog14.addExpressionField(
-        'to_real("P14_TXRP")', QgsField('TXRP14', QVariant.Double))
+    expr = 'IF (to_int("P09_POP") != NULL, to_int("P09_POP"), 0)'
+    csvPop09 = QgsVectorLayer(csvdir + 'inseePop09.csv')
+    csvPop09.addExpressionField(expr, QgsField('POP09', QVariant.Int))
+    csvPop12 = QgsVectorLayer(csvdir + 'inseePop12.csv')
+    csvPop12.addExpressionField(expr.replace('09','12'), QgsField('POP12', QVariant.Int))
+    csvPop14 = QgsVectorLayer(csvdir + 'inseePop14.csv')
+    csvPop14.addExpressionField(expr.replace('12','14'), QgsField('POP14', QVariant.Int))
+    csvLog14 = QgsVectorLayer(csvdir + 'inseeLog14.csv')
+    csvLog14.addExpressionField('to_real("P14_TXRP")', QgsField('TXRP14', QVariant.Double))
 
     # Jointure avec données INSEE et extraction des IRIS dans la zone
     join(iris, 'CODE_IRIS', csvPop09, 'IRIS', ['P09_POP'])
@@ -785,7 +778,7 @@ try:
         irisExtractor(iris, zone_buffer, globalData + 'insee/csv/', workspacePath + 'data/')
         # Extractions et reprojections
         os.mkdir(workspacePath + 'data/2009_bati')
-        os.mkdir(workspacePath + 'data/2016_bati')
+        os.mkdir(workspacePath + 'data/2014_bati')
         os.mkdir(workspacePath + 'data/pai')
         os.mkdir(workspacePath + 'data/transport')
         clipBati = [
@@ -818,7 +811,7 @@ try:
         ]
         argList = []
         for path in clipBati:
-            argList.append((clip(path, zone), workspacePath + 'data/2016_bati/'))
+            argList.append((clip(path, zone), workspacePath + 'data/2014_bati/'))
             argList.append((clip(path.replace('2016', '2009'), zone), workspacePath + 'data/2009_bati/'))
 
         for path in clipPai:
@@ -1029,7 +1022,7 @@ try:
         log.write(description + ': ')
 
         # Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
-        bati_indif = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_indifferencie.shp', 'bati_indif_2016')
+        bati_indif = QgsVectorLayer(workspacePath + 'data/2014_bati/bati_indifferencie.shp', 'bati_indif_2014')
         bati_indif.dataProvider().createSpatialIndex()
         cleanPolygons = []
         cleanPoints = [workspacePath + 'data/pai/pai_merged.shp']
@@ -1052,18 +1045,18 @@ try:
         if os.path.exists(workspacePath + 'data/restriction/exclusion.shp'):
             cleanPolygons.append(workspacePath + 'data/restriction/exclusion.shp')
         buildingCleaner(bati_indif, minSurf, maxSurf, levelHeight, cleanPolygons, cleanPoints,
-                        workspacePath + 'data/2016_bati/bati_clean.shp', workspacePath + 'data/restriction/bati_removed.shp')
+                        workspacePath + 'data/2014_bati/bati_clean.shp', workspacePath + 'data/restriction/bati_removed.shp')
         del bati_indif, cleanPolygons, cleanPoints
 
         # Intersection du bâti résidentiel avec les quartiers IRIS
-        bati_clean = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_clean.shp')
+        bati_clean = QgsVectorLayer(workspacePath + 'data/2014_bati/bati_clean.shp')
         bati_clean.dataProvider().createSpatialIndex()
         params = {
-            'INPUT': workspacePath + 'data/2016_bati/bati_clean.shp',
+            'INPUT': workspacePath + 'data/2014_bati/bati_clean.shp',
             'OVERLAY': workspacePath + 'data/iris.shp',
             'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV'],
             'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14', 'TXRP14'],
-            'OUTPUT': workspacePath + 'data/2016_bati/bati_inter_iris.shp'
+            'OUTPUT': workspacePath + 'data/2014_bati/bati_inter_iris.shp'
         }
         processing.run('qgis:intersection', params, feedback=feedback)
         log.write(getTime(start_time) + '\n')
@@ -1115,19 +1108,18 @@ try:
             log.write(description + ': ')
 
             buildStatDic = {
-                'indif': workspacePath + 'data/2016_bati/bati_indifferencie.shp',
-                'indus': workspacePath + 'data/2016_bati/bati_industriel.shp',
-                'remarq': workspacePath + 'data/2016_bati/bati_remarquable.shp',
-                'surfac': workspacePath + 'data/2016_bati/construction_surfacique.shp',
-                'aerodr': workspacePath + 'data/2016_bati/piste_aerodrome.shp',
-                'sport': workspacePath + 'data/2016_bati/terrain_sport.shp'
+                'indif': workspacePath + 'data/2014_bati/bati_indifferencie.shp',
+                'indus': workspacePath + 'data/2014_bati/bati_industriel.shp',
+                'remarq': workspacePath + 'data/2014_bati/bati_remarquable.shp',
+                'surfac': workspacePath + 'data/2014_bati/construction_surfacique.shp',
+                'aerodr': workspacePath + 'data/2014_bati/piste_aerodrome.shp',
+                'sport': workspacePath + 'data/2014_bati/terrain_sport.shp'
             }
-
             argList = []
             for k, v in buildStatDic.items():
                 argList.append((k, v, iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
             for k, v in buildStatDic.items():
-                argList.append((k, v.replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
+                argList.append((k, v.replace('2014','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
 
             if multiproc:
                 getDone(buildCsvGrid, argList)
@@ -1145,7 +1137,7 @@ try:
             printer(progres)
         log.write(description + ': ')
 
-        batiInterIris = QgsVectorLayer(workspacePath + 'data/2016_bati/bati_inter_iris.shp')
+        batiInterIris = QgsVectorLayer(workspacePath + 'data/2014_bati/bati_inter_iris.shp')
         if not speed:
             statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath + 'data/' +
                          gridSize + 'm/', workspacePath + 'data/' + gridSize + 'm/csv/')
@@ -1165,7 +1157,7 @@ try:
         # Création de la grille de restriction
         grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/grid.shp', 'grid')
         b_removed = QgsVectorLayer(workspacePath + 'data/restriction/bati_removed.shp', 'b_removed')
-        cimetiere = QgsVectorLayer(workspacePath + 'data/2016_bati/cimetiere.shp', 'cimetiere')
+        cimetiere = QgsVectorLayer(workspacePath + 'data/2014_bati/cimetiere.shp', 'cimetiere')
         s_eau = QgsVectorLayer(workspacePath + 'data/restriction/surface_eau.shp', 's_eau')
 
         restrictList = [b_removed, cimetiere, s_eau]
@@ -1227,11 +1219,7 @@ try:
             (workspacePath + 'data/ecologie.shp', workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif', 'interet'),
             (workspacePath + 'data/transport/routes.shp', workspacePath + 'data/' + gridSize + 'm/tif/routes.tif', None, 1),
             (workspacePath + 'data/transport/arrets_transport.shp', workspacePath + 'data/' + gridSize + 'm/tif/arrets_transport.tif', None, 1),
-            (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', workspacePath + 'data/' + gridSize + 'm/tif/s_planch_grid.tif', 'srf_p'),
             (workspacePath + 'data/' + gridSize + 'm/restrict_grid.shp', workspacePath + 'data/' + gridSize + 'm/tif/restrict_grid.tif', 'restrict'),
-            (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif', 'SP_Q3'),
-            (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/seuil_max_iris.tif', 'SP_MAX'),
-            (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/nb_m2_iris.tif', 'M2_HAB'),
             (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/masque.tif', None, 1, True),
             (workspacePath + 'data/restriction/zonages_protection.shp', workspacePath + 'data/' + gridSize + 'm/tif/zonages_protection.tif', None, 1),
             (workspacePath + 'data/restriction/tampon_autoroutes.shp', workspacePath + 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif', None, 1),
@@ -1242,10 +1230,6 @@ try:
             argList.append((workspacePath + 'data/restriction/ppr.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', None, 1))
         elif os.path.exists(workspacePath + 'data/plu.shp'):
             argList.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', 'ppr'))
-
-        if os.path.exists(workspacePath + 'data/plu.shp'):
-            argList.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif', 'restrict'))
-            argList.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif', 'priority'))
 
         if multiproc:
             getDone(rasterize, argList)
@@ -1318,15 +1302,24 @@ try:
             rmtree(projectPath)
         os.makedirs(projectPath)
 
+    copyfile(localData + 'poids.csv', projectPath + 'poids.csv')
+
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
-    population = 0
+    pop09 = 0
+    pop12 = 0
+    pop14 = 0
     iris = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_iris.shp')
     for feat in iris.getFeatures():
-        population += int(feat.attribute('POP14'))
+        pop09 += int(feat.attribute('POP09'))
+        pop12 += int(feat.attribute('POP12'))
+        pop14 += int(feat.attribute('POP14'))
     del iris
 
     with open(projectPath + 'population.csv', 'x') as populationCsv:
-        populationCsv.write('population, ' + str(population))
+        populationCsv.write('annee, demographie\n')
+        populationCsv.write('2009, ' + str(pop09) + '\n')
+        populationCsv.write('2012, ' + str(pop12) + '\n')
+        populationCsv.write('2014, ' + str(pop14) + '\n')
 
     grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', 'grid')
     extent = grid.extent()
@@ -1337,8 +1330,25 @@ try:
     extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
     # Rasterisations
-    rasterize(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population.tif', 'pop')
-    rasterize(workspacePath + 'data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
+    argList = [
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_plancher.tif', 'srf_p'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_09.tif', 'ssol_09'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_14.tif', 'ssol_14'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'q3_iris.tif', 'SP_Q3'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'max_iris.tif', 'SP_MAX'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'm2hab_iris.tif', 'M2_HAB'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population.tif', 'pop'),
+        (workspacePath + 'data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
+    ]
+    if os.path.exists(workspacePath + 'data/plu.shp'):
+        argList.append((workspacePath + 'data/plu.shp', projectPath + 'plu_restriction.tif', 'restrict'))
+        argList.append((workspacePath + 'data/plu.shp', projectPath +'plu_priorite.tif', 'priority'))
+
+    if multiproc :
+        getDone(rasterize, argList)
+    else:
+        for a in argList:
+            rasterize(*a)
 
     # Création des variables GDAL indispensables pour la fonction to_tif()
     ds = gdal.Open(projectPath + 'population.tif')
@@ -1369,8 +1379,6 @@ try:
     recreatif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_recreatif.tif', 'float32')
 
     # Normalisation des valeurs entre 0 et 1
-    copyfile(localData + 'poids.csv', projectPath + 'poids.csv')
-
     administratif = np.where(administratif != -9999, administratif / np.amax(administratif), 0)
     commercial = np.where(commercial != -9999, commercial / np.amax(commercial), 0)
     enseignement = np.where(enseignement != -9999, enseignement / np.amax(enseignement), 0)
@@ -1395,29 +1403,15 @@ try:
     slope = to_array(workspacePath + 'data/' + gridSize + 'm/tif/slope.tif')
     slopeMask = np.where(slope > maxSlope, 1, 0)
 
-    restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (
-        zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
+    restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) |
+                            (zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
     to_tif(restriction, 'byte', proj, geot, projectPath + 'restriction.tif')
     del surfActivMask, exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
-
-    if os.path.exists(workspacePath + 'data/plu.shp'):
-        pluRestrict = to_array(workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif')
-        pluPriority = to_array(workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif')
-        to_tif(pluRestrict, 'byte', proj, geot, projectPath + 'plu_restriction.tif')
-        to_tif(pluPriority, 'byte', proj, geot, projectPath + 'plu_priorite.tif')
-        del pluRestrict, pluPriority
 
     ecologie = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif')
     ecologie = np.where((ecologie == 0) & (irisMask != 1), 1, ecologie)
     to_tif(ecologie, 'float32', proj, geot, projectPath + 'ecologie.tif')
     del ecologie
-
-    nb_m2 = to_array(workspacePath + 'data/' + gridSize + 'm/tif/nb_m2_iris.tif')
-    s_planch = to_array(workspacePath + 'data/' + gridSize + 'm/tif/s_planch_grid.tif')
-    seuil = to_array(workspacePath + 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif')
-    capa_m2 = np.where(seuil - s_planch >= 0, seuil - s_planch, 0)
-    capacite = np.where((irisMask != 1) & (nb_m2 != 0), capa_m2 / nb_m2, 0)
-    to_tif(capacite, 'uint16', proj, geot, projectPath + 'capacite.tif')
 
     log.write(getTime(start_time) + '\n')
     if not silent:
