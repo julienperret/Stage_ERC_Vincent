@@ -11,7 +11,6 @@ from tools import *
 from ast import literal_eval
 from time import strftime, time
 from shutil import rmtree, copyfile
-from multiprocessing import Process
 
 from qgis.core import (
     QgsApplication,
