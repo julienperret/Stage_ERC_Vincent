@@ -787,6 +787,8 @@ try:
         # Extractions et reprojections
         os.mkdir(workspacePath + 'data/2009_bati')
         os.mkdir(workspacePath + 'data/2016_bati')
+        os.mkdir(workspacePath + 'data/pai')
+        os.mkdir(workspacePath + 'data/transport')
         clipBati = [
             globalData + 'rge/' + codeDept + '/bdtopo_2016/BATI_INDIFFERENCIE.SHP',
             globalData + 'rge/' + codeDept + '/bdtopo_2016/BATI_INDUSTRIEL.SHP',
@@ -815,34 +817,25 @@ try:
             globalData + 'rge/' + codeDept + '/bdtopo_2016/TRONCON_VOIE_FERREE.SHP',
             globalData + 'rge/' + codeDept + '/bdtopo_2016/GARE.SHP'
         ]
-        jobs = []
+        argList = []
         for path in clipBati:
-            if multiproc:
-                jobs.append(Process(target=reproj, args=(clip(path, zone), workspacePath + 'data/2016_bati/')))
-                jobs.append(Process(target=reproj, args=(clip(path.replace('2016', '2009'), zone), workspacePath + 'data/2009_bati/')))
-            else:
-                reproj(clip(path, zone), workspacePath + 'data/2016_bati/')
-                reproj(clip(path.replace('2016', '2009'), zone), workspacePath + 'data/2009_bati/')
-
-        os.mkdir(workspacePath + 'data/pai')
+            argList.append((clip(path, zone), workspacePath + 'data/2016_bati/'))
+            argList.append((clip(path.replace('2016', '2009'), zone), workspacePath + 'data/2009_bati/'))
 
         for path in clipPai:
-            if multiproc:
-                jobs.append(Process(target=reproj, args=(clip(path, zone_buffer), workspacePath + 'data/pai/')))
-            else:
-                reproj(clip(path, zone_buffer), workspacePath + 'data/pai/')
+            argList.append((clip(path, zone_buffer), workspacePath + 'data/pai/'))
 
-        os.mkdir(workspacePath + 'data/transport')
         for path in clipRes:
-            if multiproc:
-                jobs.append(Process(target=reproj, args=(clip(path, zone_buffer), workspacePath + 'data/transport/')))
-            else:
-                reproj(clip(path, zone_buffer), workspacePath + 'data/transport/')
-        del clipBati, clipRes, clipPai
-        reproj(clip(globalData + 'rge/' + codeDept + '/bdtopo_2016/SURFACE_ACTIVITE.SHP', zone), workspacePath + 'data/pai/')
+            argList.append((clip(path, zone_buffer), workspacePath + 'data/transport/'))
 
         if multiproc:
-            getDone(jobs)
+            getDone(reproj, argList)
+        else:
+            for a in argList:
+                reproj(*a)
+
+        del clipBati, clipRes, clipPai
+        reproj(clip(globalData + 'rge/' + codeDept + '/bdtopo_2016/SURFACE_ACTIVITE.SHP', zone), workspacePath + 'data/pai/')
 
         # Préparation de la couche arrêts de transport en commun
         transports = []
@@ -885,12 +878,11 @@ try:
         sirene = reproj(clip(globalData + 'sirene/geosirene.shp', zone_buffer))
         sireneSplitter(sirene, workspacePath + 'data/geosirene/')
 
+        argList = []
         # Correction de l'OCS ou extraction de l'OSO CESBIO si besoin
         if not os.path.exists(localData + 'ocsol.shp'):
-            ocsol = QgsVectorLayer(
-                globalData + 'oso/departement_' + codeDept + '.shp', 'ocsol')
-            oso.dataProvider().createSpatialIndex()
-            reproj(clip(ocsol, zone), workspacePath + 'data/')
+            ocsol = QgsVectorLayer( globalData + 'oso/departement_' + codeDept + '.shp', 'ocsol')
+            ocsol.dataProvider().createSpatialIndex()
         else:
             params = {
                 'INPUT': localData + 'ocsol.shp',
@@ -912,8 +904,7 @@ try:
                 END
             """
             ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
-            reproj(clip(ocsol, zone), workspacePath + 'data/')
-        del ocsol
+        argList.append((clip(ocsol, zone), workspacePath + 'data/'))
 
         # Traitement du shape de l'intérêt écologique
         if os.path.exists(localData + 'ecologie.shp'):
@@ -932,23 +923,32 @@ try:
 
             params = {'INPUT': ecologie, 'OUTPUT': 'memory:ecologie'}
             res = processing.run('native:fixgeometries', params, feedback=feedback)
-            reproj(clip(res['OUTPUT'], zone), workspacePath + 'data/')
-            del ecologie, ecoFields, field
+            ecologie = res['OUTPUT']
+            del ecoFields, field
         # Autrement déterminer l'intérêt écologique grâce à l'ocsol ?
         else:
             pass
 
+        argList.append((clip(ecologie, zone), workspacePath + 'data/'))
+
         os.mkdir(workspacePath + 'data/restriction')
-        reproj(clip(globalData + 'rge/' + codeDept +
-                    '/bdtopo_2016/SURFACE_EAU.SHP', zone), workspacePath + 'data/restriction/')
+        argList.append((clip(globalData + 'rge/' + codeDept + '/bdtopo_2016/SURFACE_EAU.SHP', zone), workspacePath + 'data/restriction/'))
 
         # Traitement d'une couche facultative du PPR
         if os.path.exists('ppr.shp'):
-            reproj(clip('ppr.shp', zone), workspacePath + 'data/restriction')
+            argList.append((clip('ppr.shp', zone), workspacePath + 'data/restriction'))
 
         # Traitement d'une couche facultative pour exclusion de zones bâties lors du calcul de densité
         if os.path.exists(localData + 'exclusion.shp'):
-            reproj(clip(localData + 'exclusion.shp', zone), workspacePath + 'data/restriction/')
+            argList.append((clip(localData + 'exclusion.shp', zone), workspacePath + 'data/restriction/'))
+
+        if multiproc:
+            getDone(reproj, argList)
+        else:
+            for a in argList:
+                reproj(*a)
+
+        del ecologie, ocsol
 
         # Traitement des couches de zonage de protection
         zonagesEnv = []
@@ -1123,21 +1123,18 @@ try:
                 'aerodr': workspacePath + 'data/2016_bati/piste_aerodrome.shp',
                 'sport': workspacePath + 'data/2016_bati/terrain_sport.shp'
             }
-            if multiproc:
-                arguments = []
-                for k, v in buildStatDic.items():
-                    arguments.append((k, v, iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
-                for k, v in buildStatDic.items():
-                    arguments.append((k, v.replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
-                jobs = []
-                for a in arguments:
-                    jobs.append(Process(target=buildCsvGrid, args=a))
-                getDone(jobs)
 
+            argList = []
+            for k, v in buildStatDic.items():
+                argList.append((k, v, iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
+            for k, v in buildStatDic.items():
+                argList.append((k, v.replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
+
+            if multiproc:
+                getDone(buildCsvGrid, argList)
             else:
-                for k, v in buildStatDic.items():
-                    buildCsvGrid(k, v, iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
-                    buildCsvGrid(k, v.replace('2016','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/')
+                for a in argList:
+                    buildCsvGrid(*a)
 
             log.write(getTime(start_time) + '\n')
 
@@ -1227,7 +1224,7 @@ try:
         extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
         # Rasterisations
-        arguments = [
+        argList = [
             (workspacePath + 'data/ecologie.shp', workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif', 'interet'),
             (workspacePath + 'data/transport/routes.shp', workspacePath + 'data/' + gridSize + 'm/tif/routes.tif', None, 1),
             (workspacePath + 'data/transport/arrets_transport.shp', workspacePath + 'data/' + gridSize + 'm/tif/arrets_transport.tif', None, 1),
@@ -1243,21 +1240,18 @@ try:
             (workspacePath + 'data/pai/surf_activ_non_com.shp', workspacePath + 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif', None, 1)
         ]
         if os.path.exists(workspacePath + 'data/restriction/ppr.shp'):
-            arguments.append((workspacePath + 'data/restriction/ppr.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', None, 1))
+            argList.append((workspacePath + 'data/restriction/ppr.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', None, 1))
         elif os.path.exists(workspacePath + 'data/plu.shp'):
-            arguments.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', 'ppr'))
+            argList.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', 'ppr'))
 
         if os.path.exists(workspacePath + 'data/plu.shp'):
-            arguments.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif', 'restrict'))
-            arguments.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif', 'priority'))
+            argList.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_rest.tif', 'restrict'))
+            argList.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/plu_prio.tif', 'priority'))
 
         if multiproc:
-            jobs = []
-            for a in arguments:
-                jobs.append(Process(target=rasterize, args=a))
-            getDone(jobs)
+            getDone(rasterize, argList)
         else:
-            for a in arguments:
+            for a in argList:
                 rasterize(*a)
 
         # Calcul des rasters de distance
@@ -1320,8 +1314,9 @@ try:
     log.write(description + ': ')
 
     # Mise en forme finale des données raster pour le modèle
-    if not truth and os.path.exists(projectPath):
-        rmtree(projectPath)
+    if not truth :
+        if os.path.exists(projectPath):
+            rmtree(projectPath)
         os.makedirs(projectPath)
 
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté

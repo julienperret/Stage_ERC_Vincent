@@ -1,8 +1,8 @@
-import os
 import sys
 import gdal
 import numpy as np
 from time import time
+from multiprocessing import Process, Pool
 
 # Pour la gestion des slashs en fin de chemin
 def slashify(path):
@@ -16,16 +16,21 @@ def printer(string):
 	sys.stdout.write("\r\x1b[K" + string)
 	sys.stdout.flush()
 
-def getDone(jobs):
+def getDone(function, argList, usePool=False):
     c = 0
-    while c < len(jobs):
-        for i in range(c, c + os.cpu_count()):
-            if i < len(jobs):
-                jobs[i].start()
-        for i in range(c, c + os.cpu_count()):
-            if i < len(jobs):
-                jobs[i].join()
-                c += 1
+    if not usePool:
+        jobs = []
+        for a in argList:
+            jobs.append(Process(target=function, args=a))
+        for j in jobs:
+            j.start()
+        for j in jobs:
+            j.join()
+    elif usePool:
+        p = Pool()
+        p.map(function, argList)
+        p.close()
+        p.join()
 
 # Calcul le temps d'exécution d'une étape
 def getTime(start):
