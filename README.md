@@ -12,7 +12,7 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 * force = suppression du répertoire de sortie si il existe  
 * speed = éviter de calculer l'évolution toutes couches de bâti, divise le temps par 2 (de 20 à 10mn)  
 * truth = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires  
-* multiproc = utilisation de plusieurs threads (1 par cpu)  
+* multiproc = utilisation de plusieurs threads (peut coûter cher en RAM !)  
 * silent = aucun 'print' durant l'exécution  
 
 Usage :  
