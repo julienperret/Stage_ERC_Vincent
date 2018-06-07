@@ -142,7 +142,7 @@ studyAreaName = localData.split('/')[len(localData.split('/'))-2]
 if truth:
     workspacePath = outputDir  + 'tmp/'
     if os.path.exists(workspacePath) :
-        rmtree(outputDir + 'tmp/')
+        rmtree(workspacePath)
     projectPath = outputDir
 else:
     workspacePath = outputDir + codeDept + '/' + studyAreaName + '/'
@@ -1230,6 +1230,7 @@ try:
         arguments = [
             (workspacePath + 'data/ecologie.shp', workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif', 'interet'),
             (workspacePath + 'data/transport/routes.shp', workspacePath + 'data/' + gridSize + 'm/tif/routes.tif', None, 1),
+            (workspacePath + 'data/transport/arrets_transport.shp', workspacePath + 'data/' + gridSize + 'm/tif/arrets_transport.tif', None, 1),
             (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', workspacePath + 'data/' + gridSize + 'm/tif/s_planch_grid.tif', 'srf_p'),
             (workspacePath + 'data/' + gridSize + 'm/restrict_grid.shp', workspacePath + 'data/' + gridSize + 'm/tif/restrict_grid.tif', 'restrict'),
             (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', workspacePath + 'data/' + gridSize + 'm/tif/seuil_q3_iris.tif', 'SP_Q3'),
@@ -1272,7 +1273,6 @@ try:
         }
         processing.run('gdal:proximity', params, feedback=feedback)
 
-        rasterize(workspacePath + 'data/transport/arrets_transport.shp', workspacePath + 'data/' + gridSize + 'm/tif/arrets_transport.tif', burn=1)
         params['INPUT'] = workspacePath + 'data/' + gridSize + 'm/tif/arrets_transport.tif'
         params['MAX_DISTANCE'] = transDist
         params['OUTPUT'] = workspacePath + 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif'
@@ -1320,9 +1320,9 @@ try:
     log.write(description + ': ')
 
     # Mise en forme finale des données raster pour le modèle
-    if os.path.exists(projectPath):
+    if not truth and os.path.exists(projectPath):
         rmtree(projectPath)
-    os.makedirs(projectPath)
+        os.makedirs(projectPath)
 
     # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
     population = 0

@@ -3,7 +3,6 @@ import sys
 import gdal
 import numpy as np
 from time import time
-import multiprocessing as mp
 
 # Pour la gestion des slashs en fin de chemin
 def slashify(path):
