@@ -155,8 +155,9 @@ try:
     # Création des dataframes contenant les informations par IRIS
     with open(dataDir + 'population.csv') as csvFile:
         reader = csv.reader(csvFile)
-        pop = {rows[0]:rows[1] for rows in reader}
-    pop = int(pop['population'])
+        next(reader, None)
+        histPop = {rows[0]:rows[1] for rows in reader}
+    pop = int(histPop['2014'])
 
     dicPop = {}
     year = 2015
