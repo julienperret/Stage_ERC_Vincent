@@ -5,6 +5,7 @@ import sys
 import traceback
 import pandas as pd
 from toolbox import slashify
+from shutil import rmtree
 
 inseeDataPath = slashify(sys.argv[1])
 try:
