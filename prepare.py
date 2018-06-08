@@ -95,8 +95,6 @@ if len(sys.argv) > 5:
             speed = True
         elif 'truth' in arg:
             truth = True
-        elif 'multiproc' in arg:
-            multiproc = True
         elif 'silent' in arg:
             silent = True
 
@@ -129,8 +127,6 @@ if 'speed' not in globals():
     speed = False
 if 'truth' not in globals():
     truth = False
-if 'multiproc' not in globals():
-    multiproc = False
 if 'silent' not in globals():
     silent = False
 
@@ -646,7 +642,6 @@ def envRestrict(layerList, overlay, outdir):
 # Jointure avec données INSEE et extraction des IRIS dans la zone
 def irisExtractor(iris, overlay, csvdir, outdir):
     # Conversion des chaînes en nombre
-    expr =
     csvPop09 = QgsVectorLayer(csvdir + 'inseePop09.csv')
     csvPop09.addExpressionField('to_int("P09_POP")', QgsField('POP09', QVariant.Int))
     csvPop12 = QgsVectorLayer(csvdir + 'inseePop12.csv')
@@ -820,7 +815,7 @@ try:
         for path in clipRes:
             argList.append((clip(path, zone_buffer), workspacePath + 'data/transport/'))
 
-        if multiproc:
+        if speed:
             getDone(reproj, argList)
         else:
             for a in argList:
@@ -934,7 +929,7 @@ try:
         if os.path.exists(localData + 'exclusion.shp'):
             argList.append((clip(localData + 'exclusion.shp', zone), workspacePath + 'data/restriction/'))
 
-        if multiproc:
+        if speed:
             getDone(reproj, argList)
         else:
             for a in argList:
@@ -1098,36 +1093,35 @@ try:
         iris.dataProvider().createSpatialIndex()
         log.write(getTime(start_time) + '\n')
 
-        if not speed:
-            start_time = time()
-            etape = 4
-            description = "analyse de l'évolution des zones bâties "
-            progres = "Etape %i sur 8 : %s" %(etape, description)
-            if not silent:
-                printer(progres)
-            log.write(description + ': ')
+        start_time = time()
+        etape = 4
+        description = "analyse de l'évolution des zones bâties "
+        progres = "Etape %i sur 8 : %s" %(etape, description)
+        if not silent:
+            printer(progres)
+        log.write(description + ': ')
 
-            buildStatDic = {
-                'indif': workspacePath + 'data/2014_bati/bati_indifferencie.shp',
-                'indus': workspacePath + 'data/2014_bati/bati_industriel.shp',
-                'remarq': workspacePath + 'data/2014_bati/bati_remarquable.shp',
-                'surfac': workspacePath + 'data/2014_bati/construction_surfacique.shp',
-                'aerodr': workspacePath + 'data/2014_bati/piste_aerodrome.shp',
-                'sport': workspacePath + 'data/2014_bati/terrain_sport.shp'
-            }
-            argList = []
-            for k, v in buildStatDic.items():
-                argList.append((k, v, iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
-            for k, v in buildStatDic.items():
-                argList.append((k, v.replace('2014','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
+        buildStatDic = {
+            'indif': workspacePath + 'data/2014_bati/bati_indifferencie.shp',
+            'indus': workspacePath + 'data/2014_bati/bati_industriel.shp',
+            'remarq': workspacePath + 'data/2014_bati/bati_remarquable.shp',
+            'surfac': workspacePath + 'data/2014_bati/construction_surfacique.shp',
+            'aerodr': workspacePath + 'data/2014_bati/piste_aerodrome.shp',
+            'sport': workspacePath + 'data/2014_bati/terrain_sport.shp'
+        }
+        argList = []
+        for k, v in buildStatDic.items():
+            argList.append((k, v, iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
+        for k, v in buildStatDic.items():
+            argList.append((k, v.replace('2014','2009'), iris, grid, workspacePath + 'data/' + gridSize + 'm/csv/'))
 
-            if multiproc:
-                getDone(buildCsvGrid, argList)
-            else:
-                for a in argList:
-                    buildCsvGrid(*a)
+        if speed:
+            getDone(buildCsvGrid, argList)
+        else:
+            for a in argList:
+                buildCsvGrid(*a)
 
-            log.write(getTime(start_time) + '\n')
+        log.write(getTime(start_time) + '\n')
 
         start_time = time()
         etape = 5
@@ -1138,11 +1132,8 @@ try:
         log.write(description + ': ')
 
         batiInterIris = QgsVectorLayer(workspacePath + 'data/2014_bati/bati_inter_iris.shp')
-        if not speed:
-            statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath + 'data/' +
-                         gridSize + 'm/', workspacePath + 'data/' + gridSize + 'm/csv/')
-        else:
-            statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath + 'data/' + gridSize + 'm/')
+        statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath + 'data/' +
+                     gridSize + 'm/', workspacePath + 'data/' + gridSize + 'm/csv/')
         del grid, iris
 
         log.write(getTime(start_time) + '\n')
@@ -1231,7 +1222,7 @@ try:
         elif os.path.exists(workspacePath + 'data/plu.shp'):
             argList.append((workspacePath + 'data/plu.shp', workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', 'ppr'))
 
-        if multiproc:
+        if speed:
             getDone(rasterize, argList)
         else:
             for a in argList:
@@ -1331,27 +1322,27 @@ try:
 
     # Rasterisations
     argList = [
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population_2014.tif', 'pop'),
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_plancher.tif', 'srf_p'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_09.tif', 'ssol_09'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_14.tif', 'ssol_14'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'q3_iris.tif', 'SP_Q3'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'max_iris.tif', 'SP_MAX'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'm2hab_iris.tif', 'M2_HAB'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population.tif', 'pop'),
-        (workspacePath + 'data/ocsol.shp', projectPath + 'ocsol.tif', 'interet')
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_2009.tif', 'ssol_09'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_2014.tif', 'ssol_14'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_q3_spl.tif', 'SP_Q3'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_max_spl.tif', 'SP_MAX'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_m2_hab.tif', 'M2_HAB'),
+        (workspacePath + 'data/ocsol.shp', projectPath + 'occupation_sol.tif', 'interet')
     ]
     if os.path.exists(workspacePath + 'data/plu.shp'):
         argList.append((workspacePath + 'data/plu.shp', projectPath + 'plu_restriction.tif', 'restrict'))
         argList.append((workspacePath + 'data/plu.shp', projectPath +'plu_priorite.tif', 'priority'))
 
-    if multiproc :
+    if speed :
         getDone(rasterize, argList)
     else:
         for a in argList:
             rasterize(*a)
 
     # Création des variables GDAL indispensables pour la fonction to_tif()
-    ds = gdal.Open(projectPath + 'population.tif')
+    ds = gdal.Open(projectPath + 'population_2014.tif')
     proj = ds.GetProjection()
     geot = ds.GetGeoTransform()
     population = ds.ReadAsArray()
@@ -1360,11 +1351,11 @@ try:
     # Conversion des raster de distance
     distance_routes = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
     routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
-    to_tif(routes, 'float32', proj, geot, projectPath + 'routes.tif')
+    to_tif(routes, 'float32', proj, geot, projectPath + 'proximite_routes.tif')
 
     distance_transport = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
     transport = np.where(distance_transport > -1, 1 - (distance_transport / np.amax(distance_transport)), 0)
-    to_tif(transport, 'float32', proj, geot, projectPath + 'transport.tif')
+    to_tif(transport, 'float32', proj, geot, projectPath + 'proximite_transport.tif')
 
     # Conversion et aggrégation des rasters de densité SIRENE
     with open(globalData + 'sirene/poids.csv') as csvFile:
@@ -1385,11 +1376,10 @@ try:
     medical = np.where(medical != -9999, medical / np.amax(medical), 0)
     recreatif = np.where(recreatif != -9999, recreatif / np.amax(recreatif), 0)
 
-    sirene = ((administratif * poidsSirene['administratif']) + (commercial * poidsSirene['commercial']) +
-               (enseignement * poidsSirene['enseignement']) + (medical * poidsSirene['medical']) +
-               (recreatif * poidsSirene['recreatif'])) / sum(poidsSirene.values())
+    sirene = ((administratif * poidsSirene['administratif']) + (commercial * poidsSirene['commercial']) + (enseignement * poidsSirene['enseignement']) +
+              (medical * poidsSirene['medical']) + (recreatif * poidsSirene['recreatif'])) / sum(poidsSirene.values())
     sirene = sirene / np.amax(sirene)
-    to_tif(sirene, 'float32', proj, geot, projectPath + 'sirene.tif')
+    to_tif(sirene, 'float32', proj, geot, projectPath + 'densite_sirene.tif')
     del poidsSirene, administratif, commercial, enseignement, medical, recreatif, sirene
 
     # Création du raster de restriction (sans PLU)
@@ -1405,12 +1395,12 @@ try:
 
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) |
                             (zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
-    to_tif(restriction, 'byte', proj, geot, projectPath + 'restriction.tif')
+    to_tif(restriction, 'byte', proj, geot, projectPath + 'restriction_totale.tif')
     del surfActivMask, exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
 
     ecologie = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif')
     ecologie = np.where((ecologie == 0) & (irisMask != 1), 1, ecologie)
-    to_tif(ecologie, 'float32', proj, geot, projectPath + 'ecologie.tif')
+    to_tif(ecologie, 'float32', proj, geot, projectPath + 'non-importance_ecologique.tif')
     del ecologie
 
     log.write(getTime(start_time) + '\n')

@@ -10,9 +10,8 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 
 *Mots magiques :*  
 * force = suppression du répertoire de sortie si il existe  
-* speed = éviter de calculer l'évolution toutes couches de bâti, divise le temps par 2 (de 20 à 10mn)  
+* speed = utilisation de plusieurs threads (peut coûter cher en RAM !)  
 * truth = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires  
-* multiproc = utilisation de plusieurs threads (peut coûter cher en RAM !)  
 * silent = aucun 'print' durant l'exécution  
 
 Usage :  
@@ -28,9 +27,6 @@ Deux paramètres au minimum :
     3 : taille des cellules de la grille  
     4 : le taux annuel d'évolution de la population (en %)  
     5 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
-
-*Mots magiques :*  
-* silent = aucun 'print' durant l'exécution  
 
 Usage :  
     ./simulate.py ./workspace/mtp/simulation_50m/ ./results/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
