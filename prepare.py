@@ -242,7 +242,6 @@ def rasterize(vector, output, field=None, burn=None, inverse=False, touch=False)
 def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut, removedOut):
     # Selection des bâtiments situés dans polygones
     for layer in polygons:
-        layer.dataProvider.
         params = {
             'INPUT': buildings,
             'PREDICATE': 6,
