@@ -18,62 +18,37 @@ np.seterr(divide='ignore', invalid='ignore')
 # Stockage et contrôle de la validité des paramètres utilisateur
 dataDir = slashify(sys.argv[1])
 outputDir = slashify(sys.argv[2])
-gridSize = int(sys.argv[3])
-rate = float(sys.argv[4])
-if rate > 4:
+rate = float(sys.argv[3])
+if rate > 3:
     print("Taux d'évolution trop élevé, valeur max acceptée : 3 %")
     sys.exit()
-if len(sys.argv) > 5:
-    argList = sys.argv[5].split()
+if len(sys.argv) > 4:
+    argList = sys.argv[4].split()
     for arg in argList:
         if 'mode' in arg:
             mode = arg.split('=')[1]
-            if mode not in {'souple', 'strict'}:
-                print("Mode de seuillage invalide \nValeurs possibles : souple ou strict")
+            if mode not in {'densification', 'etalement'}:
+                print("Mode de seuillage invalide \nValeurs possibles : densification ou etalement")
                 sys.exit()
-        if 'saturateFirst' in arg:
-            saturateFirst = literal_eval(arg.split('=')[1])
         if 'pluPriority' in arg:
             pluPriority = literal_eval(arg.split('=')[1])
         if 'finalYear' in arg:
             finalYear = int(arg.split('=')[1])
-        if 'adjustCapa' in arg:
-            adjustCapa = int(arg.split('=')[1])
         if 'silent' in arg:
             silent = True
 
 # Valeurs de paramètres par défaut
 if 'mode' not in globals():
-    mode = 'souple'
-if 'saturateFirst' not in globals():
-    saturateFirst = True
+    mode = 'densification'
 if 'pluPriority' not in globals():
     pluPriority = True
 if 'finalYear' not in globals():
     finalYear = 2040
-if 'adjustCapa' not in globals():
-    adjustCapa = 100
 if 'silent' not in globals():
     silent = False
 
-cellSurf = gridSize * gridSize
-projectPath = outputDir + str(gridSize) + 'm_' + mode + '_tx' + str(rate)
-if adjustCapa != 100:
-    projectPath += '_adjust' + str(adjustCapa)
-if saturateFirst:
-    projectPath += '_satFirst'
-if pluPriority:
-    projectPath += '_pluPrio'
-if finalYear != 2040:
-    projectPath += '_' + str(finalYear)
-projectPath += '/'
-
-if os.path.exists(projectPath):
-    rmtree(projectPath)
-os.makedirs(projectPath + 'snapshots')
-
 # Fonction de répartition de la population
-def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
+def urbanize(mode, popALoger, pluPriority=False):
     global population, capacite
     popLogee = 0
     capaciteTmp = capacite.copy()
@@ -146,12 +121,32 @@ def urbanize(mode, popALoger, saturateFirst=True, pluPriority=False):
     to_tif(population, 'uint16', proj, geot, projectPath + 'snapshots/pop_' + str(year) + '.tif')
     return popALoger - popLogee
 
-# Création d'un fichier journal
-log = open(projectPath + 'log.csv', 'x')
-mesures = open(projectPath + 'mesures.csv', 'x')
-start_time = time()
-
 try:
+    # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
+    ds = gdal.Open(dataDir + 'population_2014.tif')
+    population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
+    proj = ds.GetProjection()
+    geot = ds.GetGeoTransform()
+    pixSize = int(geot[1])
+    cellSurf = pixSize * pixSize
+    ds = None
+
+    projectPath = outputDir + str(pixSize) + 'm_' + mode + '_tx' + str(rate)
+    if pluPriority:
+        projectPath += '_pluPrio'
+    if finalYear != 2040:
+        projectPath += '_' + str(finalYear)
+    projectPath += '/'
+
+    if os.path.exists(projectPath):
+        rmtree(projectPath)
+    os.makedirs(projectPath + 'snapshots')
+
+    # Création d'un fichier journal
+    log = open(projectPath + 'log.csv', 'x')
+    mesures = open(projectPath + 'mesures.csv', 'x')
+    start_time = time()
+
     # Création des dataframes contenant les informations par IRIS
     with open(dataDir + 'population.csv') as csvFile:
         reader = csv.reader(csvFile)
@@ -181,19 +176,12 @@ try:
         poids[key] = poids[key] / sum(poids.values())
         coefficients.write(key + ', ' + str(poids[key]))
 
-    # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-    ds = gdal.Open(dataDir + 'population.tif')
-    population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
-    proj = ds.GetProjection()
-    geot = ds.GetGeoTransform()
-    ds = None
-
     urb14 = np.where(population > 0, 1, 65535)
     to_tif(urb14, 'uint16', proj, geot, projectPath + 'urbain_2014.tif' )
     del urb14
 
     # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
-    restriction = to_array(dataDir + 'restriction.tif')
+    restriction = to_array(dataDir + 'restriction_totale.tif')
     capacite = to_array(dataDir + 'capacite.tif', 'uint16')
     capacite = np.where(restriction != 1, capacite, 0)
     if os.path.exists(dataDir + 'plu_restriction.tif') and os.path.exists(dataDir + 'plu_priorite.tif'):
@@ -251,15 +239,15 @@ try:
     to_tif(capacite, 'uint16', proj, geot, projectPath + 'capacite_depart.tif')
 
     # Conversion des autres raster d'entrée en numpy array
-    ecologie = to_array(dataDir + 'ecologie.tif', 'float32')
-    ocsol = to_array(dataDir + 'ocsol.tif', 'float32')
-    routes = to_array(dataDir + 'routes.tif', 'float32')
-    transport = to_array(dataDir + 'transport.tif', 'float32')
-    sirene = to_array(dataDir + 'sirene.tif', 'float32')
+    ecologie = to_array(dataDir + 'non-importance_ecologique.tif', 'float32')
+    ocsol = to_array(dataDir + 'occupation_sol.tif', 'float32')
+    routes = to_array(dataDir + 'proximite_routes.tif', 'float32')
+    transport = to_array(dataDir + 'proximite_transport.tif', 'float32')
+    sirene = to_array(dataDir + 'densite_sirene.tif', 'float32')
 
     # Création du raster final d'intérêt avec pondération
     interet = np.where((restriction != 1), (ecologie * poids['ecologie']) + (ocsol * poids['ocsol']) +
-     (routes * poids['routes']) + (transport * poids['transport']) + (sirene * poids['sirene']), 0)
+                       (routes * poids['routes']) + (transport * poids['transport']) + (sirene * poids['sirene']), 0)
     to_tif(interet, 'float32', proj, geot, projectPath + 'interet.tif')
     del poids, restriction, ocsol, routes, transport, sirene
 
@@ -285,7 +273,7 @@ try:
     expansionSum = expansion.sum()
 
     to_tif(capacite, 'uint16', proj, geot, projectPath + 'capacite_future.tif')
-    to_tif(population, 'uint16', proj, geot, projectPath + 'population_future.tif')
+    to_tif(population, 'uint16', proj, geot, projectPath + 'population_' + str(finalYear) + '.tif')
     to_tif(expansion, 'byte', proj, geot, projectPath + 'expansion.tif')
     to_tif(popNouvelle, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
     to_tif(capaSaturee, 'byte', proj, geot, projectPath + 'capacite_saturee')
