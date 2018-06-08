@@ -34,6 +34,8 @@ if len(sys.argv) > 4:
             pluPriority = literal_eval(arg.split('=')[1])
         if 'finalYear' in arg:
             finalYear = int(arg.split('=')[1])
+        if 'maxBuiltRatio' in arg:
+            maxBuiltRatio = float(arg.split('=')[1]) / 100
         if 'silent' in arg:
             silent = True
 
@@ -44,20 +46,31 @@ if 'pluPriority' not in globals():
     pluPriority = True
 if 'finalYear' not in globals():
     finalYear = 2040
+if 'maxBuiltRatio' not in globals():
+    maxBuiltRatio = 0.9
 if 'silent' not in globals():
     silent = False
 
-# Fonction de répartition de la population
-def urbanize(mode, popALoger, pluPriority=False):
-    global population, capacite
-    popLogee = 0
-    capaciteTmp = capacite.copy()
-    cols, rows = population.shape[1], population.shape[0]
-    populationTmp = np.zeros([rows, cols], np.uint16)
+def choose(weight, size):
+    cells = []
+    flatWeight = weight.flatten()
+    choices = np.random.choice(flatWeight.size, size, p=flatWeight / flatWeight.sum())
+    i = 0
+    while i < choices.size :
+        row = choices[i] // weight.shape[1]
+        col = choices[i] % weight.shape[1]
+        cells.append((row, col))
+        i += 1
+    return cells
 
-    if mode == 'souple':
-        if saturateFirst:
-            capaciteTmp = np.where(population > 0, capaciteTmp, 0)
+# Fonction de répartition de la population
+def urbanize(popALoger, pluPriority=False):
+    global mode, interet, demo, spla, ssol
+    popLog = 0
+    splaTmp = np.zeros([rows, cols], np.uint16)
+    ssolTmp = np.zeros([rows, cols], np.uint16)
+
+    if mode == 'densification':
         if pluPriority:
             capaciteTmp = np.where(plu_priorite == 1, capaciteTmp, 0)
         while popLogee < popALoger and capaciteTmp.sum() > 0:
@@ -74,25 +87,8 @@ def urbanize(mode, popALoger, pluPriority=False):
                     capaciteTmp[row][col] -= 1
                 i += 1
         # Si on a pas pu loger tout le monde dans des cellules déjà urbanisées => expansion
-        if saturateFirst and popALoger - popLogee > 0:
-            capaciteTmp = np.where(population == 0, capacite - populationTmp, 0)
-            if pluPriority:
-                capaciteTmp = np.where(plu_priorite == 1, capaciteTmp, 0)
-            while popLogee < popALoger and capaciteTmp.sum() > 0:
-                weight = np.where(capaciteTmp > 0, interet, 0)
-                flatWeight = weight.flatten()
-                choices = np.random.choice(flatWeight.size, popALoger - popLogee, p=flatWeight / flatWeight.sum())
-                i = 0
-                while i < choices.size :
-                    row = choices[i] // weight.shape[1]
-                    col = choices[i] % weight.shape[1]
-                    if capaciteTmp[row][col] > 0:
-                        populationTmp[row][col] += 1
-                        popLogee += 1
-                        capaciteTmp[row][col] -= 1
-                    i += 1
-
-    elif mode == 'strict':
+    elif mode == 'etalement'
+        capaciteTmp = np.where(population == 0, capacite - populationTmp, 0)
         if pluPriority:
             capaciteTmp = np.where(plu_priorite == 1, capaciteTmp, 0)
         while popLogee < popALoger and capaciteTmp.sum() > 0:
@@ -100,31 +96,20 @@ def urbanize(mode, popALoger, pluPriority=False):
             flatWeight = weight.flatten()
             choices = np.random.choice(flatWeight.size, popALoger - popLogee, p=flatWeight / flatWeight.sum())
             i = 0
-            while i < choices.size:
+            while i < choices.size :
                 row = choices[i] // weight.shape[1]
                 col = choices[i] % weight.shape[1]
                 if capaciteTmp[row][col] > 0:
-                    cellCapa = capaciteTmp[row][col]
-                    if cellCapa <= popALoger - popLogee:
-                        populationTmp[row][col] += cellCapa
-                        popLogee += cellCapa
-                        capaciteTmp[row][col] -= cellCapa
-                    else:
-                        cellCapa = cellCapa - (cellCapa - (popALoger - popLogee))
-                        populationTmp[row][col] += cellCapa
-                        popLogee += cellCapa
-                        capaciteTmp[row][col] -= cellCapa
+                    populationTmp[row][col] += 1
+                    popLogee += 1
+                    capaciteTmp[row][col] -= 1
                 i += 1
-
-    capacite -= populationTmp
-    population += populationTmp
-    to_tif(population, 'uint16', proj, geot, projectPath + 'snapshots/pop_' + str(year) + '.tif')
-    return popALoger - popLogee
 
 try:
     # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-    ds = gdal.Open(dataDir + 'population_2014.tif')
-    population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
+    ds = gdal.Open(dataDir + 'demographie_2014.tif')
+    demoDep = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
+    cols, rows = demoDep.shape[1], demoDep.shape[0] # x, y
     proj = ds.GetProjection()
     geot = ds.GetGeoTransform()
     pixSize = int(geot[1])
@@ -152,10 +137,14 @@ try:
         reader = csv.reader(csvFile)
         next(reader, None)
         histPop = {rows[0]:rows[1] for rows in reader}
-    pop = int(histPop['2014'])
+
+    pop09 = int(histPop['2009'])
+    pop14 = int(histPop['2014'])
+    evoPop = (pop14 - pop09) / pop09 / 5
 
     dicPop = {}
     year = 2015
+    pop = pop14
     while year <= finalYear:
         dicPop[year] = round(pop * (rate / 100))
         pop += round(pop * (rate / 100))
@@ -165,87 +154,60 @@ try:
     sumPopALoger = sum(dicPop.values())
     log.write("Population à loger d'ici à " + str(finalYear) + ", " + str(sumPopALoger) + "\n")
 
+    # Traitement des raster et calcul des statistiques sur l'évolution des surfaces bâties
+    ssol09 = to_array(dataDir + 'surface_sol_2009.tif', 'uint16')
+    urba09 = np.where(ssol09 > 0, 1, 0).astype(np.byte)
+    ssol14 = to_array(dataDir + 'surface_sol_2014.tif', 'uint16')
+    urba14 = np.where(ssol14 > 0, 1, 0).astype(np.byte)
+    m2SolHab09 = ssol09.sum() / pop09
+    m2SolHab14 = ssol14.sum() / pop14
+    m2SolEvo = (m2SolHab14 - m2SolHab09) / m2SolHab09
+
+    spla14 = to_array(dataDir  + 'surface_plancher.tif', 'uint16')
+    ssolRes = to_array(dataDir + 'surface_sol_residentiel.tif', 'uint16')
+    ratioPlaSol = np.where(ssolRes != 0, spla14 / ssolRes14, 0).astype(np.float32)
+    nbNibMoy = np.nanmean(np.where(ratioPlaSol == 0, np.nan, ratioPlaSol))
+
+    to_tif(urba14, 'byte', proj, geot, projectPath + 'construit_2014.tif')
+
+    # Variables utilisées par la fonction urbanize
+    demo = demoDep.copy()
+    spla = spla14.copy()
+    ssol = ssol14.copy()
+
     # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
-    with open(dataDir + 'poids.csv') as csvFile:
-        reader = csv.reader(csvFile)
+    with open(dataDir + 'poids.csv') as r:
+        reader = csv.reader(r)
         next(reader, None)
         poids = {rows[0]:int(rows[1]) for rows in reader}
 
-    coefficients = open(projectPath + 'coefficients.csv', 'x')
-    for key in poids:
-        poids[key] = poids[key] / sum(poids.values())
-        coefficients.write(key + ', ' + str(poids[key]))
+    coef = {}
+    with open(projectPath + 'coefficients.csv', 'x') as w:
+        for key in poids:
+            coef[key] = poids[key] / sum(poids.values())
+            w.write(key + ', ' + str(coef[key]))
 
-    # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
+    # Préparation des restrictions
     restriction = to_array(dataDir + 'restriction_totale.tif')
-    capacite = to_array(dataDir + 'capacite.tif', 'uint16')
-    capacite = np.where(restriction != 1, capacite, 0)
     if os.path.exists(dataDir + 'plu_restriction.tif') and os.path.exists(dataDir + 'plu_priorite.tif'):
         hasPlu = True
-        plu_priorite = to_array(dataDir + 'plu_priorite.tif')
-        plu_restriction = to_array(dataDir + 'plu_restriction.tif')
-        capacite = np.where(plu_restriction != 1, capacite, 0)
+        pluPrio = to_array(dataDir + 'plu_priorite.tif')
+        pluRest = to_array(dataDir + 'plu_restriction.tif')
     else:
         hasPlu = False
 
-    # Modification de la capacité selon une valeur utilisateur en %
-    if adjustCapa > 0:
-        capacite = (capacite * (adjustCapa/100)).astype(np.uint16)
-
-    # On vérifie que la capcité d'accueil est suffisante, ici on pourrait modifier la couche de restriction pour augmenter la capacité
-    f = 0
-    capaciteAccueil = capacite.sum()
-    log.write("Capacité d'accueil originale du territoire, " + str(capaciteAccueil) + '\n')
-    if capaciteAccueil < sumPopALoger:
-        f += 100
-        if hasPlu:
-            if not silent:
-                print("La capacité d'accueil étant insuffisante, on retire les restrictions issues du PLU.")
-            capacite = to_array(dataDir + 'capacite.tif', 'uint16')
-            capacite = np.where(restriction != 1, capacite, 0)
-            capaciteAccueil = capacite.sum()
-            if capaciteAccueil < sumPopALoger:
-                while capaciteAccueil < sumPopALoger:
-                    f += 5
-                    capacite = to_array(dataDir + 'capacite.tif', 'uint16')
-                    capacite = np.where(restriction != 1, capacite, 0)
-                    capacite = capacite * (f/100)
-                    capaciteAccueil = capacite.sum()
-                if not silent:
-                    print("Afin de loger tout le monde, la capacite est augmentée de " + str(f) + ' %')
-        # Ici on augmente les valeurs du raster de capacité avec un pas de 5 %
-        else:
-            while capaciteAccueil < sumPopALoger:
-                f += 5
-                if not silent:
-                    print("Capacite  " + str(f) + ' %')
-                capacite = to_array(dataDir + 'capacite.tif', 'uint16')
-                capacite = np.where(restriction != 1, capacite, 0)
-                capacite = capacite * (f/100)
-                capaciteAccueil = capacite.sum()
-            if not silent:
-                print("Afin de loger tout le monde, la capacite est augmentée de " + str(f) + ' %')
-
-    log.write("Nouvelle capacité d'accueil du territoire, " + str(capaciteAccueil) + "\n")
-    log.write("Pourcentage d'augmentation de la capacite, " + str(f) + "\n")
-    log.write("Objectif démographique pour 2040, " + str(int(population.sum()) + sumPopALoger ) + "\n")
-
-    capaciteDepart = capacite.copy()
-    populationDepart = population.copy()
-    to_tif(capacite, 'uint16', proj, geot, projectPath + 'capacite_depart.tif')
-
     # Conversion des autres raster d'entrée en numpy array
-    ecologie = to_array(dataDir + 'non-importance_ecologique.tif', 'float32')
-    ocsol = to_array(dataDir + 'occupation_sol.tif', 'float32')
-    routes = to_array(dataDir + 'proximite_routes.tif', 'float32')
-    transport = to_array(dataDir + 'proximite_transport.tif', 'float32')
-    sirene = to_array(dataDir + 'densite_sirene.tif', 'float32')
+    eco = to_array(dataDir + 'non-importance_ecologique.tif', 'float32')
+    ocs = to_array(dataDir + 'occupation_sol.tif', 'float32')
+    rou = to_array(dataDir + 'proximite_routes.tif', 'float32')
+    tra = to_array(dataDir + 'proximite_transport.tif', 'float32')
+    sir = to_array(dataDir + 'densite_sirene.tif', 'float32')
 
     # Création du raster final d'intérêt avec pondération
-    interet = np.where((restriction != 1), (ecologie * poids['ecologie']) + (ocsol * poids['ocsol']) +
-                       (routes * poids['routes']) + (transport * poids['transport']) + (sirene * poids['sirene']), 0)
+    interet = np.where((restriction != 1), (eco * coef['ecologie']) + (ocs * coef['ocsol']) +
+                       (rou * coef['routes']) + (tra * coef['transport']) + (sir * poids['sirene']), 0)
+    interet = (interet / np.amax(interet)).astype(np.float32)
     to_tif(interet, 'float32', proj, geot, projectPath + 'interet.tif')
-    del poids, restriction, ocsol, routes, transport, sirene
 
     for year in range(2015, finalYear + 1):
         progress = "Année %i/%i" %(year, finalYear)
@@ -253,33 +215,27 @@ try:
             printer(progress)
         popALoger = dicPop[year]
         if hasPlu:
-            popRestante = urbanize(mode, popALoger, saturateFirst, pluPriority)
+            popRestante = urbanize(popALoger, pluPriority)
             if popRestante > 0:
-                urbanize(mode, popRestante, saturateFirst)
+                urbanize(popRestante)
         else:
-            urbanize(mode, popALoger, saturateFirst)
+            urbanize(popALoger)
 
     # Calcul et export des résultats
-    popNouvelle = population - populationDepart
-    capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
-    expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
-    peuplementMoyen = np.nanmean(np.where(popNouvelle == 0, np.nan, popNouvelle))
-    impactEnvironnemental = int(np.where(expansion == 1, 1 - ecologie, 0).sum() * cellSurf)
+    popNouv = demo - demoDep
+    expansion = np.where((demoDep == 0) & (demo > 0), 1, 0)
+    peuplementMoyen = np.nanmean(np.where(demoNouv == 0, np.nan, demoNouv))
+    impact = int(np.where(expansion == 1, 1 - eco, 0).sum() * cellSurf)
     expansionSum = expansion.sum()
 
-    to_tif(capacite, 'uint16', proj, geot, projectPath + 'capacite_future.tif')
-    to_tif(population, 'uint16', proj, geot, projectPath + 'population_' + str(finalYear) + '.tif')
+    to_tif(demo, 'uint16', proj, geot, projectPath + 'demographie_' + str(finalYear) + '.tif')
     to_tif(expansion, 'byte', proj, geot, projectPath + 'expansion.tif')
-    to_tif(popNouvelle, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
-    to_tif(capaSaturee, 'byte', proj, geot, projectPath + 'capacite_saturee')
+    to_tif(popNouv, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
 
-    nbCapaCell = np.where(capaciteDepart != 0, 1, 0).sum()
     mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
-    mesures.write("Taux d'expansion, " + str(expansionSum / nbCapaCell) + "\n")
-    mesures.write("Taux de saturation, " + str(capaSaturee.sum() / nbCapaCell) + "\n")
     mesures.write("Expansion totale en m2, " + str(expansionSum * cellSurf) + "\n")
     mesures.write("Impact environnemental cumulé, " + str(impactEnvironnemental) + "\n")
-    log.write("Nombre de personnes final, " + str(population.sum()) + '\n')
+    log.write("Nombre de personnes final, " + str(pop.sum()) + '\n')
 
     end_time = time()
     execTime = round(end_time - start_time, 2)

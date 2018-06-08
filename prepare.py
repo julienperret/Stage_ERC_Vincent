@@ -148,8 +148,8 @@ else:
 if not os.path.exists(workspacePath):
     os.makedirs(workspacePath)
 
-statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum',
-                 'mean', 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
+statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum', 'mean',
+                 'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
 if not silent:
     print('Commencé à ' + strftime('%H:%M:%S'))
@@ -249,7 +249,6 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
             'METHOD': 1
         }
         processing.run('native:selectbylocation', params, feedback=feedback)
-
     # Selection si la bâtiment intersecte des points
     for layer in points:
         params = {
@@ -259,7 +258,6 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
             'METHOD': 1
         }
         processing.run('native:selectbylocation', params, feedback=feedback)
-
     # Estimation du nombre d'étages
     expr = """ CASE
         WHEN "HAUTEUR" = 0 THEN 1
@@ -267,7 +265,6 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
         ELSE floor("HAUTEUR"/""" + str(hEtage) + """) END
     """
     buildings.addExpressionField(expr, QgsField('NB_NIV', QVariant.Int, len=2))
-
     # Nettoyage des bâtiments supposés trop grand ou trop petit pour être habités
     params = {
         'INPUT': buildings,
@@ -280,7 +277,6 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
         'OUTPUT': removedOut
     }
     processing.run('native:saveselectedfeatures', params, feedback=feedback)
-
     # Inversion de la selection pour export final
     buildings.invertSelection()
     params = {
@@ -400,14 +396,14 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
         'INPUT': buildings,
         'VALUES_FIELD_NAME': 'planch_g',
         'CATEGORIES_FIELD_NAME': 'id_2',
-        'OUTPUT': outdir + 'csv/grid_srf_pl.csv'
+        'OUTPUT': outdir + 'csv/grid_spla.csv'
     }
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
     params = {
         'INPUT': buildings,
         'VALUES_FIELD_NAME': 'planch_g',
         'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-        'OUTPUT': outdir + 'csv/iris_srf_pl.csv'
+        'OUTPUT': outdir + 'csv/iris_spla.csv'
     }
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
@@ -415,7 +411,7 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
     del buildings, res
 
     # Correction et changement de nom pour jointure des stat sur la grille et les IRIS
-    csvIplanch = QgsVectorLayer(outdir + 'csv/iris_srf_pl.csv')
+    csvIplanch = QgsVectorLayer(outdir + 'csv/iris_spla.csv')
     csvIplanch.addExpressionField('to_real("q3")', QgsField('SP_Q3', QVariant.Double))
     csvIplanch.addExpressionField('to_real("max")', QgsField('SP_MAX', QVariant.Double))
     csvIplanch.addExpressionField('to_real("sum")', QgsField('SP_SUM', QVariant.Double))
@@ -425,8 +421,8 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
     csvGssol.addExpressionField('to_real("sum")', QgsField('ssol_res', QVariant.Double))
     csvGrid.append(csvGssol)
 
-    csvGplanch = QgsVectorLayer(outdir + 'csv/grid_srf_pl.csv')
-    csvGplanch.addExpressionField('to_real("sum")', QgsField('srf_pl', QVariant.Double))
+    csvGplanch = QgsVectorLayer(outdir + 'csv/grid_spla.csv')
+    csvGplanch.addExpressionField('to_real("sum")', QgsField('spla', QVariant.Double))
     csvGrid.append(csvGplanch)
 
     csvIm2 = QgsVectorLayer(outdir + 'csv/iris_m2_hab.csv')
@@ -1299,11 +1295,11 @@ try:
         pop09 += int(feat.attribute('POP09'))
         pop12 += int(feat.attribute('POP12'))
         pop14 += int(feat.attribute('POP14'))
-    with open(projectPath + 'population.csv', 'x') as populationCsv:
-        populationCsv.write('annee, demographie\n')
-        populationCsv.write('2009, ' + str(pop09) + '\n')
-        populationCsv.write('2012, ' + str(pop12) + '\n')
-        populationCsv.write('2014, ' + str(pop14) + '\n')
+    with open(projectPath + 'population.csv', 'x') as w:
+        w.write('annee, demographie\n')
+        w.write('2009, ' + str(pop09) + '\n')
+        w.write('2012, ' + str(pop12) + '\n')
+        w.write('2014, ' + str(pop14) + '\n')
     del iris
 
     grid = QgsVectorLayer(workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', 'grid')
@@ -1316,8 +1312,8 @@ try:
 
     # Rasterisations
     argList = [
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'population_2014.tif', 'pop'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_plancher.tif', 'srf_pl'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'demographie_2014.tif', 'pop'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_plancher.tif', 'spla'),
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_residentiel.tif', 'ssol_res'),
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_2009.tif', 'ssol_09'),
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_2014.tif', 'ssol_14'),
@@ -1337,10 +1333,9 @@ try:
             rasterize(*a)
 
     # Création des variables GDAL indispensables pour la fonction to_tif()
-    ds = gdal.Open(projectPath + 'population_2014.tif')
+    ds = gdal.Open(projectPath + 'demographie_2014.tif')
     proj = ds.GetProjection()
     geot = ds.GetGeoTransform()
-    population = ds.ReadAsArray()
     ds = None
 
     # Conversion des raster de distance
@@ -1371,7 +1366,7 @@ try:
 
     sirene = ((administratif * poidsSirene['administratif']) + (commercial * poidsSirene['commercial']) + (enseignement * poidsSirene['enseignement']) +
               (medical * poidsSirene['medical']) + (recreatif * poidsSirene['recreatif'])) / sum(poidsSirene.values())
-    sirene = sirene / np.amax(sirene)
+    sirene = (sirene / np.amax(sirene)).astype(np.float32)
     to_tif(sirene, 'float32', proj, geot, projectPath + 'densite_sirene.tif')
     del poidsSirene, administratif, commercial, enseignement, medical, recreatif, sirene
 

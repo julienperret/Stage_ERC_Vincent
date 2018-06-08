@@ -43,6 +43,8 @@ def to_tif(array, dtype, proj, geot, path):
         dtype = gdal.GDT_Float32
     elif dtype == 'uint16':
         dtype = gdal.GDT_UInt16
+    elif dtype == 'int16':
+        dtype = gdal.GDT_Int16
     else :
         dtype = gdal.GDT_Unknown
     ds_out = driver.Create(path, cols, rows, 1, dtype)
