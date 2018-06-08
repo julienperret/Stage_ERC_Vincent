@@ -21,15 +21,15 @@ Dépendances pour python3 :
     PyQt5, qgis, gdal, numpy  
 
 ## ./simulate.py  
+**work in progress**
 Deux paramètres au minimum :  
     1 : répertoire contenant la donnée  
     2 : répertoire des résultats (créé si besoin)  
-    3 : taille des cellules de la grille  
-    4 : le taux annuel d'évolution de la population (en %)  
-    5 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
+    3 : le taux annuel d'évolution de la population (en %)  
+    4 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
 
 Usage :  
-    ./simulate.py ./workspace/mtp/simulation_50m/ ./results/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
+    ./simulate.py ./workspace/mtp/simulation_50m/ ./results/ 0.5 'mode=etalement'
 
 Dépendances pour python3 :  
     gdal, numpy  

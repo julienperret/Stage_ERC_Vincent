@@ -176,10 +176,6 @@ try:
         poids[key] = poids[key] / sum(poids.values())
         coefficients.write(key + ', ' + str(poids[key]))
 
-    urb14 = np.where(population > 0, 1, 65535)
-    to_tif(urb14, 'uint16', proj, geot, projectPath + 'urbain_2014.tif' )
-    del urb14
-
     # Préparation du raster de capacité, nettoyage des cellules interdites à la construction
     restriction = to_array(dataDir + 'restriction_totale.tif')
     capacite = to_array(dataDir + 'capacite.tif', 'uint16')
@@ -264,7 +260,6 @@ try:
             urbanize(mode, popALoger, saturateFirst)
 
     # Calcul et export des résultats
-    urb40 = np.where(population > 0, 1, 65535)
     popNouvelle = population - populationDepart
     capaSaturee = np.where((capaciteDepart > 0) & (capacite == 0), 1, 0)
     expansion = np.where((populationDepart == 0) & (population > 0), 1, 0)
@@ -277,7 +272,6 @@ try:
     to_tif(expansion, 'byte', proj, geot, projectPath + 'expansion.tif')
     to_tif(popNouvelle, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
     to_tif(capaSaturee, 'byte', proj, geot, projectPath + 'capacite_saturee')
-    to_tif(urb40, 'uint16', proj, geot, projectPath + 'urbain_2040.tif' )
 
     nbCapaCell = np.where(capaciteDepart != 0, 1, 0).sum()
     mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
