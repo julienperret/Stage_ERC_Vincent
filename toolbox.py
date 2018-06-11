@@ -62,6 +62,8 @@ def to_array(tif, dtype=None):
         return ds.ReadAsArray().astype(np.float32)
     elif dtype == 'uint16':
         return ds.ReadAsArray().astype(np.uint16)
+    elif dtype == 'int16':
+        return ds.ReadAsArray().astype(np.int16)
     else:
         return ds.ReadAsArray()
     ds = None

@@ -21,7 +21,7 @@ Dépendances pour python3 :
     PyQt5, qgis, gdal, numpy  
 
 ## ./simulate.py  
-**work in progress**
+**work in progress**  
 Deux paramètres au minimum :  
     1 : répertoire contenant la donnée  
     2 : répertoire des résultats (créé si besoin)  
