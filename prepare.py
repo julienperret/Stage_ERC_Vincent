@@ -18,6 +18,7 @@ from qgis.core import (
     QgsCoordinateTransformContext,
     QgsCoordinateReferenceSystem,
     QgsField,
+    QgsFields,
     QgsProcessingFeedback,
     QgsRectangle,
     QgsVectorFileWriter,
@@ -78,9 +79,6 @@ if len(sys.argv) > 5:
         # Taux maximum de chevauchement entre les cellules et des couches à exclure (ex: bati industriel)
         elif 'maxOverlapRes' in arg:
             maxOverlapRatio = float(arg.split('=')[1])
-        # Taux minimum pour considérer qu'une cellule est déjà construite
-        elif 'minBuiltRatio' in arg:
-            minBuiltRatio = float(arg.split('=')[1])
         # Paramètres variables pour la création des rasters de distance
         elif 'roadDist' in arg:
             roadDist = int(arg.split('=')[1])
@@ -113,8 +111,6 @@ if 'levelHeight' not in globals():
     levelHeight = 3
 if 'maxOverlapRatio' not in globals():
     maxOverlapRatio = 0.2
-if 'minBuiltRatio' not in globals():
-    minBuiltRatio = 0.01
 if 'roadDist' not in globals():
     roadDist = 200
 if 'transDist' not in globals():
@@ -148,7 +144,7 @@ else:
 if not os.path.exists(workspacePath):
     os.makedirs(workspacePath)
 
-statBlackList = ['count', 'unique', 'min', 'max', 'range', 'sum', 'mean',
+statBlacklist = ['count', 'unique', 'min', 'max', 'range', 'sum', 'mean',
                  'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
 if not silent:
@@ -217,9 +213,8 @@ def join(layer, field, joinLayer, joinField, blacklist=[], prefix=''):
     layer.addJoin(j)
 
 # Enregistre un objet QgsVectorLayer sur le disque
-def to_shp(layer, path):
-    writer = QgsVectorFileWriter(
-        path, 'utf-8', layer.fields(), layer.wkbType(), layer.sourceCrs(), 'ESRI Shapefile')
+def to_shp(layer, path, blacklist=None):
+    writer = QgsVectorFileWriter(path, 'utf-8', layer.fields(), layer.wkbType(), layer.sourceCrs(), 'ESRI Shapefile')
     writer.addFeatures(layer.getFeatures())
 
 # Rasterisation d'un fichier vecteur
@@ -337,19 +332,18 @@ def buildCsvGrid(name, path, iris, grid, outCsvDir):
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
 # Intersection entre la couche de bâti nettoyée jointe aux iris et la grille avec calcul et jointure des statistiques
-def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
+def statGridIris(buildings, grid, iris, outdir, csvDir):
     csvGrid = []
     csvIris = []
     grid.dataProvider().createSpatialIndex()
     buildings.dataProvider().createSpatialIndex()
-    buildings.addExpressionField('$area', QgsField(
-        'area_i', QVariant.Double, len=10, prec=2))
+    buildings.addExpressionField('$area', QgsField('area_i', QVariant.Double))
     expr = ' ("area_i" * "NB_NIV") '
     if useTxrp :
         expr +=  '* "TXRP14"'
-    buildings.addExpressionField(expr, QgsField('planch', QVariant.Double, len=10, prec=2))
+    buildings.addExpressionField(expr, QgsField('planch', QVariant.Double))
     expr = ' ("planch" / sum("planch", group_by:="CODE_IRIS")) * "POP14" '
-    buildings.addExpressionField(expr, QgsField('pop_bati', QVariant.Double, len=10, prec=2))
+    buildings.addExpressionField(expr, QgsField('pop_bati', QVariant.Double))
     params = {
         'INPUT': buildings,
         'OVERLAY': grid,
@@ -361,21 +355,28 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
     buildings = res['OUTPUT']
 
     # Calcul de stat sur la bâti dans la grille
-    buildings.addExpressionField('$area', QgsField('area_g', QVariant.Double, len=10, prec=2))
-    expr = ' ("area_g" * "NB_NIV") '
+    buildings.addExpressionField('$area', QgsField('area_g', QVariant.Double))
+    expr = 'round("area_g" * "NB_NIV") '
     if useTxrp:
-        expr += '* "TXRP14"'
-    buildings.addExpressionField(expr, QgsField('planch_g', QVariant.Int, len=10))
-    expr = ' "area_g" / "area_i" * "pop_bati" '
-    buildings.addExpressionField(expr, QgsField('pop_cell', QVariant.Int, len=10))
-    expr = ' "planch_g" / "pop_cell" '
-    buildings.addExpressionField(expr, QgsField('nb_m2_hab', QVariant.Int, len=10))
+        expr = 'round(("area_g" * "NB_NIV") * "TXRP14")'
+    buildings.addExpressionField(expr, QgsField('planch_g', QVariant.Int))
+    expr = ' round("area_g" / "area_i" * "pop_bati") '
+    buildings.addExpressionField(expr, QgsField('pop_g', QVariant.Int))
+    expr = ' round("planch_g" / "pop_g") '
+    buildings.addExpressionField(expr, QgsField('nb_m2_hab', QVariant.Int))
 
     params = {
         'INPUT': buildings,
-        'VALUES_FIELD_NAME': 'pop_cell',
+        'VALUES_FIELD_NAME': 'pop_g',
         'CATEGORIES_FIELD_NAME': 'id_2',
         'OUTPUT': outdir + 'csv/grid_pop.csv'
+    }
+    processing.run('qgis:statisticsbycategories', params, feedback=feedback)
+    params = {
+        'INPUT': buildings,
+        'VALUES_FIELD_NAME': 'NB_NIV',
+        'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
+        'OUTPUT': outdir + 'csv/iris_nb_niv.csv'
     }
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
     params = {
@@ -389,21 +390,28 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
         'INPUT': buildings,
         'VALUES_FIELD_NAME': 'area_g',
         'CATEGORIES_FIELD_NAME': 'id_2',
-        'OUTPUT': outdir + 'csv/grid_ssol_residentiel.csv'
+        'OUTPUT': outdir + 'csv/grid_ssr.csv'
+    }
+    processing.run('qgis:statisticsbycategories', params, feedback=feedback)
+    params = {
+        'INPUT': buildings,
+        'VALUES_FIELD_NAME': 'area_g',
+        'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
+        'OUTPUT': outdir + 'csv/iris_ssr.csv'
     }
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
     params = {
         'INPUT': buildings,
         'VALUES_FIELD_NAME': 'planch_g',
         'CATEGORIES_FIELD_NAME': 'id_2',
-        'OUTPUT': outdir + 'csv/grid_spla.csv'
+        'OUTPUT': outdir + 'csv/grid_srf_pla.csv'
     }
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
     params = {
         'INPUT': buildings,
         'VALUES_FIELD_NAME': 'planch_g',
         'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-        'OUTPUT': outdir + 'csv/iris_spla.csv'
+        'OUTPUT': outdir + 'csv/iris_srf_pla.csv'
     }
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
@@ -411,28 +419,42 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
     del buildings, res
 
     # Correction et changement de nom pour jointure des stat sur la grille et les IRIS
-    csvIplanch = QgsVectorLayer(outdir + 'csv/iris_spla.csv')
-    csvIplanch.addExpressionField('to_real("q3")', QgsField('SP_Q3', QVariant.Double))
-    csvIplanch.addExpressionField('to_real("max")', QgsField('SP_MAX', QVariant.Double))
-    csvIplanch.addExpressionField('to_real("sum")', QgsField('SP_SUM', QVariant.Double))
+    csvIplanch = QgsVectorLayer(outdir + 'csv/iris_srf_pla.csv')
+    csvIplanch.addExpressionField('round(to_real("q3"))', QgsField('spl_q3', QVariant.Int))
+    csvIplanch.addExpressionField('round(to_real("max"))', QgsField('spl_max', QVariant.Int))
+    csvIplanch.addExpressionField('round(to_real("sum"))', QgsField('spl_sum', QVariant.Int))
     csvIris.append(csvIplanch)
 
-    csvGssol = QgsVectorLayer(outdir + 'csv/grid_ssol_residentiel.csv')
-    csvGssol.addExpressionField('to_real("sum")', QgsField('ssol_res', QVariant.Double))
-    csvGrid.append(csvGssol)
-
-    csvGplanch = QgsVectorLayer(outdir + 'csv/grid_spla.csv')
-    csvGplanch.addExpressionField('to_real("sum")', QgsField('spla', QVariant.Double))
+    csvGplanch = QgsVectorLayer(outdir + 'csv/grid_srf_pla.csv')
+    csvGplanch.addExpressionField('round(to_real("sum"))', QgsField('srf_pla', QVariant.Int))
     csvGrid.append(csvGplanch)
 
+    csvIssolR = QgsVectorLayer(outdir + 'csv/iris_ssr.csv')
+    csvIssolR.addExpressionField('round(to_real("sum"))', QgsField('ssr_sum', QVariant.Int))
+    csvIssolR.addExpressionField('round(to_real("mean"))', QgsField('ssr_mean', QVariant.Int))
+    csvIssolR.addExpressionField('round(to_real("median"))', QgsField('ssr_med', QVariant.Int))
+    csvIris.append(csvIssolR)
+
+    csvGssol = QgsVectorLayer(outdir + 'csv/grid_ssr.csv')
+    csvGssol.addExpressionField('round(to_real("sum"))', QgsField('ssol_res', QVariant.Int))
+    csvGrid.append(csvGssol)
+
+    csvIniv = QgsVectorLayer(outdir + 'csv/iris_nb_niv.csv')
+    csvIniv.addExpressionField('to_real("mean")', QgsField('niv_mean', QVariant.Double))
+    csvIniv.addExpressionField('to_int("median")', QgsField('niv_med', QVariant.Int))
+    csvIniv.addExpressionField('to_real("q3")', QgsField('niv_q3', QVariant.Double))
+    csvIniv.addExpressionField('to_int("max")', QgsField('niv_max', QVariant.Int))
+    csvIris.append(csvIniv)
+
     csvIm2 = QgsVectorLayer(outdir + 'csv/iris_m2_hab.csv')
-    csvIm2.addExpressionField('to_real("mean")', QgsField('M2_HAB', QVariant.Double))
+    csvIm2.addExpressionField('round(to_real("mean"))', QgsField('m2_hab', QVariant.Int))
     csvIris.append(csvIm2)
 
     csvGpop = QgsVectorLayer(outdir + 'csv/grid_pop.csv')
-    csvGpop.addExpressionField('to_real("sum")', QgsField('pop', QVariant.Double))
+    csvGpop.addExpressionField('to_int("sum")', QgsField('pop', QVariant.Int))
     csvGrid.append(csvGpop)
 
+    gridBlacklist = ['left', 'right', 'top', 'bottom']
     irisFields1 = []
     gridFields1 = []
     irisFields2 = []
@@ -460,9 +482,9 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
                     irisFields2.append(year + '_' + name)
 
     for csvLayer in csvGrid:
-        join(grid, 'id', csvLayer, 'id_2', statBlackList)
+        join(grid, 'id', csvLayer, 'id_2', statBlacklist)
     for csvLayer in csvIris:
-        join(iris, 'CODE_IRIS', csvLayer, 'CODE_IRIS', statBlackList)
+        join(iris, 'CODE_IRIS', csvLayer, 'CODE_IRIS', statBlacklist)
 
     cpt = 0
     expr = ''
@@ -472,7 +494,7 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
             expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
         else:
             expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
-    grid.addExpressionField(expr, QgsField('ssol_09', QVariant.Double))
+    grid.addExpressionField('round(' + expr + ')', QgsField('ssol_09', QVariant.Int))
 
     cpt = 0
     expr = ''
@@ -482,12 +504,7 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
             expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
         else:
             expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
-    grid.addExpressionField(expr, QgsField('ssol_14', QVariant.Double))
-
-    expr = 'IF("ssol_09" >= $area * ' + str(ratio) + ', 1, 0)'
-    grid.addExpressionField(expr, QgsField('built_09', QVariant.Int, len=1))
-    expr = 'IF("ssol_14" >= $area * ' + str(ratio) + ', 1, 0)'
-    grid.addExpressionField(expr, QgsField('built_14', QVariant.Int, len=1))
+    grid.addExpressionField('round(' + expr + ')', QgsField('ssol_14', QVariant.Int))
 
     cpt = 0
     expr = ''
@@ -497,7 +514,7 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
             expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
         else:
             expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
-    iris.addExpressionField(expr, QgsField('ssol_09', QVariant.Double))
+    iris.addExpressionField('round(' + expr + ')', QgsField('ssol_09', QVariant.Int))
 
     cpt = 0
     expr = ''
@@ -507,11 +524,23 @@ def statGridIris(buildings, ratio, grid, iris, outdir, csvDir):
             expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
         else:
             expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
-    iris.addExpressionField(expr, QgsField('ssol_14', QVariant.Double))
+    iris.addExpressionField('round(' + expr + ')', QgsField('ssol_14', QVariant.Int))
 
+    iris.addExpressionField('"SSR_SUM" / "ssol_14"', QgsField('TX_SSR', QVariant.Double))
     iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
-    to_shp(grid, outdir + '/stat_grid.shp')
-    to_shp(iris, outdir + '/stat_iris.shp')
+
+    params = {
+        'INPUT': grid,
+        'COLUMN': gridBlacklist + gridFields1 + gridFields2,
+        'OUTPUT': outdir + '/stat_grid.shp'
+    }
+    processing.run('qgis:deletecolumn', params, feedback=feedback)
+    params = {
+        'INPUT': iris,
+        'COLUMN': irisFields1 + irisFields2,
+        'OUTPUT': outdir + '/stat_iris.shp'
+    }
+    processing.run('qgis:deletecolumn', params, feedback=feedback)
 
 # Crée une grille avec des statistiques par cellule sur la surface couverte pour chaque couche en entrée
 def restrictGrid(layerList, grid, ratio, outdir):
@@ -550,7 +579,7 @@ def restrictGrid(layerList, grid, ratio, outdir):
         del layer, res
 
     for csvLayer in csvList:
-        join(grid, 'id', csvLayer, 'id_2', statBlackList)
+        join(grid, 'id', csvLayer, 'id_2', statBlacklist)
     cpt = 0
     # Expression pour écarter complètement les cellules qui intersectent
     if ratio == 0:
@@ -1134,8 +1163,7 @@ try:
         log.write(description + ': ')
 
         batiInterIris = QgsVectorLayer(workspacePath + 'data/2014_bati/bati_inter_iris.shp')
-        statGridIris(batiInterIris, minBuiltRatio, grid, iris, workspacePath + 'data/' +
-                     gridSize + 'm/', workspacePath + 'data/' + gridSize + 'm/csv/')
+        statGridIris(batiInterIris, grid, iris, workspacePath + 'data/' + gridSize + 'm/', workspacePath + 'data/' + gridSize + 'm/csv/')
         del grid, iris
         log.write(getTime(start_time) + '\n')
 
@@ -1312,14 +1340,18 @@ try:
 
     # Rasterisations
     argList = [
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'demographie_2014.tif', 'pop'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_plancher.tif', 'spla'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_residentiel.tif', 'ssol_res'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_2009.tif', 'ssol_09'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'surface_sol_2014.tif', 'ssol_14'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_q3_spl.tif', 'SP_Q3'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_max_spl.tif', 'SP_MAX'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_m2_hab.tif', 'M2_HAB'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'demographie_14.tif', 'pop'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_pla.tif', 'srf_pla'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_res.tif', 'ssol_res'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_09.tif', 'ssol_09'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_14.tif', 'ssol_14'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_tx_ssr.tif', 'tx_ssr'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_q3.tif', 'niv_q3'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_med.tif', 'niv_med'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_max.tif', 'niv_max'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_q3.tif', 'spl_q3'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_max.tif', 'spl_max'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_m2_hab.tif', 'm2_hab'),
         (workspacePath + 'data/ocsol.shp', projectPath + 'occupation_sol.tif', 'interet')
     ]
     if os.path.exists(workspacePath + 'data/plu.shp'):
@@ -1333,7 +1365,7 @@ try:
             rasterize(*a)
 
     # Création des variables GDAL indispensables pour la fonction to_tif()
-    ds = gdal.Open(projectPath + 'demographie_2014.tif')
+    ds = gdal.Open(projectPath + 'demographie_14.tif')
     proj = ds.GetProjection()
     geot = ds.GetGeoTransform()
     ds = None
