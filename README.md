@@ -14,6 +14,9 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 * truth = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires  
 * silent = aucun 'print' durant l'exécution  
 
+En cas de problème avec les "distance_trucmuche.tif", vérifier qu'il y a un header dans les fichiers csv.
+
+
 Usage :  
 python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "gridSize=50 speed"  
 
@@ -39,6 +42,8 @@ Dépendances pour python3 :
 care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data/ 34  ./mtp/ ./results/ "gridSize=50 useTxrp=True levelHeight=3 force"  
 
 care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data/ /my/output/dir/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
+
+ATTENTION : derrière -p : mettre les chemins en absolu 
 
 ### ./toolbox.py   
 Contient les fonctions communes; à déplacer avec tout script sorti du dépôt.  
