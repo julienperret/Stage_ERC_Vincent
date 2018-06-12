@@ -319,10 +319,11 @@ try:
     # ===> ici, prendre en compte le reste de l'artificialisation (routes ?)
     capaSol = ( np.zeros([rows, cols], np.int32) + int(cellSurf * (maxBuiltRatio / 100)) ) - srfSol14
     capaSol = np.where((capaSol > 0) & (restriction != 1), capaSol, 0).astype(np.uint32)
+    to_tif(capaSol, 'uint16', proj, geot, projectPath + 'capacite_sol.tif')
     # Raster pour seuillage de le surface plancher : max ou q3 de la srfPla dans l'IRIS ?
     maxPla = to_array(dataDir + 'iris_srf_pla_' + seuilPla + '.tif', np.uint32)
     capaPla = np.where((srfPla14 <= maxPla) & (restriction != 1), maxPla - srfPla14, 0).astype(np.uint32)
-    to_tif(capaPla, 'uint32', proj, geot, projectPath + 'capa_plancher.tif')
+    to_tif(capaPla, 'uint32', proj, geot, projectPath + 'capacite_plancher.tif')
 
     # Variables utilisées par la fonction urbanize
     urb = urb14.copy()
