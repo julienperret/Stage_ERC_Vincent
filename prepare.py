@@ -56,11 +56,8 @@ if len(sys.argv) > 5:
         if 'gridSize' in arg:
             gridSize = arg.split("=")[1]
             if not 200 >= int(gridSize) >= 20:
-                error = 'La taille de la grille doit être comprise entre 20m et 200m'
                 if not silent:
-                    print(error)
-                else:
-                    log.write('Erreur : ' + error)
+                    print('La taille de la grille doit être comprise entre 20m et 200m')
                 sys.exit()
         # Taille du tampon utilisé pour extraire les iris et pour extraire la donnée utile au delà des limites de la zone (comme les points SIRENE)
         elif 'bufferDistance' in arg:
