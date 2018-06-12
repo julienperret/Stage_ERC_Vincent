@@ -26,7 +26,7 @@ if len(sys.argv) > 4:
     argList = sys.argv[4].split()
     for arg in argList:
         if 'seuilPla' in arg:
-            seuilPla = arg.split('=')
+            seuilPla = arg.split('=')[1]
         if 'maximumDensity' in arg:
             maximumDensity = literal_eval(arg.split('=')[1])
         if 'pluPriority' in arg:
@@ -102,40 +102,50 @@ def slidingWin(array, row, col, size=3, calc='sum'):
 # Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def expand(row, col):
     global capaSol, capaPla, urb
+    minV = m2PlaHab[row][col]
     maxV = capaSol[row][col]
     srf = 0
-    if slidingWin(urb, row, col, winSize, 'sum') <= maxContig:
-        unitV = ssrMed[row][col]
-        if maximumDensity or unitV > maxV:
-            unitV = maxV
-        srf = np.random.randint(0, unitV + 1)
-        if srf > 0:
-            urb[row][col] = 1
-            capaSol[row][col] -= srf
-            if buildNonRes:
-                capaPla[row][col] -= srf * txSsr[row][col]
+    if maxV > minV:
+        if slidingWin(urb, row, col, winSize, 'sum') <= maxContig:
+            if maximumDensity :
+                srf = maxV
             else:
-                capaPla[row][col] -= srf
+                srf = np.random.randint(minV, maxV + 1)
+            if srf > 0:
+                urb[row][col] = 1
+                capaSol[row][col] -= srf
+                if buildNonRes:
+                    capaPla[row][col] -= srf * txSsr[row][col]
+                else:
+                    capaPla[row][col] -= srf
     return srf
 
 # Densification d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def densify(mode, row, col):
-    srf = 0
     global capaSol, capaPla
+    minV = m2PlaHab[row][col]
+    srf = 0
     if mode == 'sol':
         maxV = capaSol[row][col]
-        unitV = ssrMed[row][col]
-        if maximumDensity or unitV > maxV:
-            unitV = maxV
-        srf = np.random.randint(0, unitV + 1)
-        capaSol[row][col] -= srf
+        if maxV > minV:
+            if maximumDensity:
+                srf = maxV
+            else:
+                srf = np.random.randint(minV, maxV + 1)
+            if srf > 0:
+                capaSol[row][col] -= srf
+                if buildNonRes:
+                    capaPla[row][col] -= srf * txSsr[row][col]
+                else:
+                    capaPla[row][col] -= srf
     elif mode == 'pla':
         maxV = capaPla[row][col]
-        unitV = ssrMed[row][col]
-        if maximumDensity or unitV > maxV:
-            unitV = maxV
-        srf = np.random.randint(0, unitV + 1)
-    capaPla[row][col] -= srf
+        if maxV > minV:
+            if maximumDensity:
+                srf = maxV
+            else:
+                srf = np.random.randint(minV, maxV + 1)
+            capaPla[row][col] -= srf
     return srf
 
 # Fonction principale pour gérer etalement puis densification,
@@ -162,18 +172,20 @@ def urbanize(maxSrf, pop, zau=False):
             if buildNonRes:
                 srf = srf * txSsr[row][col]
             tmpSrfPla[row][col] += srf
-            count = np.where(m2PlaHab != 0, tmpSrfPla / m2PlaHab, 0).sum().astype(np.uint16)
+            count = np.where(m2PlaHab != 0, tmpSrfPla / m2PlaHab, 0).astype(np.uint16).sum()
 
     if built >= maxSrf:
         tmpInteret = np.where(urb == 1, interet, 0)
         if zau:
             tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
         while count < pop and tmpInteret.sum() > 0 :
+            srf = 0
             row, col = choose(tmpInteret)
             if capaPla[row][col] > 0:
                 srf = densify('pla', row, col)
-                tmpSrfPla[row][col] += srf
-                count = np.where(m2PlaHab != 0, tmpSrfPla / m2PlaHab, 0).sum().astype(np.uint16)
+                if srf > 0:
+                    tmpSrfPla[row][col] += srf
+                    count = np.where(m2PlaHab != 0, tmpSrfPla / m2PlaHab, 0).astype(np.uint16).sum()
 
     srfSol += tmpSrfSol
     srfSolRes += tmpSrfSol
@@ -199,6 +211,8 @@ try:
         projectPath + '_build' + str(maxBuiltRatio)
     if buildNonRes :
         projectPath += '_buildNonRes'
+    if maximumDensity :
+        projectPath += '_maximumDensity'
     if finalYear != 2040:
         projectPath += '_' + str(finalYear)
     projectPath += '/'
@@ -307,14 +321,14 @@ try:
     capaSol = np.where((capaSol > 0) & (restriction != 1), capaSol, 0).astype(np.uint32)
     # Raster pour seuillage de le surface plancher : max ou q3 de la srfPla dans l'IRIS ?
     maxPla = to_array(dataDir + 'iris_srf_pla_' + seuilPla + '.tif', np.uint32)
-    capaPla = np.where(restriction != 1, maxPla - srfPla14, 0).astype(np.uint32)
+    capaPla = np.where((srfPla14 <= maxPla) & (restriction != 1), maxPla - srfPla14, 0).astype(np.uint32)
+    to_tif(capaPla, 'uint32', proj, geot, projectPath + 'capa_plancher.tif')
 
     # Variables utilisées par la fonction urbanize
     urb = urb14.copy()
     demographie = demographieDep.copy()
     srfPla = srfPla14.copy()
     srfSol = srfSol14.copy()
-
 
     preConstruit = 0
     preLogee = 0
@@ -341,7 +355,6 @@ try:
         to_tif(srfSol, 'uint16', proj, geot, projectPath + 'snapshots/surface_sol/srf_sol_' + str(year) + '.tif')
         to_tif(srfPla, 'uint32', proj, geot, projectPath + 'snapshots/surface_plancher/srf_pla_' + str(year) + '.tif')
 
-
     # Calcul et export des résultats
     popNouv = demographie - demographieDep
     srfSolNouv = srfSol - srfSol14
@@ -359,6 +372,7 @@ try:
     expansionSum = expansion.sum()
     to_tif(popNouv, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
     popNouvCount = popNouv.sum()
+    log.write("Population logée, " + str(popNouvCount) + '\n')
 
     mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
     mesures.write("Expansion totale en m2, " + str(expansionSum * cellSurf) + "\n")
@@ -369,7 +383,7 @@ try:
     end_time = time()
     execTime = round(end_time - start_time, 2)
     log.write("Temps d'execution, " + str(execTime))
-    print("\nTemps d'execution : " + str(execTime) + ' secondes')
+    print("\nFini en " + str(execTime) + ' secondes')
 
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
