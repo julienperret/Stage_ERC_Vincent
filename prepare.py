@@ -431,6 +431,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
 
     csvIssolR = QgsVectorLayer(outdir + 'csv/iris_ssr.csv')
     csvIssolR.addExpressionField('round(to_real("sum"))', QgsField('ssr_sum', QVariant.Int))
+    csvIssolR.addExpressionField('round(to_real("min"))', QgsField('ssr_min', QVariant.Int))
     csvIssolR.addExpressionField('round(to_real("mean"))', QgsField('ssr_mean', QVariant.Int))
     csvIssolR.addExpressionField('round(to_real("median"))', QgsField('ssr_med', QVariant.Int))
     csvIris.append(csvIssolR)
@@ -1346,10 +1347,11 @@ try:
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_09.tif', 'ssol_09'),
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_14.tif', 'ssol_14'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_tx_ssr.tif', 'tx_ssr'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_q3.tif', 'niv_q3'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_med.tif', 'niv_med'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_max.tif', 'niv_max'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_q3.tif', 'spl_q3'),
+        # (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_q3.tif', 'niv_q3'),
+        # (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_med.tif', 'niv_med'),
+        # (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_max.tif', 'niv_max'),
+        # (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_q3.tif', 'spl_q3'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_max.tif', 'spl_max'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_max.tif', 'spl_max'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_m2_hab.tif', 'm2_hab'),
         (workspacePath + 'data/ocsol.shp', projectPath + 'occupation_sol.tif', 'interet')
@@ -1371,10 +1373,10 @@ try:
     ds = None
 
     # Conversion des raster de distance
-    distance_routes = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_routes.tif', 'float32')
+    distance_routes = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_routes.tif', np.float32)
     routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
     to_tif(routes, 'float32', proj, geot, projectPath + 'proximite_routes.tif')
-    distance_transport = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif', 'float32')
+    distance_transport = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif', np.float32)
     transport = np.where(distance_transport > -1, 1 - (distance_transport / np.amax(distance_transport)), 0)
     to_tif(transport, 'float32', proj, geot, projectPath + 'proximite_transport.tif')
 
@@ -1384,11 +1386,11 @@ try:
         next(reader, None)
         poidsSirene = {rows[0]:int(rows[1]) for rows in reader}
 
-    administratif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_administratif.tif', 'float32')
-    commercial = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_commercial.tif', 'float32')
-    enseignement = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_enseignement.tif', 'float32')
-    medical = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_medical.tif', 'float32')
-    recreatif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_recreatif.tif', 'float32')
+    administratif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_administratif.tif', np.float32)
+    commercial = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_commercial.tif', np.float32)
+    enseignement = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_enseignement.tif', np.float32)
+    medical = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_medical.tif', np.float32)
+    recreatif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_recreatif.tif', np.float32)
     # Normalisation des valeurs entre 0 et 1
     administratif = np.where(administratif != -9999, administratif / np.amax(administratif), 0)
     commercial = np.where(commercial != -9999, commercial / np.amax(commercial), 0)
@@ -1403,22 +1405,22 @@ try:
     del poidsSirene, administratif, commercial, enseignement, medical, recreatif, sirene
 
     # Création du raster de restriction (sans PLU)
-    irisMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/masque.tif')
-    exclusionMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/exclusion.tif')
-    surfActivMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif')
-    gridMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/restrict_grid.tif')
-    zonageMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/zonages_protection.tif')
-    highwayMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif')
-    pprMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif')
+    irisMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/masque.tif', np.byte)
+    exclusionMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/exclusion.tif', np.byte)
+    surfActivMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/surf_activ_non_com.tif', np.byte)
+    gridMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/restrict_grid.tif', np.byte)
+    zonageMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/zonages_protection.tif', np.byte)
+    highwayMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/tampon_autoroutes.tif', np.byte)
+    pprMask = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ppr.tif', np.byte)
     slope = to_array(workspacePath + 'data/' + gridSize + 'm/tif/slope.tif')
-    slopeMask = np.where(slope > maxSlope, 1, 0)
+    slopeMask = np.where(slope > maxSlope, 1, 0).astype(np.byte)
 
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) |
                             (zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
     to_tif(restriction, 'byte', proj, geot, projectPath + 'restriction_totale.tif')
     del surfActivMask, exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
 
-    ecologie = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif')
+    ecologie = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif', np.float32)
     ecologie = np.where((ecologie == 0), 1, 1 - ecologie)
     ecologie = np.where((irisMask != 1), ecologie, 0)
     to_tif(ecologie, 'float32', proj, geot, projectPath + 'non-importance_ecologique.tif')

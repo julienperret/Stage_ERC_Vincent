@@ -51,7 +51,7 @@ try:
     for tifPath in os.listdir(inDir):
         if os.path.splitext(tifPath)[1] == '.tif':
             basename = os.path.splitext(tifPath.split('/')[len(tifPath.split('/'))-1])[0]
-            array = to_array(inDir + '/' + tifPath).astype(np.uint32)
+            array = to_array(inDir + '/' + tifPath, np.uint32)
             array = (array * 65535 / maxValue).astype(np.uint16)
             to_tif(array, 'uint16', outDir + '/tmp/' + basename + '.tif')
 

@@ -45,6 +45,8 @@ def to_tif(array, dtype, proj, geot, path):
         dtype = gdal.GDT_UInt16
     elif dtype == 'int16':
         dtype = gdal.GDT_Int16
+    elif dtype == 'uint32':
+        dtype = gdal.GDT_UInt32
     else :
         dtype = gdal.GDT_Unknown
     ds_out = driver.Create(path, cols, rows, 1, dtype)
@@ -56,14 +58,8 @@ def to_tif(array, dtype, proj, geot, path):
 # Convertit un tif en numpy array
 def to_array(tif, dtype=None):
     ds = gdal.Open(tif)
-    if dtype == 'byte':
-        return ds.ReadAsArray().astype(np.byte)
-    elif dtype == 'float32':
-        return ds.ReadAsArray().astype(np.float32)
-    elif dtype == 'uint16':
-        return ds.ReadAsArray().astype(np.uint16)
-    elif dtype == 'int16':
-        return ds.ReadAsArray().astype(np.int16)
+    if dtype :
+        return ds.ReadAsArray().astype(dtype)
     else:
         return ds.ReadAsArray()
     ds = None
