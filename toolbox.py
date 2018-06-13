@@ -43,17 +43,15 @@ def to_tif(array, dtype, proj, geot, path):
         dtype = gdal.GDT_Float32
     elif dtype == 'uint16':
         dtype = gdal.GDT_UInt16
-    elif dtype == 'int16':
-        dtype = gdal.GDT_Int16
     elif dtype == 'uint32':
         dtype = gdal.GDT_UInt32
     else :
         dtype = gdal.GDT_Unknown
-    ds_out = driver.Create(path, cols, rows, 1, dtype)
-    ds_out.SetProjection(proj)
-    ds_out.SetGeoTransform(geot)
-    ds_out.GetRasterBand(1).WriteArray(array)
-    ds_out = None
+    ds = driver.Create(path, cols, rows, 1, dtype)
+    ds.SetProjection(proj)
+    ds.SetGeoTransform(geot)
+    ds.GetRasterBand(1).WriteArray(array)
+    ds = None
 
 # Convertit un tif en numpy array
 def to_array(tif, dtype=None):

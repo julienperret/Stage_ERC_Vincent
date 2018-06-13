@@ -163,7 +163,7 @@ def densify(mode, row, col):
     return (sS, sP)
 
 # Fonction principale pour gérer etalement puis densification,
-def urbanize(pop, maxSrf=None, zau=False, ):
+def urbanize(pop, maxSrf=0, zau=False, ):
     global demographie, capaSol, srfSol, capaPla, srfPla, srfSolRes
     tmpDemog = np.zeros([rows, cols], np.uint16)
     tmpSrfPla = np.zeros([rows, cols], np.uint32)
@@ -171,7 +171,7 @@ def urbanize(pop, maxSrf=None, zau=False, ):
     count = 0
     built = 0
     # Expansion pas ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
-    if maxSrf:
+    if maxSrf > 0:
         tmpInteret = np.where(capaSol > 0, interet, 0)
         if zau:
             tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
@@ -191,7 +191,7 @@ def urbanize(pop, maxSrf=None, zau=False, ):
             count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
         srfSol += tmpSrfSol
         srfSolRes += tmpSrfSol
-    # Ici on "ajoute" vraiment des personnes à partir de la capaPla qui a pu être mise à jour en phase d'expansion
+    # Densification de l'existant lorsque la surface construite au sol max est atteinte
     tmpInteret = np.where((urb == 1) & (capaPla > 0), interet, 0)
     if zau:
         tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
@@ -217,11 +217,9 @@ try:
     cellSurf = pixSize * pixSize
     ds = None
 
-    projectPath = outputDir + str(pixSize) + 'm' + '_tx' + str(rate)
+    projectPath = outputDir + str(pixSize) + 'm' + '_tx' + str(rate) + '_buildRatio' + str(maxBuiltRatio)
     if pluPriority:
         projectPath += '_pluPrio'
-    if maxBuiltRatio != 90:
-        projectPath + '_build' + str(maxBuiltRatio)
     if buildNonRes :
         projectPath += '_buildNonRes'
     if maximumDensity :
@@ -314,7 +312,7 @@ try:
     capaSol = np.zeros([rows, cols], np.uint32) + int(cellSurf * (maxBuiltRatio / 100))
     capaSol = np.where((restriction != 1) & (srfSol14 < capaSol), capaSol - srfSol14, 0).astype(np.uint16)
     capaPla = np.where(srfPla14 <= maxPla, maxPla - srfPla14, 0).astype(np.uint32)
-    capaPla = np.where((srfSolRes > 0) & (restriction != 1), capaPla, 0)
+    capaPla = np.where((restriction != 1) & (srfSolRes > 0), capaPla, 0)
     # Statistiques sur l'évolution du bâti
     urb09 = np.where(srfSol09 > 0, 1, 0).astype(np.byte)
     urb14 = np.where(srfSol14 > 0, 1, 0).astype(np.byte)

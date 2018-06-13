@@ -427,6 +427,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     csvGrid.append(csvGplanch)
 
     csvIssolR = QgsVectorLayer(outdir + 'csv/iris_ssr.csv')
+    csvIssolR.addExpressionField('round(to_real("sum"))', QgsField('ssr_sum', QVariant.Int))
     csvIssolR.addExpressionField('round(to_real("median"))', QgsField('ssr_med', QVariant.Int))
     csvIris.append(csvIssolR)
 
@@ -435,6 +436,9 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     csvGrid.append(csvGssol)
 
     csvIniv = QgsVectorLayer(outdir + 'csv/iris_nb_niv.csv')
+    csvIniv.addExpressionField('to_real("mean")', QgsField('niv_mean', QVariant.Double))
+    csvIniv.addExpressionField('to_int("median")', QgsField('niv_med', QVariant.Int))
+    csvIniv.addExpressionField('to_real("q3")', QgsField('niv_q3', QVariant.Double))
     csvIniv.addExpressionField('to_int("max")', QgsField('niv_max', QVariant.Int))
     csvIris.append(csvIniv)
 
