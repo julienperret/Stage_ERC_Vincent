@@ -77,7 +77,7 @@ if 'maxBuiltRatio' not in globals():
 if 'winSize' not in globals():
     winSize = 3
 if 'maxContig' not in globals():
-    maxContig = 7
+    maxContig = 6
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
 def choose(weight, size=1):
