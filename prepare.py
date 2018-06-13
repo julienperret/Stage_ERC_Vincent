@@ -427,10 +427,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     csvGrid.append(csvGplanch)
 
     csvIssolR = QgsVectorLayer(outdir + 'csv/iris_ssr.csv')
-    csvIssolR.addExpressionField('round(to_real("sum"))', QgsField('ssr_sum', QVariant.Int))
-    csvIssolR.addExpressionField('round(to_real("mean"))', QgsField('ssr_mean', QVariant.Int))
     csvIssolR.addExpressionField('round(to_real("median"))', QgsField('ssr_med', QVariant.Int))
-    csvIssolR.addExpressionField('round(to_real("max"))', QgsField('ssr_max', QVariant.Int))
     csvIris.append(csvIssolR)
 
     csvGssol = QgsVectorLayer(outdir + 'csv/grid_ssr.csv')
@@ -438,9 +435,6 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     csvGrid.append(csvGssol)
 
     csvIniv = QgsVectorLayer(outdir + 'csv/iris_nb_niv.csv')
-    csvIniv.addExpressionField('to_real("mean")', QgsField('niv_mean', QVariant.Double))
-    csvIniv.addExpressionField('to_int("median")', QgsField('niv_med', QVariant.Int))
-    csvIniv.addExpressionField('to_real("q3")', QgsField('niv_q3', QVariant.Double))
     csvIniv.addExpressionField('to_int("max")', QgsField('niv_max', QVariant.Int))
     csvIris.append(csvIniv)
 
@@ -1345,7 +1339,6 @@ try:
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_14.tif', 'ssol_14'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_ssr_med.tif', 'ssr_med'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_tx_ssr.tif', 'tx_ssr'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_med.tif', 'niv_med'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_max.tif', 'niv_max'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_q3.tif', 'spl_q3'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_max.tif', 'spl_max'),

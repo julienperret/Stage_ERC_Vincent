@@ -102,6 +102,8 @@ def slidingWin(array, row, col, size=3, calc='sum'):
 # Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def expand(row, col):
     global capaSol, capaPla, urb
+    nivMin = 1
+    nivMax = nbNivMax[row][col]
     minV = ssrMed[row][col]
     maxV = capaSol[row][col]
     sS = 0
@@ -116,9 +118,13 @@ def expand(row, col):
             urb[row][col] = 1
             sP = sS
             if buildNonRes:
-                sP = sP * txSsr[row][col]
-            sP = sP * 3# Ici ajouter nombre moyen d'étages pour "initialisation" de nouveaux bâtiments
-            capaPla[row][col] += sP
+                sP *= txSsr[row][col]
+            nbNiv = np.random.randint(nivMin, nivMax + 1)
+            sP *= nbNiv
+            if capaPla[row][col] > sP:
+                capaPla[row][col] -= sP
+            else:
+                capaPla[row][col] = 0
     return (sS, sP)
 
 # Densification d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
@@ -128,7 +134,7 @@ def densify(mode, row, col):
     sP = 0
     # Densifier au sol : il faut penser au fait que parfois capaPla < capaSol
     if mode == 'sol':
-        nivMin = nbNivMed[row][col]
+        nivMin = 1
         nivMax = nbNivMax[row][col]
         minV = m2PlaHab[row][col]
         maxV = capaSol[row][col]
@@ -137,9 +143,9 @@ def densify(mode, row, col):
             capaSol[row][col] -= sS
             sP = sS
             if buildNonRes:
-                sP = sP * txSsr[row][col]
+                sP *= txSsr[row][col]
             nbNiv = np.random.randint(nivMin, nivMax + 1)
-            sP *= nbNiv # Ici ajouter nombre moyen d'étages pour "initialisation" de nouveaux bâtiments
+            sP *= nbNiv
             if capaPla[row][col] > sP:
                 capaPla[row][col] -= sP
             else:
@@ -291,7 +297,6 @@ try:
         txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
     m2PlaHab = to_array(dataDir + 'iris_m2_hab.tif', np.uint16)
     srfPla14 = to_array(dataDir  + 'srf_pla.tif', np.uint32)
-    nbNivMed = to_array(dataDir + 'iris_niv_med.tif', np.uint8)
     nbNivMax = to_array(dataDir + 'iris_niv_max.tif', np.uint8)
     maxPla = to_array(dataDir + 'iris_srf_pla_' + seuilPla + '.tif', np.uint32)
     # Interets
