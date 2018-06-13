@@ -59,7 +59,7 @@ if 'buildNonRes' not in globals():
     buildNonRes = True
 # Taux d'artificialisation maximum des cellules
 if 'maxBuiltRatio' not in globals():
-    maxBuiltRatio = 90
+    maxBuiltRatio = 80
 # Paramètres pour les règles de contiguïtés; maxContig <= winSize²
 if 'winSize' not in globals():
     winSize = 3
@@ -102,96 +102,103 @@ def slidingWin(array, row, col, size=3, calc='sum'):
 # Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def expand(row, col):
     global capaSol, capaPla, urb
-    minV = m2PlaHab[row][col]
+    minV = ssrMed[row][col]
     maxV = capaSol[row][col]
-    srf = 0
+    sS = 0
+    sP = 0
     if maxV > minV:
         if slidingWin(urb, row, col, winSize, 'sum') <= maxContig:
             if maximumDensity :
-                srf = maxV
+                sS = maxV
             else:
-                srf = np.random.randint(minV, maxV + 1)
-            if srf > 0:
-                urb[row][col] = 1
-                capaSol[row][col] -= srf
-                if buildNonRes:
-                    capaPla[row][col] -= srf * txSsr[row][col]
-                else:
-                    capaPla[row][col] -= srf
-    return srf
+                sS = np.random.randint(minV, maxV + 1)
+            capaSol[row][col] -= sS
+            urb[row][col] = 1
+            sP = sS
+            if buildNonRes:
+                sP = sP * txSsr[row][col]
+            sP = sP * 3# Ici ajouter nombre moyen d'étages pour "initialisation" de nouveaux bâtiments
+            capaPla[row][col] += sP
+    return (sS, sP)
 
 # Densification d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def densify(mode, row, col):
     global capaSol, capaPla
-    minV = m2PlaHab[row][col]
-    srf = 0
+    sS = 0
+    sP = 0
+    # Densifier au sol : il faut penser au fait que parfois capaPla < capaSol
     if mode == 'sol':
+        nivMin = nbNivMed[row][col]
+        nivMax = nbNivMax[row][col]
+        minV = m2PlaHab[row][col]
         maxV = capaSol[row][col]
         if maxV > minV:
-            if maximumDensity:
-                srf = maxV
+            sS = np.random.randint(minV, maxV + 1)
+            capaSol[row][col] -= sS
+            sP = sS
+            if buildNonRes:
+                sP = sP * txSsr[row][col]
+            nbNiv = np.random.randint(nivMin, nivMax + 1)
+            sP *= nbNiv # Ici ajouter nombre moyen d'étages pour "initialisation" de nouveaux bâtiments
+            if capaPla[row][col] > sP:
+                capaPla[row][col] -= sP
             else:
-                srf = np.random.randint(minV, maxV + 1)
-            if srf > 0:
-                capaSol[row][col] -= srf
-                if buildNonRes:
-                    capaPla[row][col] -= srf * txSsr[row][col]
-                else:
-                    capaPla[row][col] -= srf
+                capaPla[row][col] = 0
+
     elif mode == 'pla':
+        minV = m2PlaHab[row][col]
         maxV = capaPla[row][col]
         if maxV > minV:
             if maximumDensity:
-                srf = maxV
+                sP = maxV
             else:
-                srf = np.random.randint(minV, maxV + 1)
-            capaPla[row][col] -= srf
-    return srf
+                sP = np.random.randint(minV, maxV + 1)
+            capaPla[row][col] -= sP
+    return (sS, sP)
 
 # Fonction principale pour gérer etalement puis densification,
-def urbanize(maxSrf, pop, zau=False):
+def urbanize(pop, maxSrf=None, zau=False, ):
     global demographie, capaSol, srfSol, capaPla, srfPla, srfSolRes
     tmpDemog = np.zeros([rows, cols], np.uint16)
-    tmpSrfPla = np.zeros([rows, cols], np.uint16)
+    tmpSrfPla = np.zeros([rows, cols], np.uint32)
     tmpSrfSol = np.zeros([rows, cols], np.uint16)
-    tmpInteret = np.where(srfSolRes == 0, interet, 0)
-    if zau:
-        tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
     count = 0
     built = 0
-    while built < maxSrf and count < pop and tmpInteret.sum() > 0:
-        srf = 0
-        row, col = choose(tmpInteret)
-        if urb[row][col] == 0:
-            srf = expand(row, col)
-        elif urb[row][col] == 1 and capaSol[row][col] > 0:
-            srf = densify('sol', row, col)
-        if srf > 0:
-            built += srf
-            tmpSrfSol[row][col] += srf
-            if buildNonRes:
-                srf = srf * txSsr[row][col]
-            tmpSrfPla[row][col] += srf
-            count = np.where(m2PlaHab != 0, tmpSrfPla / m2PlaHab, 0).astype(np.uint16).sum()
-
-    if built >= maxSrf:
-        tmpInteret = np.where(urb == 1, interet, 0)
+    # Expansion pas ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
+    if maxSrf:
+        tmpInteret = np.where(capaSol > 0, interet, 0)
         if zau:
             tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
-        while count < pop and tmpInteret.sum() > 0 :
-            srf = 0
+        while built < maxSrf and count < pop and tmpInteret.sum() > 0:
+            sS = 0
+            sP = 0
             row, col = choose(tmpInteret)
-            if capaPla[row][col] > 0:
-                srf = densify('pla', row, col)
-                if srf > 0:
-                    tmpSrfPla[row][col] += srf
-                    count = np.where(m2PlaHab != 0, tmpSrfPla / m2PlaHab, 0).astype(np.uint16).sum()
-
-    srfSol += tmpSrfSol
-    srfSolRes += tmpSrfSol
+            if urb[row][col] == 0:
+                sS, sP = expand(row, col)
+            else:
+                sS, sP = densify('sol', row, col)
+            built += sS
+            tmpSrfSol[row][col] += sS
+            if capaSol[row][col] == 0:
+                tmpInteret[row][col] = 0
+            tmpSrfPla[row][col] += sP
+            count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+        srfSol += tmpSrfSol
+        srfSolRes += tmpSrfSol
+    # Ici on "ajoute" vraiment des personnes à partir de la capaPla qui a pu être mise à jour en phase d'expansion
+    tmpInteret = np.where((urb == 1) & (capaPla > 0), interet, 0)
+    if zau:
+        tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
+    while count < pop and tmpInteret.sum() > 0:
+        srf = 0
+        row, col = choose(tmpInteret)
+        _, sP = densify('pla', row, col)
+        if sP > 0:
+            tmpSrfPla[row][col] += sP
+            count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
     srfPla += tmpSrfPla
-    demographie += np.where(m2PlaHab != 0, tmpSrfPla / m2PlaHab, 0).astype(np.uint16)
-    return (maxSrf - built, pop - count)
+    demographie += np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16)
+    return (pop - count, maxSrf - built)
 
 try:
     # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
@@ -226,9 +233,8 @@ try:
     os.mkdir(projectPath + 'snapshots/surface_plancher')
 
     # Création d'un fichier journal
-    log = open(projectPath + 'log.csv', 'x')
+    log = open(projectPath + 'log.txt', 'x')
     mesures = open(projectPath + 'mesures.csv', 'x')
-    start_time = time()
 
     # Création des dataframes contenant les informations par IRIS
     with open(dataDir + 'population.csv') as csvFile:
@@ -250,7 +256,7 @@ try:
 
     # Nombre total de personnes à loger - permet de vérifier si le raster capacité permet d'accueillir tout le monde
     sumPopALoger = sum(dicPop.values())
-    log.write("Population à loger d'ici à " + str(finalYear) + ", " + str(sumPopALoger) + "\n")
+    log.write("Population à loger d'ici à " + str(finalYear) + " : " + str(sumPopALoger) + "\n")
 
     # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
     with open(dataDir + 'poids.csv') as r:
@@ -264,36 +270,54 @@ try:
             coef[key] = poids[key] / sum(poids.values())
             w.write(key + ', ' + str(coef[key]))
 
-    # Préparation des restrictions
+    # Préparation des restrictions et gestion du PLU
     restriction = to_array(dataDir + 'restriction_totale.tif')
     if os.path.exists(dataDir + 'plu_restriction.tif') and os.path.exists(dataDir + 'plu_priorite.tif'):
         hasPlu = True
         pluPrio = to_array(dataDir + 'plu_priorite.tif')
         pluRest = to_array(dataDir + 'plu_restriction.tif')
+        restriction = np.where(pluRest != 1, restriction, 1)
     else:
         hasPlu = False
 
-    # Création du raster final d'intérêt avec pondération
+    # Déclaration des matrices
+    demographie14 = to_array(dataDir + 'demographie_14.tif', np.uint16)
+    srfSol09 = to_array(dataDir + 'srf_sol_09.tif', np.uint16)
+    srfSol14 = to_array(dataDir + 'srf_sol_14.tif', np.uint16)
+    txArtif = (srfSol14 / cellSurf).astype(np.float32)
+    srfSolRes = to_array(dataDir + 'srf_sol_res.tif', np.uint16)
+    ssrMed = to_array(dataDir + 'iris_ssr_med.tif', np.uint16)
+    if buildNonRes:
+        txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
+    m2PlaHab = to_array(dataDir + 'iris_m2_hab.tif', np.uint16)
+    srfPla14 = to_array(dataDir  + 'srf_pla.tif', np.uint32)
+    nbNivMed = to_array(dataDir + 'iris_niv_med.tif', np.uint8)
+    nbNivMax = to_array(dataDir + 'iris_niv_max.tif', np.uint8)
+    maxPla = to_array(dataDir + 'iris_srf_pla_' + seuilPla + '.tif', np.uint32)
+    # Interets
     eco = to_array(dataDir + 'non-importance_ecologique.tif', np.float32)
     ocs = to_array(dataDir + 'occupation_sol.tif', np.float32)
     rou = to_array(dataDir + 'proximite_routes.tif', np.float32)
     tra = to_array(dataDir + 'proximite_transport.tif', np.float32)
     sir = to_array(dataDir + 'densite_sirene.tif', np.float32)
-
+    # Création du raster final d'intérêt avec pondération
     interet = np.where((restriction != 1), (eco * coef['ecologie']) + (ocs * coef['ocsol']) +
                        (rou * coef['routes']) + (tra * coef['transport']) + (sir * poids['sirene']), 0)
     interet = (interet / np.amax(interet)).astype(np.float32)
-    to_tif(interet, 'float32', proj, geot, projectPath + 'interet.tif')
 
-    # Traitement des raster et calcul des statistiques sur l'évolution des surfaces bâties
-    srfSol09 = to_array(dataDir + 'srf_sol_09.tif', np.uint16)
-    srfSol14 = to_array(dataDir + 'srf_sol_14.tif', np.uint16)
+    # Création des rasters de capacité en surfaces sol et plancher
+    capaSol = np.zeros([rows, cols], np.uint32) + int(cellSurf * (maxBuiltRatio / 100))
+    capaSol = np.where((restriction != 1) & (srfSol14 < capaSol), capaSol - srfSol14, 0).astype(np.uint16)
+    capaPla = np.where(srfPla14 <= maxPla, maxPla - srfPla14, 0).astype(np.uint32)
+    capaPla = np.where((srfSolRes > 0) & (restriction != 1), capaPla, 0)
+    # Statistiques sur l'évolution du bâti
     urb09 = np.where(srfSol09 > 0, 1, 0).astype(np.byte)
     urb14 = np.where(srfSol14 > 0, 1, 0).astype(np.byte)
     m2SolHab09 = srfSol09.sum() / pop09
     m2SolHab14 = srfSol14.sum() / pop14
     m2SolHabEvo = (m2SolHab14 - m2SolHab09) / m2SolHab09 / 5
-
+    srfSolNonRes = srfSol14 - srfSolRes
+    ratioPlaSol = np.where(srfSolRes != 0, srfPla14 / srfSolRes, 0).astype(np.float32)
     # Création du dictionnaire pour nombre de m² ouverts à l'urbanisation par année
     dicSrf = {}
     maxSrf = m2SolHab14
@@ -303,34 +327,20 @@ try:
         dicSrf[year] = int(round(maxSrf * dicPop[year]))
         year += 1
 
-    # Statistiques sur le nombre moyen d'étage dans la cellule, et sur les taux de surface plancher residentiel if buildNonRes
-    m2PlaHab = to_array(dataDir + 'iris_m2_hab.tif', np.uint16)
-    srfPla14 = to_array(dataDir  + 'srf_pla.tif', np.uint32)
-    srfSolRes = to_array(dataDir + 'srf_sol_res.tif', np.uint32)
-    srfSolNonRes = srfSol14 - srfSolRes
-    ratioPlaSol = np.where(srfSolRes != 0, srfPla14 / srfSolRes, 0).astype(np.float32)
-    ssrMed = to_array(dataDir + 'iris_ssr_med.tif', np.uint16)
-    if buildNonRes:
-        txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
+    # Instantanés de la situation à t0
+    to_tif(urb14, 'byte', proj, geot, projectPath + 'urbanisation_14.tif')
+    to_tif(capaSol, 'uint16', proj, geot, projectPath + 'capacite_sol_14.tif')
+    to_tif(capaPla, 'uint32', proj, geot, projectPath + 'capacite_plancher_14.tif')
+    to_tif(txArtif, 'float32', proj, geot, projectPath + 'taux_artif_14.tif')
+    to_tif(interet, 'float32', proj, geot, projectPath + 'interet_14.tif')
+    to_tif(ratioPlaSol, 'float32', proj, geot, projectPath + 'ratio_pla_sol_14.tif')
 
-    to_tif(urb14, 'byte', proj, geot, projectPath + 'urbanisation_2014.tif')
-
-    # Création du raster de capacité en surface constructible à partir du ratio utilisateur et des surfaces actuelles
-    # ===> ici, prendre en compte le reste de l'artificialisation (routes ?)
-    capaSol = ( np.zeros([rows, cols], np.int32) + int(cellSurf * (maxBuiltRatio / 100)) ) - srfSol14
-    capaSol = np.where((capaSol > 0) & (restriction != 1), capaSol, 0).astype(np.uint32)
-    to_tif(capaSol, 'uint16', proj, geot, projectPath + 'capacite_sol.tif')
-    # Raster pour seuillage de le surface plancher : max ou q3 de la srfPla dans l'IRIS ?
-    maxPla = to_array(dataDir + 'iris_srf_pla_' + seuilPla + '.tif', np.uint32)
-    capaPla = np.where((srfPla14 <= maxPla) & (restriction != 1), maxPla - srfPla14, 0).astype(np.uint32)
-    to_tif(capaPla, 'uint32', proj, geot, projectPath + 'capacite_plancher.tif')
-
-    # Variables utilisées par la fonction urbanize
+    ##### Boucle principale #####
+    start_time = time()
     urb = urb14.copy()
-    demographie = demographieDep.copy()
-    srfPla = srfPla14.copy()
     srfSol = srfSol14.copy()
-
+    srfPla = srfPla14.copy()
+    demographie = demographie14.copy()
     preConstruit = 0
     preLogee = 0
     nonLogee = 0
@@ -340,17 +350,18 @@ try:
         popALoger = dicPop[year]
         maxSrf = dicSrf[year]
         if hasPlu and pluPriority:
-            resteSrf, restePop = urbanize(maxSrf - preConstruit, popALoger - preLogee, True)
-            while resteSrf > 0:
-                resteSrf, restePop = urbanize(resteSrf, restePop, False)
+            restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preConstruit,  True)
+            if resteSrf > 0:
+                restePop, resteSrf = urbanize(restePop, resteSrf)
             if restePop > 0:
-                _, restePop = urbanize(0, restePop, False)
+                restePop, _ = urbanize(restePop)
         else:
-            resteSrf, restePop = urbanize(maxSrf - preConstruit, popALoger - preLogee, False)
+            restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preConstruit)
         preConstruit = -resteSrf
         preLogee = -restePop
         if restePop > 0 and year == finalYear:
             nonLogee = restePop
+        # Snapshots
         to_tif(demographie, 'uint16', proj, geot, projectPath + 'snapshots/demographie/demo_' + str(year) + '.tif')
         to_tif(urb, 'byte', proj, geot, projectPath + 'snapshots/urbanisation/urb_' + str(year) + '.tif')
         to_tif(srfSol, 'uint16', proj, geot, projectPath + 'snapshots/surface_sol/srf_sol_' + str(year) + '.tif')
@@ -358,39 +369,46 @@ try:
 
     # Calcul et export des résultats
     popNouv = demographie - demographieDep
-    srfSolNouv = srfSol - srfSol14
-    to_tif(srfSolNouv, 'uint16', proj, geot, projectPath + 'surface_sol_construite.tif')
-    srfPlaNouv = srfPla - srfPla14
-    to_tif(srfPlaNouv, 'uint32', proj, geot, projectPath + 'surface_plancher_construite.tif')
-    expansion = np.where((urb14 == 0) & (urb ==1), 1, 0)
+    popNouvCount = popNouv.sum()
     peuplementMoyen = np.nanmean(np.where(popNouv == 0, np.nan, popNouv))
-    impactEnv = int(np.where(expansion == 1, 1 - eco, 0).sum() * cellSurf)
+    srfSolNouv = srfSol - srfSol14
+    srfPlaNouv = srfPla - srfPla14
+    txArtifNouv = (srfSol / cellSurf).astype(np.float32)
+    txArtifMoyen = np.nanmean(np.where(txArtifNouv == 0, np.nan, txArtifNouv))
+    expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
     expansionSum = expansion.sum()
+    impactEnv = (txArtifNouv * eco).sum()
 
     to_tif(urb, 'uint16', proj, geot, projectPath + 'urbanisation_' + str(finalYear) + '.tif')
+    to_tif(srfSol, 'uint16', proj, geot, projectPath + 'surface_sol_' + str(finalYear) + '.tif')
+    to_tif(srfPla, 'uint32', proj, geot, projectPath + 'surface_plancher_' + str(finalYear) + '.tif')
     to_tif(demographie, 'uint16', proj, geot, projectPath + 'demographie_' + str(finalYear) + '.tif')
+    to_tif(txArtifNouv, 'float32', proj, geot, projectPath + 'taux_artif_' + str(finalYear) + '.tif')
     to_tif(expansion, 'byte', proj, geot, projectPath + 'expansion.tif')
-    expansionSum = expansion.sum()
+    to_tif(srfSolNouv, 'uint16', proj, geot, projectPath + 'surface_sol_construite.tif')
+    to_tif(srfPlaNouv, 'uint32', proj, geot, projectPath + 'surface_plancher_construite.tif')
     to_tif(popNouv, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
-    popNouvCount = popNouv.sum()
-    log.write("Population logée, " + str(popNouvCount) + '\n')
 
+    mesures.write("Population non logée, " + str(nonLogee) + '\n')
     mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
-    mesures.write("Expansion totale en m2, " + str(expansionSum * cellSurf) + "\n")
+    mesures.write("Expansion au sol, " + str(srfSolNouv.sum()) + "\n")
+    mesures.write("Surface plancher construite, " + str(srfPlaNouv.sum()) + "\n")
+    mesures.write("Taux moyen d'artificialisation, " + str(txArtifMoyen) + "\n")
     mesures.write("Impact environnemental cumulé, " + str(impactEnv) + "\n")
-    mesures.write("Nombre de personnes final, " + str(demographie.sum()) + '\n')
-    mesures.write('Population non logée, ' + str(nonLogee))
+    log.write("Population logée : " + str(popNouvCount) + '\n')
+    log.write("Population non logée : " + str(nonLogee) + '\n')
+    log.write("Nombre de personnes final : " + str(demographie.sum()) + '\n')
 
     end_time = time()
     execTime = round(end_time - start_time, 2)
-    log.write("Temps d'execution, " + str(execTime))
-    print("\nFini en " + str(execTime) + ' secondes')
+    log.write("Temps d'execution : " + str(execTime))
+    print('\n' + str(execTime) + ' secondes')
 
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
     print("\n*** Error :")
     traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
-    log.write('\n*** Error :\n' + str(sys.exc_info()))
+    log.write('\n*** Error :\n' + str(sys.exc_info()[0]) + '\n' + str(sys.exc_info()[1]) + '\n' + str(sys.exc_info()[2]))
     log.close()
     sys.exit()
 
