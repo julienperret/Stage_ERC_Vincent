@@ -40,6 +40,8 @@ if len(sys.argv) > 4:
             finalYear = int(arg.split('=')[1])
         if 'buildNonRes' in arg:
             buildNonRes = literal_eval(arg.split('=')[1])
+        if 'densifyNonRes' in arg:
+            densifyNonRes = literal_eval(arg.split('=')[1])
         if 'maxBuiltRatio' in arg:
             maxBuiltRatio = float(arg.split('=')[1])
         if 'winSize' in arg:
@@ -65,6 +67,9 @@ if 'pluPriority' not in globals():
 # Pour simuler également la construction des surfaces non résidentielles
 if 'buildNonRes' not in globals():
     buildNonRes = True
+# Pour densifier le plancher partout, même si ce n'est pas du bâti résidentiel
+if 'densifyNonRes' not in globals():
+    densifyNonRes = False
 # Taux d'artificialisation maximum d'une cellule
 if 'maxBuiltRatio' not in globals():
     maxBuiltRatio = 80
@@ -199,8 +204,11 @@ def urbanize(pop, maxSrf=0, zau=False, ):
         srfSol += tmpSrfSol
         srfSolRes += tmpSrfSol
     # Densification de l'existant lorsque la surface construite au sol max est atteinte
-    if pop > 0:
-        tmpInteret = np.where((srfSolRes > 0) & (capaPla >= m2PlaHab) & (capaPla > 0), interet, 0)
+    if count < pop:
+        if densifyNonRes :
+            tmpInteret = np.where((urb == 1) & (capaPla >= m2PlaHab), interet, 0)
+        else:
+            tmpInteret = np.where((srfSolRes > 0) & (capaPla >= m2PlaHab), interet, 0)
         if zau:
             tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
         while count < pop and tmpInteret.sum() > 0:
@@ -232,6 +240,8 @@ try:
         projectPath += '_pluPrio'
     if buildNonRes :
         projectPath += '_buildNonRes'
+    if densifyNonRes :
+        projectPath += '_densifyNonRes'
     if maximumDensity :
         projectPath += '_maximumDensity'
     if finalYear != 2040:
@@ -259,6 +269,8 @@ try:
     pop09 = int(histPop['2009'])
     pop14 = int(histPop['2014'])
     evoPop = (pop14 - pop09) / pop09 / 5
+    if rate == -1.0:
+        rate = evoPop * 100
 
     dicPop = {}
     year = 2015
@@ -292,7 +304,7 @@ try:
         removedPlu = False
         pluPrio = to_array(dataDir + 'plu_priorite.tif')
         pluRest = to_array(dataDir + 'plu_restriction.tif')
-        restrictionNoPlu = restriction.copy()
+        restrictionNonPlu = restriction.copy()
         restriction = np.where(pluRest != 1, restriction, 1)
     else:
         hasPlu = False
@@ -301,15 +313,14 @@ try:
     demographie14 = to_array(dataDir + 'demographie_2014.tif', np.uint16)
     srfSol09 = to_array(dataDir + 'srf_sol_2009.tif', np.uint16)
     srfSol14 = to_array(dataDir + 'srf_sol_2014.tif', np.uint16)
-
     srfSolRes = to_array(dataDir + 'srf_sol_res.tif', np.uint16)
     ssrMed = to_array(dataDir + 'iris_ssr_med.tif', np.uint16)
-    if buildNonRes:
-        txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
     m2PlaHab = to_array(dataDir + 'iris_m2_hab.tif', np.uint16)
     srfPla14 = to_array(dataDir  + 'srf_pla.tif', np.uint32)
     nbNivMax = to_array(dataDir + 'iris_niv_max.tif', np.uint8)
     maxPla = to_array(dataDir + 'iris_srf_pla_' + seuilPla + '.tif', np.uint32)
+    if buildNonRes:
+        txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
     # Interets
     eco = to_array(dataDir + 'non-importance_ecologique.tif', np.float32)
     ocs = to_array(dataDir + 'occupation_sol.tif', np.float32)
@@ -360,7 +371,7 @@ try:
 
     log.write('Consommation de surface au sol par habitant en 2014 : ' + str(int(round(m2SolHab14))) + ' m²\n')
     log.write('Evolution annuelle moyenne de la surface au sol par habitant : ' + str(round(m2SolHabEvo * 100, 4)) + ' %\n')
-    log.write('Objectif en surface au sol max par habitant : ' + str(int(round(maxSrf))) + ' m²\n')
+    log.write('Seuil en surface au sol par habitant calculé : ' + str(int(round(maxSrf))) + ' m²\n')
 
     # Instantanés de la situation à t0
     to_tif(urb14, 'byte', proj, geot, projectPath + 'urbanisation_2014.tif')
@@ -413,7 +424,7 @@ try:
         print('\n' + str(nonLogee) + ' personnes non logées, on retire les restriction du PLU pour une dernière passe...')
         log.write('Surface au sol non construite avant retrait du PLU : ' + str(nonConstruit) + ' m²\n')
         log.write('Population non logée avant retrait du PLU : ' + str(nonLogee) + '\n')
-        restriction = restrictionNoPlu.copy()
+        restriction = restrictionNonPlu.copy()
         capaSol = np.zeros([rows, cols], np.uint32) + int(cellSurf * (maxBuiltRatio / 100))
         capaSol = np.where((restriction != 1) & (srfSol < capaSol), capaSol - srfSol, 0).astype(np.uint16)
         capaPla = np.where(srfPla <= maxPla, maxPla - srfPla, 0).astype(np.uint32)
