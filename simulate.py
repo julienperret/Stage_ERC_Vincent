@@ -220,8 +220,8 @@ def urbanize(pop, maxSrf=0, zau=False, ):
             else:
                 tmpInteret[row][col] = 0
 
-        srfPla += tmpSrfPla
-        demographie += np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16)
+    srfPla += tmpSrfPla
+    demographie += np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16)
     return (pop - count, maxSrf - built)
 
 try:
