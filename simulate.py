@@ -47,13 +47,13 @@ if len(sys.argv) > 4:
         if 'maxContig' in arg:
             maxContig = int(arg.split('=')[1])
 
-# *** Valeurs de paramètres par défaut
+### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
     finalYear = 2040
-# Scénarios concernants l'étalement, pour la région
+# Scénarios concernants l'étalement : tendanciel, stable, reduction
 if 'scenario' not in globals():
     scenario = 'tendanciel'
-# Seuil utilisé pour limiter la surface plancher construite, par IRIS. 'q3' ou 'max'
+# Seuil utilisé pour limiter la surface plancher par IRIS lors de la densification : 'q3' ou 'max'
 if 'seuilPla' not in globals():
     seuilPla = 'q3'
 # Pour artificialiser ou densifier la cellule au maximum de sa capacité
@@ -65,10 +65,10 @@ if 'pluPriority' not in globals():
 # Pour simuler également la construction des surfaces non résidentielles
 if 'buildNonRes' not in globals():
     buildNonRes = True
-# Taux d'artificialisation maximum des cellules
+# Taux d'artificialisation maximum d'une cellule
 if 'maxBuiltRatio' not in globals():
     maxBuiltRatio = 80
-# Paramètres pour les règles de contiguïtés; maxContig <= winSize²
+# Paramètres pour les règles de contiguïtés : maxContig <= winSize²
 if 'winSize' not in globals():
     winSize = 3
 if 'maxContig' not in globals():
@@ -140,7 +140,6 @@ def densify(mode, row, col):
     global capaSol, capaPla
     sS = 0
     sP = 0
-    # Densifier au sol : il faut penser au fait que parfois capaPla < capaSol
     if mode == 'sol':
         nivMin = 1
         nivMax = nbNivMax[row][col]
@@ -158,7 +157,6 @@ def densify(mode, row, col):
                 capaPla[row][col] -= sP
             else:
                 capaPla[row][col] = 0
-
     elif mode == 'pla':
         minV = m2PlaHab[row][col]
         maxV = capaPla[row][col]
@@ -288,10 +286,13 @@ try:
 
     # Préparation des restrictions et gestion du PLU
     restriction = to_array(dataDir + 'restriction_totale.tif')
+
     if os.path.exists(dataDir + 'plu_restriction.tif') and os.path.exists(dataDir + 'plu_priorite.tif'):
         hasPlu = True
+        removedPlu = False
         pluPrio = to_array(dataDir + 'plu_priorite.tif')
         pluRest = to_array(dataDir + 'plu_restriction.tif')
+        restrictionNoPlu = restriction.copy()
         restriction = np.where(pluRest != 1, restriction, 1)
     else:
         hasPlu = False
@@ -357,9 +358,9 @@ try:
             maxSrf -= m2SolHab14 * (0.75 / totalYears)
             year += 1
 
-    log.write('Consommation de surface au sol par habitant en 2014 : ' + str(m2SolHab14) + '\n')
-    log.write('Evolution annuelle moyenne de la surface au sol par habitant : ' + str(m2SolHabEvo) + '\n')
-    log.write('Objectif en surface au sol max par habitant : ' + str(maxSrf) + '\n')
+    log.write('Consommation de surface au sol par habitant en 2014 : ' + str(int(round(m2SolHab14))) + ' m²\n')
+    log.write('Evolution annuelle moyenne de la surface au sol par habitant : ' + str(round(m2SolHabEvo * 100, 4)) + ' %\n')
+    log.write('Objectif en surface au sol max par habitant : ' + str(int(round(maxSrf))) + ' m²\n')
 
     # Instantanés de la situation à t0
     to_tif(urb14, 'byte', proj, geot, projectPath + 'urbanisation_2014.tif')
@@ -369,15 +370,17 @@ try:
     to_tif(interet, 'float32', proj, geot, projectPath + 'interet_2014.tif')
     to_tif(ratioPlaSol14, 'float32', proj, geot, projectPath + 'ratio_pla_sol_2014.tif')
 
-    ##### Boucle principale #####
     start_time = time()
-    urb = urb14.copy()
+    ##### Boucle principale #####
+    demographie = demographie14.copy()
     srfSol = srfSol14.copy()
     srfPla = srfPla14.copy()
-    demographie = demographie14.copy()
+    urb = urb14.copy()
     preConstruit = 0
+    nonConstruit = 0
     preLogee = 0
     nonLogee = 0
+
     for year in range(2015, finalYear + 1):
         progres = "Année %i/%i" %(year, finalYear)
         printer(progres)
@@ -394,26 +397,45 @@ try:
         preConstruit = -resteSrf
         preLogee = -restePop
 
-        if year == finalYear:
-            if restePop > 0:
-                nonLogee = restePop
-            if resteSrf > 0:
-                nonConstruit = resteSrf
-
         # Snapshots
         to_tif(demographie, 'uint16', proj, geot, projectPath + 'snapshots/demographie/demo_' + str(year) + '.tif')
         to_tif(urb, 'byte', proj, geot, projectPath + 'snapshots/urbanisation/urb_' + str(year) + '.tif')
         to_tif(srfSol, 'uint16', proj, geot, projectPath + 'snapshots/surface_sol/sol_' + str(year) + '.tif')
         to_tif(srfPla, 'uint32', proj, geot, projectPath + 'snapshots/surface_plancher/plancher_' + str(year) + '.tif')
 
+    if restePop > 0:
+        nonLogee = int(round(restePop))
+    if resteSrf > 0:
+        nonConstruit = int(round(resteSrf))
+
+    if nonLogee > 0 and hasPlu:
+        removedPlu = True
+        print('\n' + str(nonLogee) + ' personnes non logées, on retire les restriction du PLU pour une dernière passe...')
+        log.write('Surface au sol non construite avant retrait du PLU : ' + str(nonConstruit) + ' m²\n')
+        log.write('Population non logée avant retrait du PLU : ' + str(nonLogee) + '\n')
+        restriction = restrictionNoPlu.copy()
+        capaSol = np.zeros([rows, cols], np.uint32) + int(cellSurf * (maxBuiltRatio / 100))
+        capaSol = np.where((restriction != 1) & (srfSol < capaSol), capaSol - srfSol, 0).astype(np.uint16)
+        capaPla = np.where(srfPla <= maxPla, maxPla - srfPla, 0).astype(np.uint32)
+        capaPla = np.where((restriction != 1) & (srfSolRes > 0), capaPla, 0)
+        restePop, resteSrf = urbanize(nonLogee, nonConstruit, False)
+        if restePop > 0:
+            nonLogee = int(round(restePop))
+        if resteSrf > 0:
+            nonConstruit = int(round(resteSrf))
+
+    end_time = time()
+    execTime = round(end_time - start_time, 2)
+    print('\nTerminé en ' + str(execTime) + ' secondes')
+
     # Calcul et export des résultats
     popNouv = demographie - demographieDep
     popNouvCount = popNouv.sum()
-    peuplementMoyen = np.nanmean(np.where(popNouv == 0, np.nan, popNouv))
+    peuplementMoyen = round(np.nanmean(np.where(popNouv == 0, np.nan, popNouv)), 3)
     srfSolNouv = srfSol - srfSol14
     srfPlaNouv = srfPla - srfPla14
     txArtifNouv = (srfSol / cellSurf).astype(np.float32)
-    txArtifMoyen = np.nanmean(np.where(txArtifNouv == 0, np.nan, txArtifNouv))
+    txArtifMoyen = round(np.nanmean(np.where(txArtifNouv == 0, np.nan, txArtifNouv)) * 100, 3)
     ratioPlaSol = np.where(srfSolRes != 0, srfPla / srfSolRes, 0).astype(np.float32)
     expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
     expansionSum = expansion.sum()
@@ -430,6 +452,8 @@ try:
     to_tif(srfPlaNouv, 'uint32', proj, geot, projectPath + 'surface_plancher_construite.tif')
     to_tif(popNouv, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
 
+    if hasPlu:
+        mesures.write("Suppression du PLU, " + str(removedPlu) + '\n')
     mesures.write("Population non logée, " + str(nonLogee) + '\n')
     mesures.write("Surface au sol non construite, " + str(nonConstruit) + '\n')
     mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
@@ -437,15 +461,11 @@ try:
     mesures.write("Surface plancher construite, " + str(srfPlaNouv.sum()) + "\n")
     mesures.write("Taux moyen d'artificialisation, " + str(txArtifMoyen) + "\n")
     mesures.write("Impact environnemental cumulé, " + str(impactEnv) + "\n")
-    log.write("Surface au sol non construite : " + str(nonConstruit) + '\n')
+    log.write("Surface au sol non construite finale : " + str(nonConstruit) + '\n')
+    log.write("Population non logée finale : " + str(nonLogee) + '\n')
     log.write("Population logée : " + str(popNouvCount) + '\n')
-    log.write("Population non logée : " + str(nonLogee) + '\n')
-    log.write("Nombre de personnes final : " + str(demographie.sum()) + '\n')
-
-    end_time = time()
-    execTime = round(end_time - start_time, 2)
+    log.write("Démographie définitive : " + str(demographie.sum()) + '\n')
     log.write("Temps d'execution : " + str(execTime))
-    print('\n' + str(execTime) + ' secondes')
 
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
