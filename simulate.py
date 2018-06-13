@@ -288,7 +288,7 @@ try:
     demographie14 = to_array(dataDir + 'demographie_14.tif', np.uint16)
     srfSol09 = to_array(dataDir + 'srf_sol_09.tif', np.uint16)
     srfSol14 = to_array(dataDir + 'srf_sol_14.tif', np.uint16)
-    txArtif = (srfSol14 / cellSurf).astype(np.float32)
+
     srfSolRes = to_array(dataDir + 'srf_sol_res.tif', np.uint16)
     ssrMed = to_array(dataDir + 'iris_ssr_med.tif', np.uint16)
     if buildNonRes:
@@ -321,6 +321,7 @@ try:
     m2SolHabEvo = (m2SolHab14 - m2SolHab09) / m2SolHab09 / 5
     srfSolNonRes = srfSol14 - srfSolRes
     ratioPlaSol = np.where(srfSolRes != 0, srfPla14 / srfSolRes, 0).astype(np.float32)
+    txArtif = (srfSol14 / cellSurf).astype(np.float32)
     # Création du dictionnaire pour nombre de m² ouverts à l'urbanisation par année
     dicSrf = {}
     maxSrf = m2SolHab14
@@ -329,6 +330,10 @@ try:
         maxSrf += maxSrf * m2SolHabEvo
         dicSrf[year] = int(round(maxSrf * dicPop[year]))
         year += 1
+
+    log.write('Consommation de surface au sol par habitant en 2014 : ' + str(m2SolHab14))
+    log.write('Evolution annuelle moyenne de la surface au sol par habitant : ' + str(m2SolHabEvo))
+    log.write('Objectif en surface au sol max par habitant : ' + str(dicSrf[finalYear]))
 
     # Instantanés de la situation à t0
     to_tif(urb14, 'byte', proj, geot, projectPath + 'urbanisation_14.tif')
