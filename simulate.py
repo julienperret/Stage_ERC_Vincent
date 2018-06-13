@@ -52,7 +52,7 @@ if 'finalYear' not in globals():
     finalYear = 2040
 # Scénarios concernants l'étalement, pour la région
 if 'scenario' not in globals():
-    scenario == 'tendanciel'
+    scenario = 'tendanciel'
 # Seuil utilisé pour limiter la surface plancher construite, par IRIS. 'q3' ou 'max'
 if 'seuilPla' not in globals():
     seuilPla = 'q3'
@@ -180,7 +180,7 @@ def urbanize(pop, maxSrf=0, zau=False, ):
     built = 0
     # Expansion pas ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
     if maxSrf > 0:
-        tmpInteret = np.where(capaSol > 0, interet, 0)
+        tmpInteret = np.where((capaSol >= ssrMed) | (capaSol >= m2PlaHab), interet, 0)
         if zau:
             tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
         while built < maxSrf and count < pop and tmpInteret.sum() > 0:
@@ -191,27 +191,31 @@ def urbanize(pop, maxSrf=0, zau=False, ):
                 sS, sP = expand(row, col)
             else:
                 sS, sP = densify('sol', row, col)
-            built += sS
-            tmpSrfSol[row][col] += sS
-            if capaSol[row][col] == 0:
+            if sS > 0 and sP > 0:
+                built += sS
+                tmpSrfSol[row][col] += sS
+                tmpSrfPla[row][col] += sP
+                count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+            else:
                 tmpInteret[row][col] = 0
-            tmpSrfPla[row][col] += sP
-            count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
         srfSol += tmpSrfSol
         srfSolRes += tmpSrfSol
     # Densification de l'existant lorsque la surface construite au sol max est atteinte
-    tmpInteret = np.where((urb == 1) & (capaPla > 0), interet, 0)
-    if zau:
-        tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
-    while count < pop and tmpInteret.sum() > 0:
-        srf = 0
-        row, col = choose(tmpInteret)
-        _, sP = densify('pla', row, col)
-        if sP > 0:
-            tmpSrfPla[row][col] += sP
-            count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
-    srfPla += tmpSrfPla
-    demographie += np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16)
+    if pop > 0:
+        tmpInteret = np.where((srfSolRes > 0) & (capaPla >= m2PlaHab) & (capaPla > 0), interet, 0)
+        if zau:
+            tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
+        while count < pop and tmpInteret.sum() > 0:
+            row, col = choose(tmpInteret)
+            _, sP = densify('pla', row, col)
+            if sP > 0:
+                tmpSrfPla[row][col] += sP
+                count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+            else:
+                tmpInteret[row][col] = 0
+
+        srfPla += tmpSrfPla
+        demographie += np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16)
     return (pop - count, maxSrf - built)
 
 try:
@@ -225,7 +229,7 @@ try:
     cellSurf = pixSize * pixSize
     ds = None
 
-    projectPath = outputDir + str(pixSize) + 'm' + '_tx' + str(rate) + '_buildRatio' + str(maxBuiltRatio)
+    projectPath = outputDir + str(pixSize) + 'm' + '_tx' + str(rate) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
     if pluPriority:
         projectPath += '_pluPrio'
     if buildNonRes :
@@ -294,7 +298,7 @@ try:
 
     # Déclaration des matrices
     demographie14 = to_array(dataDir + 'demographie_2014.tif', np.uint16)
-    srfSol09 = to_array(dataDir + 'srf_sol_09.tif', np.uint16)
+    srfSol09 = to_array(dataDir + 'srf_sol_2009.tif', np.uint16)
     srfSol14 = to_array(dataDir + 'srf_sol_2014.tif', np.uint16)
 
     srfSolRes = to_array(dataDir + 'srf_sol_res.tif', np.uint16)
@@ -328,7 +332,7 @@ try:
     m2SolHab14 = srfSol14.sum() / pop14
     m2SolHabEvo = (m2SolHab14 - m2SolHab09) / m2SolHab09 / 5
     srfSolNonRes = srfSol14 - srfSolRes
-    ratioPlaSol = np.where(srfSolRes != 0, srfPla14 / srfSolRes, 0).astype(np.float32)
+    ratioPlaSol14 = np.where(srfSolRes != 0, srfPla14 / srfSolRes, 0).astype(np.float32)
     txArtif = (srfSol14 / cellSurf).astype(np.float32)
     # Création du dictionnaire pour nombre de m² ouverts à l'urbanisation par année
     dicSrf = {}
@@ -336,18 +340,22 @@ try:
     year = 2015
     if scenario == 'tendanciel':
         maxSrf = m2SolHab14
-        while year <= finalYear:
+        while year <= finalYear :
             maxSrf += maxSrf * m2SolHabEvo
-            dicSrf[year] = int(round(maxSrf * dicPop[year]))
+            dicSrf[year] = int(round(maxSrf) * dicPop[year])
             year += 1
     elif scenario == 'stable':
         maxSrf = m2SolHab14
-        while year <= finalYear:
-            dicSrf[year] = int(round(maxSrf * dicPop[year]))
+        while year <= finalYear :
+            dicSrf[year] = int(round(maxSrf) * dicPop[year])
             year += 1
     elif scenario == 'reduction':
-        pass
-        # ici, impémenter le "facteur 4"
+        maxSrf = m2SolHab14
+        totalYears = finalYear - year
+        while year <= finalYear :
+            dicSrf[year] = int(round(maxSrf) * dicPop[year])
+            maxSrf -= m2SolHab14 * (0.75 / totalYears)
+            year += 1
 
     log.write('Consommation de surface au sol par habitant en 2014 : ' + str(m2SolHab14) + '\n')
     log.write('Evolution annuelle moyenne de la surface au sol par habitant : ' + str(m2SolHabEvo) + '\n')
@@ -359,7 +367,7 @@ try:
     to_tif(capaPla, 'uint32', proj, geot, projectPath + 'capacite_plancher_2014.tif')
     to_tif(txArtif, 'float32', proj, geot, projectPath + 'taux_artif_2014.tif')
     to_tif(interet, 'float32', proj, geot, projectPath + 'interet_2014.tif')
-    to_tif(ratioPlaSol, 'float32', proj, geot, projectPath + 'ratio_pla_sol_2014.tif')
+    to_tif(ratioPlaSol14, 'float32', proj, geot, projectPath + 'ratio_pla_sol_2014.tif')
 
     ##### Boucle principale #####
     start_time = time()
@@ -377,16 +385,21 @@ try:
         maxSrf = dicSrf[year]
         if hasPlu and pluPriority:
             restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preConstruit,  True)
-            if resteSrf > 0:
+            if resteSrf > 0 and restePop > 0:
                 restePop, resteSrf = urbanize(restePop, resteSrf)
-            if restePop > 0:
+            elif restePop > 0:
                 restePop, _ = urbanize(restePop)
         else:
             restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preConstruit)
         preConstruit = -resteSrf
         preLogee = -restePop
-        if restePop > 0 and year == finalYear:
-            nonLogee = restePop
+
+        if year == finalYear:
+            if restePop > 0:
+                nonLogee = restePop
+            if resteSrf > 0:
+                nonConstruit = resteSrf
+
         # Snapshots
         to_tif(demographie, 'uint16', proj, geot, projectPath + 'snapshots/demographie/demo_' + str(year) + '.tif')
         to_tif(urb, 'byte', proj, geot, projectPath + 'snapshots/urbanisation/urb_' + str(year) + '.tif')
@@ -401,6 +414,7 @@ try:
     srfPlaNouv = srfPla - srfPla14
     txArtifNouv = (srfSol / cellSurf).astype(np.float32)
     txArtifMoyen = np.nanmean(np.where(txArtifNouv == 0, np.nan, txArtifNouv))
+    ratioPlaSol = np.where(srfSolRes != 0, srfPla / srfSolRes, 0).astype(np.float32)
     expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
     expansionSum = expansion.sum()
     impactEnv = (txArtifNouv * eco).sum()
@@ -410,17 +424,20 @@ try:
     to_tif(srfPla, 'uint32', proj, geot, projectPath + 'surface_plancher_' + str(finalYear) + '.tif')
     to_tif(demographie, 'uint16', proj, geot, projectPath + 'demographie_' + str(finalYear) + '.tif')
     to_tif(txArtifNouv, 'float32', proj, geot, projectPath + 'taux_artif_' + str(finalYear) + '.tif')
+    to_tif(ratioPlaSol, 'float32', proj, geot, projectPath + 'ratio_pla_sol_' + str(finalYear) + '.tif')
     to_tif(expansion, 'byte', proj, geot, projectPath + 'expansion.tif')
     to_tif(srfSolNouv, 'uint16', proj, geot, projectPath + 'surface_sol_construite.tif')
     to_tif(srfPlaNouv, 'uint32', proj, geot, projectPath + 'surface_plancher_construite.tif')
     to_tif(popNouv, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
 
     mesures.write("Population non logée, " + str(nonLogee) + '\n')
+    mesures.write("Surface au sol non construite, " + str(nonConstruit) + '\n')
     mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
     mesures.write("Expansion au sol, " + str(srfSolNouv.sum()) + "\n")
     mesures.write("Surface plancher construite, " + str(srfPlaNouv.sum()) + "\n")
     mesures.write("Taux moyen d'artificialisation, " + str(txArtifMoyen) + "\n")
     mesures.write("Impact environnemental cumulé, " + str(impactEnv) + "\n")
+    log.write("Surface au sol non construite : " + str(nonConstruit) + '\n')
     log.write("Population logée : " + str(popNouvCount) + '\n')
     log.write("Population non logée : " + str(nonLogee) + '\n')
     log.write("Nombre de personnes final : " + str(demographie.sum()) + '\n')
