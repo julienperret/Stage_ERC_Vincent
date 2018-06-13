@@ -331,9 +331,9 @@ try:
         dicSrf[year] = int(round(maxSrf * dicPop[year]))
         year += 1
 
-    log.write('Consommation de surface au sol par habitant en 2014 : ' + str(m2SolHab14))
-    log.write('Evolution annuelle moyenne de la surface au sol par habitant : ' + str(m2SolHabEvo))
-    log.write('Objectif en surface au sol max par habitant : ' + str(dicSrf[finalYear]))
+    log.write('Consommation de surface au sol par habitant en 2014 : ' + str(m2SolHab14) + '\n')
+    log.write('Evolution annuelle moyenne de la surface au sol par habitant : ' + str(m2SolHabEvo) + '\n')
+    log.write('Objectif en surface au sol max par habitant : ' + str(dicSrf[finalYear]) + '\n')
 
     # Instantanés de la situation à t0
     to_tif(urb14, 'byte', proj, geot, projectPath + 'urbanisation_14.tif')
