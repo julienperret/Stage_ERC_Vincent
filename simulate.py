@@ -25,6 +25,11 @@ if rate > 3:
 if len(sys.argv) > 4:
     argList = sys.argv[4].split()
     for arg in argList:
+        if 'scenario' in arg:
+            scenario = arg.split('=')[1]
+            if scenario not in ['tendanciel', 'stable', 'reduction']:
+                print('Erreur : le scénario doit être tendanciel, stable ou reduction.')
+                sys.exit()
         if 'seuilPla' in arg:
             seuilPla = arg.split('=')[1]
         if 'maximumDensity' in arg:
@@ -45,6 +50,9 @@ if len(sys.argv) > 4:
 # *** Valeurs de paramètres par défaut
 if 'finalYear' not in globals():
     finalYear = 2040
+# Scénarios concernants l'étalement, pour la région
+if 'scenario' not in globals():
+    scenario == 'tendanciel'
 # Seuil utilisé pour limiter la surface plancher construite, par IRIS. 'q3' ou 'max'
 if 'seuilPla' not in globals():
     seuilPla = 'q3'
@@ -208,7 +216,7 @@ def urbanize(pop, maxSrf=0, zau=False, ):
 
 try:
     # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-    ds = gdal.Open(dataDir + 'demographie_14.tif')
+    ds = gdal.Open(dataDir + 'demographie_2014.tif')
     demographieDep = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
     cols, rows = demographieDep.shape[1], demographieDep.shape[0] # x, y
     proj = ds.GetProjection()
@@ -285,9 +293,9 @@ try:
         hasPlu = False
 
     # Déclaration des matrices
-    demographie14 = to_array(dataDir + 'demographie_14.tif', np.uint16)
+    demographie14 = to_array(dataDir + 'demographie_2014.tif', np.uint16)
     srfSol09 = to_array(dataDir + 'srf_sol_09.tif', np.uint16)
-    srfSol14 = to_array(dataDir + 'srf_sol_14.tif', np.uint16)
+    srfSol14 = to_array(dataDir + 'srf_sol_2014.tif', np.uint16)
 
     srfSolRes = to_array(dataDir + 'srf_sol_res.tif', np.uint16)
     ssrMed = to_array(dataDir + 'iris_ssr_med.tif', np.uint16)
@@ -324,24 +332,34 @@ try:
     txArtif = (srfSol14 / cellSurf).astype(np.float32)
     # Création du dictionnaire pour nombre de m² ouverts à l'urbanisation par année
     dicSrf = {}
-    maxSrf = m2SolHab14
+
     year = 2015
-    while year <= finalYear:
-        maxSrf += maxSrf * m2SolHabEvo
-        dicSrf[year] = int(round(maxSrf * dicPop[year]))
-        year += 1
+    if scenario == 'tendanciel':
+        maxSrf = m2SolHab14
+        while year <= finalYear:
+            maxSrf += maxSrf * m2SolHabEvo
+            dicSrf[year] = int(round(maxSrf * dicPop[year]))
+            year += 1
+    elif scenario == 'stable':
+        maxSrf = m2SolHab14
+        while year <= finalYear:
+            dicSrf[year] = int(round(maxSrf * dicPop[year]))
+            year += 1
+    elif scenario == 'reduction':
+        pass
+        # ici, impémenter le "facteur 4"
 
     log.write('Consommation de surface au sol par habitant en 2014 : ' + str(m2SolHab14) + '\n')
     log.write('Evolution annuelle moyenne de la surface au sol par habitant : ' + str(m2SolHabEvo) + '\n')
-    log.write('Objectif en surface au sol max par habitant : ' + str(dicSrf[finalYear]) + '\n')
+    log.write('Objectif en surface au sol max par habitant : ' + str(maxSrf) + '\n')
 
     # Instantanés de la situation à t0
-    to_tif(urb14, 'byte', proj, geot, projectPath + 'urbanisation_14.tif')
-    to_tif(capaSol, 'uint16', proj, geot, projectPath + 'capacite_sol_14.tif')
-    to_tif(capaPla, 'uint32', proj, geot, projectPath + 'capacite_plancher_14.tif')
-    to_tif(txArtif, 'float32', proj, geot, projectPath + 'taux_artif_14.tif')
-    to_tif(interet, 'float32', proj, geot, projectPath + 'interet_14.tif')
-    to_tif(ratioPlaSol, 'float32', proj, geot, projectPath + 'ratio_pla_sol_14.tif')
+    to_tif(urb14, 'byte', proj, geot, projectPath + 'urbanisation_2014.tif')
+    to_tif(capaSol, 'uint16', proj, geot, projectPath + 'capacite_sol_2014.tif')
+    to_tif(capaPla, 'uint32', proj, geot, projectPath + 'capacite_plancher_2014.tif')
+    to_tif(txArtif, 'float32', proj, geot, projectPath + 'taux_artif_2014.tif')
+    to_tif(interet, 'float32', proj, geot, projectPath + 'interet_2014.tif')
+    to_tif(ratioPlaSol, 'float32', proj, geot, projectPath + 'ratio_pla_sol_2014.tif')
 
     ##### Boucle principale #####
     start_time = time()
@@ -372,8 +390,8 @@ try:
         # Snapshots
         to_tif(demographie, 'uint16', proj, geot, projectPath + 'snapshots/demographie/demo_' + str(year) + '.tif')
         to_tif(urb, 'byte', proj, geot, projectPath + 'snapshots/urbanisation/urb_' + str(year) + '.tif')
-        to_tif(srfSol, 'uint16', proj, geot, projectPath + 'snapshots/surface_sol/srf_sol_' + str(year) + '.tif')
-        to_tif(srfPla, 'uint32', proj, geot, projectPath + 'snapshots/surface_plancher/srf_pla_' + str(year) + '.tif')
+        to_tif(srfSol, 'uint16', proj, geot, projectPath + 'snapshots/surface_sol/sol_' + str(year) + '.tif')
+        to_tif(srfPla, 'uint32', proj, geot, projectPath + 'snapshots/surface_plancher/plancher_' + str(year) + '.tif')
 
     # Calcul et export des résultats
     popNouv = demographie - demographieDep

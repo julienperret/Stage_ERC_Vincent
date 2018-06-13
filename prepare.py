@@ -1336,11 +1336,11 @@ try:
 
     # Rasterisations
     argList = [
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'demographie_14.tif', 'pop'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'demographie_2014.tif', 'pop'),
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_pla.tif', 'srf_pla'),
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_res.tif', 'ssol_res'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_09.tif', 'ssol_09'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_14.tif', 'ssol_14'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_2009.tif', 'ssol_09'),
+        (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_2014.tif', 'ssol_14'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_ssr_med.tif', 'ssr_med'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_tx_ssr.tif', 'tx_ssr'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_max.tif', 'niv_max'),
@@ -1360,7 +1360,7 @@ try:
             rasterize(*a)
 
     # Création des variables GDAL indispensables pour la fonction to_tif()
-    ds = gdal.Open(projectPath + 'demographie_14.tif')
+    ds = gdal.Open(projectPath + 'demographie_2014.tif')
     proj = ds.GetProjection()
     geot = ds.GetGeoTransform()
     ds = None
