@@ -10,16 +10,27 @@ from toolbox import slashify, to_array
 
 inDir = slashify(sys.argv[1])
 outDir = slashify(sys.argv[2])
-if len(sys.argv) > 3:
-    argStr = sys.argv[3].split()
+dType = sys.argv[3]
+if len(sys.argv) > 4:
+    argStr = sys.argv[4].split()
     for arg in argStr:
         if 'maxValue' in arg:
             maxValue = int(arg.split('=')[1])
         if 'delay' in arg:
             delay = arg.split('=')[1]
 
-if 'delay' not in globals():
-    delay = str(len(os.listdir(inDir)))
+if dType == 'byte':
+    npType = np.int8
+    highValue = 2 ** 8 - 1
+elif dType == 'uint16':
+    npType = np.uint16
+    highValue = 2 ** 16 - 1
+elif dType == 'uint32':
+    npType = np.uint32
+    highValue = 2 ** 32 - 1
+elif Dtype == 'float32':
+    npType = np.float32
+    highValue = (2 - 2 ** -23) * 2 ** 127
 
 def to_tif(array, dtype, path):
     cols, rows = array.shape[1], array.shape[0] # x, y
@@ -30,6 +41,8 @@ def to_tif(array, dtype, path):
         dtype = gdal.GDT_Float32
     elif dtype == 'uint16':
         dtype = gdal.GDT_UInt16
+    elif dtype == 'uint32':
+        dtype = gdal.GDT_UInt32
     else :
         dtype = gdal.GDT_Unknown
     ds_out = driver.Create(path, cols, rows, 1, dtype)
@@ -38,24 +51,32 @@ def to_tif(array, dtype, path):
 
 try:
     # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-    ds = gdal.Open(inDir + 'pop_2040.tif')
-    population = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
+    ds = gdal.Open(inDir + os.listdir(inDir)[len(os.listdir())-1])
+    tif = ds.GetRasterBand(1).ReadAsArray().astype(npType)
     driver = gdal.GetDriverByName('GTiff')
     ds = None
 
+    if 'delay' not in globals():
+        delay = str(len(os.listdir(inDir)))
     if 'maxValue' not in globals():
-        maxValue = population.max()
-    del population
+        maxValue = tif.max()
 
-    os.mkdir(outDir + 'tmp')
-    for tifPath in os.listdir(inDir):
-        if os.path.splitext(tifPath)[1] == '.tif':
-            basename = os.path.splitext(tifPath.split('/')[len(tifPath.split('/'))-1])[0]
-            array = to_array(inDir + '/' + tifPath, np.uint32)
-            array = (array * 65535 / maxValue).astype(np.uint16)
-            to_tif(array, 'uint16', outDir + '/tmp/' + basename + '.tif')
+    os.makedirs(outDir + 'tmp')
+    for tif in os.listdir(inDir):
+        if os.path.splitext(tif)[1] == '.tif':
+            basename = os.path.splitext(tif.split('/')[len(tif.split('/'))-1])[0]
+            if dType == 'float32':
+                array = to_array(inDir + '/' + tif, np.float64)
+                array = (array * highValue / maxValue).astype(npType)
+            elif 'uint' in dType:
+                array = to_array(inDir + '/' + tif, np.uint64)
+                array = (array * highValue / maxValue).astype(npType)
+            elif dType == 'byte':
+                array = to_array(inDir + '/' + tif, np.uint8)
+                array = (array * highValue / maxValue).astype(npType)
+            to_tif(array, dType, outDir + '/tmp/' + basename + '.tif')
 
-    os.system('convert -delay ' + delay + ' -loop 0 ' + outDir + 'tmp/*.tif ' + outDir + 'evo_demo.gif')
+    os.system('convert -delay ' + delay + ' -loop 0 ' + outDir + 'tmp/*.tif ' + outDir + 'evo_' + basename.split('_')[0] + '.gif')
     rmtree(outDir + 'tmp')
 
 except:
