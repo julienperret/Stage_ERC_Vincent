@@ -120,7 +120,10 @@ def expand(row, col):
     s = 0
     if maxV > minV:
         if slidingWin(urb, row, col, winSize, 'sum') <= maxContig:
-            s = np.random.randint(minV, maxV + 1)
+            if maximumDensity:
+                s = maxV
+            else:
+                s = np.random.randint(minV, maxV + 1)
             capaSol[row][col] -= s
             urb[row][col] = 1
     return s
@@ -146,7 +149,10 @@ def densify(mode, row, col):
         minV = ssrMed[row][col]
         maxV = capaSol[row][col]
         if maxV > minV:
-            s = np.random.randint(minV, maxV + 1)
+            if maximumDensity:
+                s = maxV
+            else:
+                s = np.random.randint(minV, maxV + 1)
             capaSol[row][col] -= s
 
     elif mode == 'height':
@@ -200,7 +206,7 @@ def urbanize(pop, maxSrf=0, zau=False):
 
         srfSol += tmpSrfSol
         if buildNonRes:
-            tmpSrfSol *= txSsr
+            tmpSrfSol = (tmpSrfSol * txSsr).round().astype(np.uint16)
             newBuilds += tmpSrfSol
             srfSolRes += tmpSrfSol
 
