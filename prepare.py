@@ -921,8 +921,8 @@ try:
                 error = "Attribut requis 'importance' manquant ou mal nommé dans la couche d'importance écologique"
                 if not silent:
                     print(error)
-                else:
-                    log.write('Erreur : ' + error)
+                log.write('Erreur : ' + error)
+                log.close()
                 sys.exit()
             ecologie.addExpressionField('"importance"/100', QgsField('taux', QVariant.Double))
 
