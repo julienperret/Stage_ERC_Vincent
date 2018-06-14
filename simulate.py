@@ -77,7 +77,7 @@ if 'maxBuiltRatio' not in globals():
 if 'winSize' not in globals():
     winSize = 3
 if 'maxContig' not in globals():
-    maxContig = 6
+    maxContig = 5
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
 def choose(weight, size=1):
@@ -198,9 +198,11 @@ def urbanize(pop, maxSrf=0, zau=False):
                     else:
                         tmpInteret[row][col] = 0
 
-        newBuilds += tmpSrfSol
         srfSol += tmpSrfSol
-        srfSolRes += tmpSrfSol
+        if buildNonRes:
+            tmpSrfSol *= txSsr
+            newBuilds += tmpSrfSol
+            srfSolRes += tmpSrfSol
 
     # Construction de la surface plancher dans les cellules nouvellement urbanisées
     if built >= maxSrf:
@@ -215,7 +217,7 @@ def urbanize(pop, maxSrf=0, zau=False):
                 tmpInteret[row][col] = 0
 
         # Densification du bâti existant si on n'a pas pu loger tout le monde
-        if pop < count and densifyOld:
+        if count < pop and densifyOld:
             tmpInteret = np.where((urb == 1) & (capaPla > 0), interet, 0)
             while count < pop and tmpInteret.sum() > 0:
                 row, col = choose(tmpInteret)
@@ -426,22 +428,6 @@ try:
     if resteSrf > 0:
         nonConstruit = int(round(resteSrf))
 
-    if nonLogee > 0 and hasPlu:
-        removedPlu = True
-        print('\n' + str(nonLogee) + ' personnes non logées, on retire les restriction du PLU pour une dernière passe...')
-        log.write('Surface au sol non construite avant retrait du PLU : ' + str(nonConstruit) + ' m²\n')
-        log.write('Population non logée avant retrait du PLU : ' + str(nonLogee) + '\n')
-        restriction = restrictionNonPlu.copy()
-        capaSol = np.zeros([rows, cols], np.uint32) + int(cellSurf * (maxBuiltRatio / 100))
-        capaSol = np.where((restriction != 1) & (srfSol < capaSol), capaSol - srfSol, 0).astype(np.uint16)
-        capaPla = np.where(srfPla <= maxPla, maxPla - srfPla, 0).astype(np.uint32)
-        capaPla = np.where((restriction != 1), capaPla, 0)
-        restePop, resteSrf = urbanize(nonLogee, nonConstruit, False)
-        if restePop > 0:
-            nonLogee = int(round(restePop))
-        if resteSrf > 0:
-            nonConstruit = int(round(resteSrf))
-
     end_time = time()
     execTime = round(end_time - start_time, 2)
     print('\nTerminé en ' + str(execTime) + ' secondes')
@@ -477,24 +463,21 @@ try:
     mesures.write("Cellules ouvertes à l'urbanisation, " + str(expansion.sum()) + "\n")
     mesures.write("Taux moyen d'artificialisation, " + str(txArtifMoyen) + "\n")
     mesures.write("Impact environnemental cumulé, " + str(impactEnv) + "\n")
-    log.write("Surface au sol non construite finale : " + str(nonConstruit) + '\n')
-    log.write("Population non logée finale : " + str(nonLogee) + '\n')
+    log.write("Surface au sol non construite : " + str(nonConstruit) + '\n')
+    log.write("Population non logée : " + str(nonLogee) + '\n')
     log.write("Population logée : " + str(popNouvCount) + '\n')
     log.write("Démographie définitive : " + str(demographie.sum()) + '\n')
     log.write("Temps d'execution : " + str(execTime))
 
     if densifyGround:
         densificationSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
-        to_tif(densificationSol, 'byte', proj, geot, projectPath + 'densification.tif')
+        to_tif(densificationSol, 'byte', proj, geot, projectPath + 'densification_sol.tif')
         mesures.write("Cellules densifiées au sol, " + str(densificationSol.sum()) + "\n")
 
     if densifyOld:
         densificationPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
-        to_tif(densificationPla, 'byte', proj, geot, projectPath + 'densification.tif')
+        to_tif(densificationPla, 'byte', proj, geot, projectPath + 'densification_plancher.tif')
         mesures.write("Cellules densifiées au plancher, " + str(densificationPla.sum()) + "\n")
-
-    if hasPlu:
-        mesures.write("Suppression du PLU, " + str(removedPlu) + '\n')
 
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
