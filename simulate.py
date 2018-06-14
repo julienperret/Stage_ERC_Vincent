@@ -315,7 +315,7 @@ try:
 
     # Préparation des restrictions et gestion du PLU
     restriction = to_array(dataDir + 'interet/restriction_totale.tif')
-    if os.path.exists(dataDir + 'interet/plu_restriction.tif') and os.path.exists(dataDir + 'plu_priorite.tif'):
+    if os.path.exists(dataDir + 'interet/plu_restriction.tif') and os.path.exists(dataDir + 'interet/plu_priorite.tif'):
         hasPlu = True
         removedPlu = False
         pluPrio = to_array(dataDir + 'interet/plu_priorite.tif')
