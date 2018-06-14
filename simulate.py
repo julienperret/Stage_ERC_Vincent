@@ -302,13 +302,13 @@ try:
     log.write("Population à loger d'ici à " + str(finalYear) + " : " + str(sumPopALoger) + "\n")
 
     # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
-    with open(dataDir + 'poids.csv') as r:
+    with open(dataDir + 'interet/poids.csv') as r:
         reader = csv.reader(r)
         next(reader, None)
         poids = {rows[0]:int(rows[1]) for rows in reader}
 
     coef = {}
-    with open(projectPath + 'coefficients.csv', 'x') as w:
+    with open(projectPath + 'coefficients_interet.csv', 'x') as w:
         for key in poids:
             coef[key] = poids[key] / sum(poids.values())
             w.write(key + ', ' + str(coef[key]) + '\n')
