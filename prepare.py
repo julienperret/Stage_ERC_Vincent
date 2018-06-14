@@ -371,13 +371,6 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
     params = {
         'INPUT': buildings,
-        'VALUES_FIELD_NAME': 'NB_NIV',
-        'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-        'OUTPUT': outdir + 'csv/iris_nb_niv.csv'
-    }
-    processing.run('qgis:statisticsbycategories', params, feedback=feedback)
-    params = {
-        'INPUT': buildings,
         'VALUES_FIELD_NAME': 'nb_m2_hab',
         'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
         'OUTPUT': outdir + 'csv/iris_m2_hab.csv'
@@ -417,7 +410,6 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
 
     # Correction et changement de nom pour jointure des stat sur la grille et les IRIS
     csvIplanch = QgsVectorLayer(outdir + 'csv/iris_srf_pla.csv')
-    csvIplanch.addExpressionField('round(to_real("q3"))', QgsField('spl_q3', QVariant.Int))
     csvIplanch.addExpressionField('round(to_real("max"))', QgsField('spl_max', QVariant.Int))
     csvIplanch.addExpressionField('round(to_real("sum"))', QgsField('spl_sum', QVariant.Int))
     csvIris.append(csvIplanch)
@@ -434,13 +426,6 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     csvGssol = QgsVectorLayer(outdir + 'csv/grid_ssr.csv')
     csvGssol.addExpressionField('round(to_real("sum"))', QgsField('ssol_res', QVariant.Int))
     csvGrid.append(csvGssol)
-
-    csvIniv = QgsVectorLayer(outdir + 'csv/iris_nb_niv.csv')
-    csvIniv.addExpressionField('to_real("mean")', QgsField('niv_mean', QVariant.Double))
-    csvIniv.addExpressionField('to_int("median")', QgsField('niv_med', QVariant.Int))
-    csvIniv.addExpressionField('to_real("q3")', QgsField('niv_q3', QVariant.Double))
-    csvIniv.addExpressionField('to_int("max")', QgsField('niv_max', QVariant.Int))
-    csvIris.append(csvIniv)
 
     csvIm2 = QgsVectorLayer(outdir + 'csv/iris_m2_hab.csv')
     csvIm2.addExpressionField('round(to_real("mean"))', QgsField('m2_hab', QVariant.Int))
@@ -1343,8 +1328,6 @@ try:
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'srf_sol_2014.tif', 'ssol_14'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_ssr_med.tif', 'ssr_med'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_tx_ssr.tif', 'tx_ssr'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_niv_max.tif', 'niv_max'),
-        (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_q3.tif', 'spl_q3'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_max.tif', 'spl_max'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_m2_hab.tif', 'm2_hab'),
         (workspacePath + 'data/ocsol.shp', projectPath + 'occupation_sol.tif', 'interet')
