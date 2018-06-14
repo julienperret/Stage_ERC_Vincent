@@ -46,6 +46,8 @@ if len(sys.argv) > 4:
             maxBuiltRatio = float(arg.split('=')[1])
         if 'winSize' in arg:
             winSize = int(arg.split('=')[1])
+        if 'minContig' in arg:
+            minContig = int(arg.split('=')[1])
         if 'maxContig' in arg:
             maxContig = int(arg.split('=')[1])
 
@@ -73,9 +75,11 @@ if 'maximumDensity' not in globals():
 # Taux d'artificialisation maximum d'une cellule
 if 'maxBuiltRatio' not in globals():
     maxBuiltRatio = 80
-# Paramètres pour les règles de contiguïtés : maxContig <= winSize²
+# Paramètres pour les règles de contiguïtés : minContig < winSize² > maxContig
 if 'winSize' not in globals():
     winSize = 3
+if 'minContig' not in globals():
+    minContig = 1
 if 'maxContig' not in globals():
     maxContig = 5
 
@@ -119,7 +123,8 @@ def expand(row, col):
     maxV = capaSol[row][col]
     s = 0
     if maxV > minV:
-        if slidingWin(urb, row, col, winSize, 'sum') <= maxContig:
+        sumContig = slidingWin(urb, row, col, winSize, 'sum')
+        if minContig < sumContig <= maxContig:
             if maximumDensity:
                 s = maxV
             else:
