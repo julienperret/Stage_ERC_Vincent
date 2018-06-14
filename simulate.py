@@ -30,18 +30,18 @@ if len(sys.argv) > 4:
             if scenario not in ['tendanciel', 'stable', 'reduction']:
                 print('Erreur : le scénario doit être tendanciel, stable ou reduction.')
                 sys.exit()
-        if 'seuilPla' in arg:
-            seuilPla = arg.split('=')[1]
-        if 'maximumDensity' in arg:
-            maximumDensity = literal_eval(arg.split('=')[1])
         if 'pluPriority' in arg:
             pluPriority = literal_eval(arg.split('=')[1])
         if 'finalYear' in arg:
             finalYear = int(arg.split('=')[1])
         if 'buildNonRes' in arg:
             buildNonRes = literal_eval(arg.split('=')[1])
-        if 'densifyNonRes' in arg:
-            densifyNonRes = literal_eval(arg.split('=')[1])
+        if 'densifyGround' in arg:
+            densifyGround = literal_eval(arg.split('=')[1])
+        if 'densifyOld' in arg:
+            densifyOld = literal_eval(arg.split('=')[1])
+        if 'maximumDensity' in arg:
+            maximumDensity = literal_eval(arg.split('=')[1])
         if 'maxBuiltRatio' in arg:
             maxBuiltRatio = float(arg.split('=')[1])
         if 'winSize' in arg:
@@ -55,21 +55,21 @@ if 'finalYear' not in globals():
 # Scénarios concernants l'étalement : tendanciel, stable, reduction
 if 'scenario' not in globals():
     scenario = 'tendanciel'
-# Seuil utilisé pour limiter la surface plancher par IRIS lors de la densification : 'q3' ou 'max'
-if 'seuilPla' not in globals():
-    seuilPla = 'q3'
-# Pour artificialiser ou densifier la cellule au maximum de sa capacité
-if 'maximumDensity' not in globals():
-    maximumDensity = False
 # Priorité aux ZAU
 if 'pluPriority' not in globals():
     pluPriority = True
 # Pour simuler également la construction des surfaces non résidentielles
 if 'buildNonRes' not in globals():
     buildNonRes = True
-# Pour densifier le plancher partout, même si ce n'est pas du bâti résidentiel
-if 'densifyNonRes' not in globals():
-    densifyNonRes = False
+# Pour autoriser à construire de nouveaux bâtiments dans des cellules déjà urbanisées
+if 'densifyGround' not in globals():
+    densifyGround = False
+# Pour autoriser à densifier la surface plancher pré-éxistante
+if 'densifyOld' not in globals():
+    densifyOld = False
+# Pour toujours densifier la cellule au maximum de sa capacité plancher
+if 'maximumDensity' not in globals():
+    maximumDensity = False
 # Taux d'artificialisation maximum d'une cellule
 if 'maxBuiltRatio' not in globals():
     maxBuiltRatio = 80
@@ -114,114 +114,121 @@ def slidingWin(array, row, col, size=3, calc='sum'):
 
 # Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def expand(row, col):
-    global capaSol, capaPla, urb
-    nivMin = 1
-    nivMax = nbNivMax[row][col]
+    global capaSol, urb
     minV = ssrMed[row][col]
     maxV = capaSol[row][col]
-    sS = 0
-    sP = 0
+    s = 0
     if maxV > minV:
         if slidingWin(urb, row, col, winSize, 'sum') <= maxContig:
-            if maximumDensity :
-                sS = maxV
-            else:
-                sS = np.random.randint(minV, maxV + 1)
-            capaSol[row][col] -= sS
+            s = np.random.randint(minV, maxV + 1)
+            capaSol[row][col] -= s
             urb[row][col] = 1
-            sP = sS
-            if buildNonRes:
-                sP *= txSsr[row][col]
-            nbNiv = np.random.randint(nivMin, nivMax + 1)
-            sP *= nbNiv
-            if capaPla[row][col] > sP:
-                capaPla[row][col] -= sP
-            else:
-                capaPla[row][col] = 0
-    return (sS, sP)
+    return s
+
+def build(row, col):
+    global capaPla, newBuilds
+    s = 0
+    minV = newBuilds[row][col]
+    maxV = capaPla[row][col]
+    if maxV > minV:
+        if maximumDensity:
+            s = maxV
+        else:
+            s = np.random.randint(minV, maxV + 1)
+        capaPla[row][col] -= s
+    return s
 
 # Densification d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def densify(mode, row, col):
     global capaSol, capaPla
-    sS = 0
-    sP = 0
-    if mode == 'sol':
-        nivMin = 1
-        nivMax = nbNivMax[row][col]
-        minV = m2PlaHab[row][col]
+    s = 0
+    if mode == 'ground':
+        minV = ssrMed[row][col]
         maxV = capaSol[row][col]
         if maxV > minV:
-            sS = np.random.randint(minV, maxV + 1)
-            capaSol[row][col] -= sS
-            sP = sS
-            if buildNonRes:
-                sP *= txSsr[row][col]
-            nbNiv = np.random.randint(nivMin, nivMax + 1)
-            sP *= nbNiv
-            if capaPla[row][col] > sP:
-                capaPla[row][col] -= sP
-            else:
-                capaPla[row][col] = 0
-    elif mode == 'pla':
+            s = np.random.randint(minV, maxV + 1)
+            capaSol[row][col] -= s
+
+    elif mode == 'height':
         minV = m2PlaHab[row][col]
         maxV = capaPla[row][col]
         if maxV > minV:
             if maximumDensity:
-                sP = maxV
+                s = maxV
             else:
-                sP = np.random.randint(minV, maxV + 1)
-            capaPla[row][col] -= sP
-    return (sS, sP)
+                s = np.random.randint(minV, maxV + 1)
+            capaPla[row][col] -= s
+    return s
 
 # Fonction principale pour gérer etalement puis densification,
-def urbanize(pop, maxSrf=0, zau=False, ):
-    global demographie, capaSol, srfSol, capaPla, srfPla, srfSolRes
-    tmpDemog = np.zeros([rows, cols], np.uint16)
+def urbanize(pop, maxSrf=0, zau=False):
+    global demographie, capaSol, srfSol, srfSolRes, newBuilds, capaPla, srfPla
     tmpSrfPla = np.zeros([rows, cols], np.uint32)
     tmpSrfSol = np.zeros([rows, cols], np.uint16)
     count = 0
     built = 0
-    # Expansion pas ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
+    # Expansion par ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
     if maxSrf > 0:
-        tmpInteret = np.where((capaSol >= ssrMed) | (capaSol >= m2PlaHab), interet, 0)
+        tmpInteret = np.where((capaSol >= ssrMed) & (urb == 0), interet, 0)
         if zau:
             tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
-        while built < maxSrf and count < pop and tmpInteret.sum() > 0:
-            sS = 0
-            sP = 0
+        while built < maxSrf and tmpInteret.sum() > 0:
+            s = 0
             row, col = choose(tmpInteret)
             if urb[row][col] == 0:
-                sS, sP = expand(row, col)
-            else:
-                sS, sP = densify('sol', row, col)
-            if sS > 0 and sP > 0:
-                built += sS
-                tmpSrfSol[row][col] += sS
-                tmpSrfPla[row][col] += sP
-                count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+                s = expand(row, col)
+            if s > 0 :
+                built += s
+                tmpSrfSol[row][col] += s
             else:
                 tmpInteret[row][col] = 0
+
+        # On densifie l'existant si les cellules vides sont déjà saturées
+        if built < maxSrf and densifyGround:
+            tmpInteret = np.where((capaSol >= ssrMed) & (srfSolRes14 > 0), interet, 0)
+            if zau:
+                tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
+                while built < maxSrf and tmpInteret.sum() > 0:
+                    s = 0
+                    row, col = choose(tmpInteret)
+                    s = densify('ground', row, col)
+                    if s > 0 :
+                        built += s
+                        tmpSrfSol[row][col] += s
+                    else:
+                        tmpInteret[row][col] = 0
+
+        newBuilds += tmpSrfSol
         srfSol += tmpSrfSol
         srfSolRes += tmpSrfSol
-    # Densification de l'existant lorsque la surface construite au sol max est atteinte
-    if count < pop:
-        if densifyNonRes :
-            tmpInteret = np.where((urb == 1) & (capaPla >= m2PlaHab), interet, 0)
-        else:
-            tmpInteret = np.where((srfSolRes > 0) & (capaPla >= m2PlaHab), interet, 0)
-        if zau:
-            tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
+
+    # Construction de la surface plancher dans les cellules nouvellement urbanisées
+    if built >= maxSrf:
+        tmpInteret = np.where(newBuilds > 0, interet, 0)
         while count < pop and tmpInteret.sum() > 0:
             row, col = choose(tmpInteret)
-            _, sP = densify('pla', row, col)
-            if sP > 0:
-                tmpSrfPla[row][col] += sP
+            s = build(row, col)
+            if s > 0:
+                tmpSrfPla[row][col] += s
                 count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
             else:
                 tmpInteret[row][col] = 0
 
-    srfPla += tmpSrfPla
-    demographie += np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16)
+        # Densification de l'existant si on n'a pas pu loger tout le monde
+        if pop < count and densifyOld:
+            tmpInteret = np.where((srfSolRes14 > 0) & (capaPla > 0), interet, 0)
+            while count < pop and tmpInteret.sum() > 0:
+                row, col = choose(tmpInteret)
+                s = densify('height', row, col)
+                if s > 0:
+                    tmpSrfPla[row][col] += s
+                    count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+                else:
+                    tmpInteret[row][col] = 0
+
+        srfPla += tmpSrfPla
+        demographie += np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16)
+
     return (pop - count, maxSrf - built)
 
 try:
@@ -240,8 +247,10 @@ try:
         projectPath += '_pluPrio'
     if buildNonRes :
         projectPath += '_buildNonRes'
-    if densifyNonRes :
-        projectPath += '_densifyNonRes'
+    if densifyGround :
+        projectPath += '_densifyGround'
+    if densifyOld :
+        projectPath += '_densifyOld'
     if maximumDensity :
         projectPath += '_maximumDensity'
     if finalYear != 2040:
@@ -298,7 +307,6 @@ try:
 
     # Préparation des restrictions et gestion du PLU
     restriction = to_array(dataDir + 'restriction_totale.tif')
-
     if os.path.exists(dataDir + 'plu_restriction.tif') and os.path.exists(dataDir + 'plu_priorite.tif'):
         hasPlu = True
         removedPlu = False
@@ -313,12 +321,12 @@ try:
     demographie14 = to_array(dataDir + 'demographie_2014.tif', np.uint16)
     srfSol09 = to_array(dataDir + 'srf_sol_2009.tif', np.uint16)
     srfSol14 = to_array(dataDir + 'srf_sol_2014.tif', np.uint16)
-    srfSolRes = to_array(dataDir + 'srf_sol_res.tif', np.uint16)
+    srfSolRes14 = to_array(dataDir + 'srf_sol_res.tif', np.uint16)
     ssrMed = to_array(dataDir + 'iris_ssr_med.tif', np.uint16)
     m2PlaHab = to_array(dataDir + 'iris_m2_hab.tif', np.uint16)
     srfPla14 = to_array(dataDir  + 'srf_pla.tif', np.uint32)
     nbNivMax = to_array(dataDir + 'iris_niv_max.tif', np.uint8)
-    maxPla = to_array(dataDir + 'iris_srf_pla_' + seuilPla + '.tif', np.uint32)
+    maxPla = to_array(dataDir + 'iris_srf_pla_max.tif', np.uint32)
     if buildNonRes:
         txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
     # Interets
@@ -336,15 +344,15 @@ try:
     capaSol = np.zeros([rows, cols], np.uint32) + int(cellSurf * (maxBuiltRatio / 100))
     capaSol = np.where((restriction != 1) & (srfSol14 < capaSol), capaSol - srfSol14, 0).astype(np.uint16)
     capaPla = np.where(srfPla14 <= maxPla, maxPla - srfPla14, 0).astype(np.uint32)
-    capaPla = np.where((restriction != 1) & (srfSolRes > 0), capaPla, 0)
+    capaPla = np.where(restriction != 1, capaPla, 0)
     # Statistiques sur l'évolution du bâti
     urb09 = np.where(srfSol09 > 0, 1, 0).astype(np.byte)
     urb14 = np.where(srfSol14 > 0, 1, 0).astype(np.byte)
     m2SolHab09 = srfSol09.sum() / pop09
     m2SolHab14 = srfSol14.sum() / pop14
     m2SolHabEvo = (m2SolHab14 - m2SolHab09) / m2SolHab09 / 5
-    srfSolNonRes = srfSol14 - srfSolRes
-    ratioPlaSol14 = np.where(srfSolRes != 0, srfPla14 / srfSolRes, 0).astype(np.float32)
+    srfSolNonRes = srfSol14 - srfSolRes14
+    ratioPlaSol14 = np.where(srfSolRes14 != 0, srfPla14 / srfSolRes14, 0).astype(np.float32)
     txArtif = (srfSol14 / cellSurf).astype(np.float32)
     # Création du dictionnaire pour nombre de m² ouverts à l'urbanisation par année
     dicSrf = {}
@@ -385,6 +393,7 @@ try:
     ##### Boucle principale #####
     demographie = demographie14.copy()
     srfSol = srfSol14.copy()
+    srfSolRes = srfSolRes14.copy()
     srfPla = srfPla14.copy()
     urb = urb14.copy()
     preConstruit = 0
@@ -397,12 +406,11 @@ try:
         printer(progres)
         popALoger = dicPop[year]
         maxSrf = dicSrf[year]
+        newBuilds = np.zeros([rows, cols], np.uint16)
         if hasPlu and pluPriority:
             restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preConstruit,  True)
-            if resteSrf > 0 and restePop > 0:
+            if resteSrf > 0:
                 restePop, resteSrf = urbanize(restePop, resteSrf)
-            elif restePop > 0:
-                restePop, _ = urbanize(restePop)
         else:
             restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preConstruit)
         preConstruit = -resteSrf
@@ -428,7 +436,7 @@ try:
         capaSol = np.zeros([rows, cols], np.uint32) + int(cellSurf * (maxBuiltRatio / 100))
         capaSol = np.where((restriction != 1) & (srfSol < capaSol), capaSol - srfSol, 0).astype(np.uint16)
         capaPla = np.where(srfPla <= maxPla, maxPla - srfPla, 0).astype(np.uint32)
-        capaPla = np.where((restriction != 1) & (srfSolRes > 0), capaPla, 0)
+        capaPla = np.where((restriction != 1), capaPla, 0)
         restePop, resteSrf = urbanize(nonLogee, nonConstruit, False)
         if restePop > 0:
             nonLogee = int(round(restePop))
@@ -463,13 +471,11 @@ try:
     to_tif(srfPlaNouv, 'uint32', proj, geot, projectPath + 'surface_plancher_construite.tif')
     to_tif(popNouv, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
 
-    if hasPlu:
-        mesures.write("Suppression du PLU, " + str(removedPlu) + '\n')
     mesures.write("Population non logée, " + str(nonLogee) + '\n')
-    mesures.write("Surface au sol non construite, " + str(nonConstruit) + '\n')
     mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
     mesures.write("Expansion au sol, " + str(srfSolNouv.sum()) + "\n")
     mesures.write("Surface plancher construite, " + str(srfPlaNouv.sum()) + "\n")
+    mesures.write("Cellules ouvertes à l'urbanisation, " + str(expansion.sum()) + "\n")
     mesures.write("Taux moyen d'artificialisation, " + str(txArtifMoyen) + "\n")
     mesures.write("Impact environnemental cumulé, " + str(impactEnv) + "\n")
     log.write("Surface au sol non construite finale : " + str(nonConstruit) + '\n')
@@ -477,6 +483,19 @@ try:
     log.write("Population logée : " + str(popNouvCount) + '\n')
     log.write("Démographie définitive : " + str(demographie.sum()) + '\n')
     log.write("Temps d'execution : " + str(execTime))
+
+    if densifyGround:
+        densificationSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
+        to_tif(densificationSol, 'byte', proj, geot, projectPath + 'densification.tif')
+        mesures.write("Cellules densifiées, " + str(densification.sum()) + "\n")
+
+    if densifyOld:
+        densificationPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
+        to_tif(densificationPla, 'byte', proj, geot, projectPath + 'densification.tif')
+        mesures.write("Cellules densifiées, " + str(densification.sum()) + "\n")
+
+    if hasPlu:
+        mesures.write("Suppression du PLU, " + str(removedPlu) + '\n')
 
 except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
