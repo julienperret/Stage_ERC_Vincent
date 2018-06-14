@@ -303,7 +303,7 @@ try:
     with open(projectPath + 'coefficients.csv', 'x') as w:
         for key in poids:
             coef[key] = poids[key] / sum(poids.values())
-            w.write(key + ', ' + str(coef[key]))
+            w.write(key + ', ' + str(coef[key]) + '\n')
 
     # Préparation des restrictions et gestion du PLU
     restriction = to_array(dataDir + 'restriction_totale.tif')
@@ -325,7 +325,6 @@ try:
     ssrMed = to_array(dataDir + 'iris_ssr_med.tif', np.uint16)
     m2PlaHab = to_array(dataDir + 'iris_m2_hab.tif', np.uint16)
     srfPla14 = to_array(dataDir  + 'srf_pla.tif', np.uint32)
-    nbNivMax = to_array(dataDir + 'iris_niv_max.tif', np.uint8)
     maxPla = to_array(dataDir + 'iris_srf_pla_max.tif', np.uint32)
     if buildNonRes:
         txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
@@ -487,12 +486,12 @@ try:
     if densifyGround:
         densificationSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
         to_tif(densificationSol, 'byte', proj, geot, projectPath + 'densification.tif')
-        mesures.write("Cellules densifiées, " + str(densification.sum()) + "\n")
+        mesures.write("Cellules densifiées au sol, " + str(densificationSol.sum()) + "\n")
 
     if densifyOld:
         densificationPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
         to_tif(densificationPla, 'byte', proj, geot, projectPath + 'densification.tif')
-        mesures.write("Cellules densifiées, " + str(densification.sum()) + "\n")
+        mesures.write("Cellules densifiées au plancher, " + str(densificationPla.sum()) + "\n")
 
     if hasPlu:
         mesures.write("Suppression du PLU, " + str(removedPlu) + '\n')
