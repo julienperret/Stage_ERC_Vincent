@@ -885,6 +885,7 @@ try:
         # Correction de l'OCS ou extraction de l'OSO CESBIO si besoin
         if not os.path.exists(localData + 'ocsol.shp'):
             ocsol = QgsVectorLayer( globalData + 'oso/departement_' + codeDept + '.shp', 'ocsol')
+            ocsol.addExpressionField('"Classe"', QgsField('code', QVariant.Int))
             ocsol.dataProvider().createSpatialIndex()
         else:
             params = {
@@ -907,6 +908,7 @@ try:
                 END
             """
             ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
+            ocsol.addExpressionField('"c2015_niv1"', QgsField('code', QVariant.Int))
         argList.append((clip(ocsol, zone), workspacePath + 'data/'))
 
         # Traitement du shape de l'intérêt écologique
@@ -1295,7 +1297,7 @@ try:
         printer(progres)
     log.write(description + ': ')
 
-    # Préparation du fichier des IRIS - création des ID et de la matrice de contiguïté
+    # Calcul de la population totale de la zone pour export en csv
     pop09 = 0
     pop12 = 0
     pop14 = 0
@@ -1319,6 +1321,7 @@ try:
     yMax = extent.yMaximum()
     extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
+    os.mkdir(projectPath + 'interet')
     # Rasterisations
     argList = [
         (workspacePath + 'data/' + gridSize + 'm/stat_grid.shp', projectPath + 'demographie_2014.tif', 'pop'),
@@ -1330,11 +1333,12 @@ try:
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_tx_ssr.tif', 'tx_ssr'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_srf_pla_max.tif', 'spl_max'),
         (workspacePath + 'data/' + gridSize + 'm/stat_iris.shp', projectPath + 'iris_m2_hab.tif', 'm2_hab'),
-        (workspacePath + 'data/ocsol.shp', projectPath + 'occupation_sol.tif', 'interet')
+        (workspacePath + 'data/ocsol.shp', projectPath + 'interet/occupation_sol.tif', 'interet'),
+        (workspacePath + 'data/ocsol.shp', projectPath + 'classes_ocsol.tif', 'code')
     ]
     if os.path.exists(workspacePath + 'data/plu.shp'):
-        argList.append((workspacePath + 'data/plu.shp', projectPath + 'plu_restriction.tif', 'restrict'))
-        argList.append((workspacePath + 'data/plu.shp', projectPath +'plu_priorite.tif', 'priority'))
+        argList.append((workspacePath + 'data/plu.shp', projectPath + 'interet/plu_restriction.tif', 'restrict'))
+        argList.append((workspacePath + 'data/plu.shp', projectPath +'interet/plu_priorite.tif', 'priority'))
 
     if speed :
         getDone(rasterize, argList)
@@ -1351,16 +1355,17 @@ try:
     # Conversion des raster de distance
     distance_routes = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_routes.tif', np.float32)
     routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
-    to_tif(routes, 'float32', proj, geot, projectPath + 'proximite_routes.tif')
+    to_tif(routes, 'float32', proj, geot, projectPath + 'interet/proximite_routes.tif')
     distance_transport = to_array(workspacePath + 'data/' + gridSize + 'm/tif/distance_arrets_transport.tif', np.float32)
     transport = np.where(distance_transport > -1, 1 - (distance_transport / np.amax(distance_transport)), 0)
-    to_tif(transport, 'float32', proj, geot, projectPath + 'proximite_transport.tif')
+    to_tif(transport, 'float32', proj, geot, projectPath + 'interet/proximite_transport.tif')
 
     # Conversion et aggrégation des rasters de densité SIRENE
     with open(globalData + 'sirene/poids.csv') as csvFile:
         reader = csv.reader(csvFile)
         next(reader, None)
         poidsSirene = {rows[0]:int(rows[1]) for rows in reader}
+
 
     administratif = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_administratif.tif', np.float32)
     commercial = to_array(workspacePath + 'data/' + gridSize + 'm/tif/densite_commercial.tif', np.float32)
@@ -1377,7 +1382,7 @@ try:
     sirene = ((administratif * poidsSirene['administratif']) + (commercial * poidsSirene['commercial']) + (enseignement * poidsSirene['enseignement']) +
               (medical * poidsSirene['medical']) + (recreatif * poidsSirene['recreatif'])) / sum(poidsSirene.values())
     sirene = (sirene / np.amax(sirene)).astype(np.float32)
-    to_tif(sirene, 'float32', proj, geot, projectPath + 'densite_sirene.tif')
+    to_tif(sirene, 'float32', proj, geot, projectPath + 'interet/densite_sirene.tif')
     del poidsSirene, administratif, commercial, enseignement, medical, recreatif, sirene
 
     # Création du raster de restriction (sans PLU)
@@ -1393,16 +1398,15 @@ try:
 
     restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) |
                             (zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
-    to_tif(restriction, 'byte', proj, geot, projectPath + 'restriction_totale.tif')
+    to_tif(restriction, 'byte', proj, geot, projectPath + 'interet/restriction_totale.tif')
     del surfActivMask, exclusionMask, gridMask, zonageMask, highwayMask, pprMask, slope, slopeMask, restriction
 
     ecologie = to_array(workspacePath + 'data/' + gridSize + 'm/tif/ecologie.tif', np.float32)
     ecologie = np.where((ecologie == 0), 1, 1 - ecologie)
     ecologie = np.where((irisMask != 1), ecologie, 0)
-    to_tif(ecologie, 'float32', proj, geot, projectPath + 'non-importance_ecologique.tif')
-    del ecologie
+    to_tif(ecologie, 'float32', proj, geot, projectPath + 'interet/non-importance_ecologique.tif')
 
-    copyfile(localData + 'poids.csv', projectPath + 'poids.csv')
+    copyfile(localData + 'poids.csv', projectPath + 'interet/poids.csv')
 
     if not silent:
         print('\nTerminée à ' + strftime('%H:%M:%S'))
@@ -1418,8 +1422,7 @@ except:
     if not silent:
         print("\n*** Error :")
         traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
-    else:
-        log.write('\n*** Error :\n' + str(sys.exc_info()))
+    log.write('\nError :\n' + traceback.format_exc())
     qgs.exitQgis()
     log.close()
     sys.exit()

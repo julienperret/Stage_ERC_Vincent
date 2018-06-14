@@ -314,12 +314,12 @@ try:
             w.write(key + ', ' + str(coef[key]) + '\n')
 
     # Préparation des restrictions et gestion du PLU
-    restriction = to_array(dataDir + 'restriction_totale.tif')
-    if os.path.exists(dataDir + 'plu_restriction.tif') and os.path.exists(dataDir + 'plu_priorite.tif'):
+    restriction = to_array(dataDir + 'interet/restriction_totale.tif')
+    if os.path.exists(dataDir + 'interet/plu_restriction.tif') and os.path.exists(dataDir + 'plu_priorite.tif'):
         hasPlu = True
         removedPlu = False
-        pluPrio = to_array(dataDir + 'plu_priorite.tif')
-        pluRest = to_array(dataDir + 'plu_restriction.tif')
+        pluPrio = to_array(dataDir + 'interet/plu_priorite.tif')
+        pluRest = to_array(dataDir + 'interet/plu_restriction.tif')
         restrictionNonPlu = restriction.copy()
         restriction = np.where(pluRest != 1, restriction, 1)
     else:
@@ -337,11 +337,11 @@ try:
     if buildNonRes:
         txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
     # Interets
-    eco = to_array(dataDir + 'non-importance_ecologique.tif', np.float32)
-    ocs = to_array(dataDir + 'occupation_sol.tif', np.float32)
-    rou = to_array(dataDir + 'proximite_routes.tif', np.float32)
-    tra = to_array(dataDir + 'proximite_transport.tif', np.float32)
-    sir = to_array(dataDir + 'densite_sirene.tif', np.float32)
+    eco = to_array(dataDir + 'interet/non-importance_ecologique.tif', np.float32)
+    ocs = to_array(dataDir + 'interet/occupation_sol.tif', np.float32)
+    rou = to_array(dataDir + 'interet/proximite_routes.tif', np.float32)
+    tra = to_array(dataDir + 'interet/proximite_transport.tif', np.float32)
+    sir = to_array(dataDir + 'interet/densite_sirene.tif', np.float32)
     # Création du raster final d'intérêt avec pondération
     interet = np.where((restriction != 1), (eco * coef['ecologie']) + (ocs * coef['ocsol']) +
                        (rou * coef['routes']) + (tra * coef['transport']) + (sir * poids['sirene']), 0)
@@ -489,7 +489,7 @@ except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
     print("\n*** Error :")
     traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
-    log.write('\n*** Error :\n' + str(sys.exc_info()[0]) + '\n' + str(sys.exc_info()[1]) + '\n' + str(sys.exc_info()[2]))
+    log.write('\nError :\n' + traceback.format_exc())
     log.close()
     sys.exit()
 
