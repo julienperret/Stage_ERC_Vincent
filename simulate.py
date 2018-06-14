@@ -214,9 +214,9 @@ def urbanize(pop, maxSrf=0, zau=False):
             else:
                 tmpInteret[row][col] = 0
 
-        # Densification de l'existant si on n'a pas pu loger tout le monde
+        # Densification du bâti existant si on n'a pas pu loger tout le monde
         if pop < count and densifyOld:
-            tmpInteret = np.where((srfSolRes14 > 0) & (capaPla > 0), interet, 0)
+            tmpInteret = np.where((urb == 1) & (capaPla > 0), interet, 0)
             while count < pop and tmpInteret.sum() > 0:
                 row, col = choose(tmpInteret)
                 s = densify('height', row, col)
