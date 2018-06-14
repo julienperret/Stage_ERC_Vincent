@@ -207,8 +207,9 @@ def urbanize(pop, maxSrf=0, zau=False):
         srfSol += tmpSrfSol
         if buildNonRes:
             tmpSrfSol = (tmpSrfSol * txSsr).round().astype(np.uint16)
-            newBuilds += tmpSrfSol
-            srfSolRes += tmpSrfSol
+
+        newBuilds += tmpSrfSol
+        srfSolRes += tmpSrfSol
 
     # Construction de la surface plancher dans les cellules nouvellement urbanisées
     if built >= maxSrf:
