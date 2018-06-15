@@ -1,6 +1,6 @@
-**__Les dernières modifications sur prepare.py obligent à recharger la donnée locale depuis le SFTP__**  
+**__! Les dernières modifications sur prepare.py obligent à recharger la donnée locale depuis le SFTP !__**  
 
-## ./prepare.py
+## ./prepare.py  
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  
     1 : répertoire des données globales  
     2 : n° de département dans lequel la zone d'étude est située  
@@ -24,7 +24,6 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 |                                            | maxOverlapRatio                  | 0       | 1       | float | 0,2               | Seuil de chevauchement max entre une cellule et une couche (cimetières, surfaces en eau…) pour exclusion |
 | Création des rasters de densité SIRENE     | global_data/sirene/poids.csv     | 1       | +       | int   | 1                 | Poids de chaque raster de densité de points SIRENE                                                       |
 |                                            | global_data/sirene/distances.csv | 100     | 1000    | m     | bufferDistance    | Distances maximales de recherche pour chaque raster de densité de points SIRENE                          |
-
 
 *Mots magiques :*  
 
@@ -71,13 +70,15 @@ Usage :
 Dépendances pour python3 :  
     gdal, numpy  
 
-## Commandes CARE qui semblent marcher :  
+### Commandes CARE qui semblent marcher :  
 
 care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data/ 34  ./mtp/ ./results/ "pixRes=50 useTxrp=True levelHeight=3 force"  
 
 care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data/ /my/output/dir/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
 
 ATTENTION : derrière -p : mettre les chemins en absolu
+
+## Outils  
 
 ### ./toolbox.py   
 Contient les fonctions communes; à déplacer avec tout script sorti du dépôt.  
