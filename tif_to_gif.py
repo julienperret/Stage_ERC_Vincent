@@ -28,7 +28,7 @@ elif dType == 'uint16':
 elif dType == 'uint32':
     npType = np.uint32
     highValue = 2 ** 32 - 1
-elif Dtype == 'float32':
+elif dType == 'float32':
     npType = np.float32
     highValue = (2 - 2 ** -23) * 2 ** 127
 
