@@ -4,7 +4,7 @@
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  
     1 : répertoire des données globales  
     2 : n° de département dans lequel la zone d'étude est située  
-    3 : répertoire des données locales
+    3 : répertoire des données locales  
     4 : répertoire des résultats (créé si besoin)  
     5 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
 
