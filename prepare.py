@@ -1361,10 +1361,6 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
         geot = ds.GetGeoTransform()
         ds = None
 
-        # Traitement de l'intérêt écologique
-        ecologie = to_array(workspace + 'data/' + pixRes + 'm/tif/ecologie.tif', np.float32)
-        ecologie = np.where((ecologie == 0), 1, 1 - ecologie)
-        ecologie = np.where((irisMask != 1), ecologie, 0)
         # Conversion des rasters de distance
         distance_routes = to_array(workspace + 'data/' + pixRes + 'm/tif/distance_routes.tif', np.float32)
         routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
@@ -1390,7 +1386,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
         sirene = ((administratif * poidsSirene['administratif']) + (commercial * poidsSirene['commercial']) + (enseignement * poidsSirene['enseignement']) +
                   (medical * poidsSirene['medical']) + (recreatif * poidsSirene['recreatif'])) / sum(poidsSirene.values())
         sirene = (sirene / np.amax(sirene)).astype(np.float32)
-        
+
         # Création du raster de restriction (sans PLU)
         irisMask = to_array(workspace + 'data/' + pixRes + 'm/tif/masque.tif', np.byte)
         exclusionMask = to_array(workspace + 'data/' + pixRes + 'm/tif/exclusion.tif', np.byte)
@@ -1404,6 +1400,10 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
         # Fusion
         restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) |
                                 (zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
+        # Traitement de l'intérêt écologique
+        ecologie = to_array(workspace + 'data/' + pixRes + 'm/tif/ecologie.tif', np.float32)
+        ecologie = np.where((ecologie == 0), 1, 1 - ecologie)
+        ecologie = np.where((irisMask != 1), ecologie, 0)
 
         to_tif(restriction, 'byte', proj, geot, project + 'interet/restriction_totale.tif')
         to_tif(ecologie, 'float32', proj, geot, project + 'interet/non-importance_ecologique.tif')
