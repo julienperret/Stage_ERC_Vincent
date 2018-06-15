@@ -17,7 +17,7 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 En cas de problème avec les "distance_trucmuche.tif", vérifier qu'il y a un header dans les fichiers csv.  
 
 Usage :  
-python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "gridSize=50 speed"  
+python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "pixRes=50 speed"  
 
 Dépendances pour python3 :  
     PyQt5, qgis, gdal, numpy  
@@ -37,7 +37,7 @@ Dépendances pour python3 :
 
 ## Commandes CARE qui semblent marcher :  
 
-care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data/ 34  ./mtp/ ./results/ "gridSize=50 useTxrp=True levelHeight=3 force"  
+care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data/ 34  ./mtp/ ./results/ "pixRes=50 useTxrp=True levelHeight=3 force"  
 
 care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data/ /my/output/dir/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
 
