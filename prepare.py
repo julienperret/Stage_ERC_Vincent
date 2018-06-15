@@ -971,9 +971,15 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             if os.path.exists('ppr.shp'):
                 argList.append((clip('ppr.shp', zone), workspace + 'data/restriction'))
 
-            # Traitement d'une couche facultative pour exclusion de zones bâties lors du calcul de densité
-            if os.path.exists(localData + 'exclusion.shp'):
-                argList.append((clip(localData + 'exclusion.shp', zone), workspace + 'data/restriction/'))
+            # Utilisation des parcelles DGFIP pour exclure des bâtiments lors du calcul de densité
+            if os.path.exists(localData + 'exclusion_parcelles.shp'):
+                params = {'INPUT': localData + 'exclusion_parcelles.shp', 'OUTPUT': 'memory:exclusion_parcelles' }
+                res = processing.run('native:fixgeometries', params, feedback=feedback)
+                parcelles = res['OUTPUT']
+                argList.append((clip(parcelles, zone), workspace + 'data/restriction/'))
+            # Sinon, traitement d'une couche facultative pour exclusion de zones bâties lors du calcul et inclusion dans les restrictions
+            if os.path.exists(localData + 'exclusion_manuelle.shp'):
+                argList.append((clip(localData + 'exclusion_manuelle.shp', zone), workspace + 'data/restriction/'))
 
             if speed:
                 getDone(reproj, argList)
@@ -1081,12 +1087,12 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 printer(progres)
             log.write(description + ': ')
 
-            # Nettoyage dans la couche de bâti indif. avec les PAI et surfaces d'activité
+            # Nettoyage dans la couche de bâti indifferencié
             bati_indif = QgsVectorLayer(workspace + 'data/2014_bati/bati_indifferencie.shp', 'bati_indif_2014')
             bati_indif.dataProvider().createSpatialIndex()
             cleanPolygons = []
-            cleanPoints = [workspace + 'data/pai/pai_merged.shp']
-            # On ignore les zones industrielles et commerciales
+            cleanPoints = []
+            # On inclut les surfaces d'activités (autres que commerciales et industrielles) dans la couche de restriction
             params = {
                 'INPUT': workspace + 'data/pai/surface_activite.shp',
                 'EXPRESSION': """ "CATEGORIE" != 'Industriel ou commercial' """,
@@ -1094,16 +1100,41 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 'FAIL_OUTPUT': 'memory:'
             }
             processing.run('native:extractbyexpression', params, feedback=feedback)
-            # Fusion des polygones pour éviter les résidus avec le prédicat WITHIN
-            params = {
-                'INPUT': workspace + 'data/pai/surf_activ_non_com.shp',
-                'FIELD': [],
-                'OUTPUT': 'memory:'
-            }
-            res = processing.run('native:dissolve', params, feedback=feedback)
-            cleanPolygons.append(res['OUTPUT'])
-            if os.path.exists(workspace + 'data/restriction/exclusion.shp'):
-                cleanPolygons.append(workspace + 'data/restriction/exclusion.shp')
+            # Si possible, on utilise plutôt les parcelles non résidentilles DGFIP fusionnées avec un tampon de 2m
+            if os.path.exists(workspace + 'data/restriction/exclusion_parcelles.shp'):
+                parcelles = QgsVectorLayer(workspace + 'data/restriction/exclusion_parcelles.shp', 'parcelles')
+                parcelles.dataProvider().createSpatialIndex()
+                params = {
+                    'INPUT': parcelles,
+                    'DISTANCE': 2,
+                    'SEGMENTS': 5,
+                    'END_CAP_STYLE': 0,
+                    'JOIN_STYLE': 0,
+                    'MITER_LIMIT': 2,
+                    'DISSOLVE': True,
+                    'OUTPUT': 'memory:exclusion_parcelles'
+                }
+                processing.run('native:buffer', params, feedback=feedback)
+                parcelles = res['OUTPUT']
+                cleanPolygons.append(parcelles)
+                del parcelles
+
+            # Sinon, on utliser les surfaces d'activité et les PAI
+            else:
+                cleanPoints.append(workspace + 'data/pai/pai_merged.shp')
+                # Fusion des polygones de zones d'activité pour éviter les oublis avec le prédicat WITHIN
+                params = {
+                    'INPUT': workspace + 'data/pai/surf_activ_non_com.shp',
+                    'FIELD': [],
+                    'OUTPUT': 'memory:'
+                }
+                res = processing.run('native:dissolve', params, feedback=feedback)
+                cleanPolygons.append(res['OUTPUT'])
+
+            # Couche pour zone supplémentaires à exclure du calcul de pop à inclure dans les restrictions
+            if os.path.exists(workspace + 'data/restriction/exclusion_manuelle.shp'):
+                cleanPolygons.append(workspace + 'data/restriction/exclusion_manuelle.shp')
+
             buildingCleaner(bati_indif, minSurf, maxSurf, levelHeight, cleanPolygons, cleanPoints,
                             workspace + 'data/2014_bati/bati_clean.shp', workspace + 'data/restriction/bati_removed.shp')
             del bati_indif, cleanPolygons, cleanPoints
@@ -1274,10 +1305,13 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 (workspace + 'data/restriction/tampon_voies_ferrees.shp', workspace + 'data/' + pixRes + 'm/tif/tampon_voies_ferrees.tif', None, 1),
                 (workspace + 'data/restriction/tampon_autoroutes.shp', workspace + 'data/' + pixRes + 'm/tif/tampon_autoroutes.tif', None, 1),
                 (workspace + 'data/restriction/tampon_routes_importantes.shp', workspace + 'data/' + pixRes + 'm/tif/tampon_routes_importantes.tif', None, 1),
-                (workspace + 'data/restriction/exclusion.shp', workspace + 'data/' + pixRes + 'm/tif/exclusion.tif', None, 1),
                 (workspace + 'data/restriction/zonages_protection.shp', workspace + 'data/' + pixRes + 'm/tif/zonages_protection.tif', None, 1),
                 (workspace + 'data/pai/surf_activ_non_com.shp', workspace + 'data/' + pixRes + 'm/tif/surf_activ_non_com.tif', None, 1)
             ]
+            if os.path.exists(workspace + 'data/restriction/exclusion_parcelles.shp'):
+                argList.append((workspace + 'data/restriction/exclusion_parcelles.shp', workspace + 'data/' + pixRes + 'm/tif/exclusion_parcelles.tif', None, 1))
+            if os.path.exists(workspace + 'data/restriction/exclusion_manuelle.shp'):
+                argList.append((workspace + 'data/restriction/exclusion_manuelle.shp', workspace + 'data/' + pixRes + 'm/tif/exclusion_manuelle.tif', None, 1))
 
             if os.path.exists(workspace + 'data/restriction/ppr.shp'):
                 argList.append((workspace + 'data/restriction/ppr.shp', workspace + 'data/' + pixRes + 'm/tif/ppr.tif', None, 1))
@@ -1436,7 +1470,6 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
         # Création du raster de restriction (sans PLU)
         irisMask = to_array(workspace + 'data/' + pixRes + 'm/tif/masque.tif', np.byte)
-        exclusionMask = to_array(workspace + 'data/' + pixRes + 'm/tif/exclusion.tif', np.byte)
         surfActivMask = to_array(workspace + 'data/' + pixRes + 'm/tif/surf_activ_non_com.tif', np.byte)
         gridMask = to_array(workspace + 'data/' + pixRes + 'm/tif/restrict_grid.tif', np.byte)
         zonageMask = to_array(workspace + 'data/' + pixRes + 'm/tif/zonages_protection.tif', np.byte)
@@ -1447,8 +1480,12 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
         slope = to_array(workspace + 'data/' + pixRes + 'm/tif/slope.tif')
         slopeMask = np.where(slope > maxSlope, 1, 0).astype(np.byte)
         # Fusion
-        restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (roadsMask == 1) |
+        restriction = np.where((irisMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (roadsMask == 1) |
                                (railsMask == 1) | (zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
+
+        if os.path.exists(workspace + 'data/' + pixRes + 'm/tif/exclusion_manuelle.tif'):
+            exclusionManuelle = to_array(workspace + 'data/' + pixRes + 'm/tif/exclusion_manuelle.tif', np.byte)
+            restriction = np.where(exclusionManuelle == 1, 1, restriction)
 
         to_tif(restriction, 'byte', proj, geot, project + 'interet/restriction_totale.tif')
         to_tif(ecologie, 'float32', proj, geot, project + 'interet/non-importance_ecologique.tif')

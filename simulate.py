@@ -75,7 +75,7 @@ if 'maximumDensity' not in globals():
 # Taux d'artificialisation maximum d'une cellule
 if 'maxBuiltRatio' not in globals():
     maxBuiltRatio = 80
-# Paramètres pour les règles de contiguïtés : minContig < winSize² > maxContig
+# Paramètres pour les règles de contiguïtés
 if 'winSize' not in globals():
     winSize = 3
 if 'minContig' not in globals():
@@ -252,33 +252,34 @@ cols, rows = demographieDep.shape[1], demographieDep.shape[0] # x, y
 proj = ds.GetProjection()
 geot = ds.GetGeoTransform()
 pixSize = int(geot[1])
-cellSurf = pixSize * pixSize
+srfCell = pixSize * pixSize
 ds = None
 
-projectPath = outputDir + str(pixSize) + 'm' + '_tx' + str(rate) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
+project = outputDir + str(pixSize) + 'm' + '_tx' + str(rate) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
 if pluPriority:
-    projectPath += '_pluPrio'
+    project += '_pluPrio'
 if buildNonRes :
-    projectPath += '_buildNonRes'
+    project += '_buildNonRes'
 if densifyGround :
-    projectPath += '_densifyGround'
+    project += '_densifyGround'
 if densifyOld :
-    projectPath += '_densifyOld'
+    project += '_densifyOld'
 if maximumDensity :
-    projectPath += '_maximumDensity'
+    project += '_maximumDensity'
 if finalYear != 2040:
-    projectPath += '_' + str(finalYear)
-projectPath += '/'
+    project += '_' + str(finalYear)
+project += '/'
 
-if os.path.exists(projectPath):
-    rmtree(projectPath)
-os.makedirs(projectPath + 'snapshots')
-os.mkdir(projectPath + 'snapshots/demographie')
-os.mkdir(projectPath + 'snapshots/urbanisation')
-os.mkdir(projectPath + 'snapshots/surface_sol')
-os.mkdir(projectPath + 'snapshots/surface_plancher')
+if os.path.exists(project):
+    rmtree(project)
+os.makedirs(project + 'output')
+os.mkdir(project + 'snapshots')
+os.mkdir(project + 'snapshots/demographie')
+os.mkdir(project + 'snapshots/urbanisation')
+os.mkdir(project + 'snapshots/surface_sol')
+os.mkdir(project + 'snapshots/surface_plancher')
 
-with open(projectPath + 'log.txt', 'w') as log, open(projectPath + 'mesures.csv', 'w') as mesures:
+with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv', 'w') as mesures:
     try:
         # Création des dictionnaires contenant la population par année
         with open(dataDir + 'population.csv') as csvFile:
@@ -311,7 +312,7 @@ with open(projectPath + 'log.txt', 'w') as log, open(projectPath + 'mesures.csv'
             poids = {rows[0]:int(rows[1]) for rows in reader}
 
         coef = {}
-        with open(projectPath + 'coefficients_interet.csv', 'x') as w:
+        with open(project + 'coefficients_interet.csv', 'x') as w:
             for key in poids:
                 coef[key] = poids[key] / sum(poids.values())
                 w.write(key + ', ' + str(coef[key]) + '\n')
@@ -339,7 +340,7 @@ with open(projectPath + 'log.txt', 'w') as log, open(projectPath + 'mesures.csv'
         maxPla = to_array(dataDir + 'iris_srf_pla_max.tif', np.uint32)
         if buildNonRes:
             txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
-        # Interets
+        # Amenités
         eco = to_array(dataDir + 'interet/non-importance_ecologique.tif', np.float32)
         ocs = to_array(dataDir + 'interet/occupation_sol.tif', np.float32)
         rou = to_array(dataDir + 'interet/proximite_routes.tif', np.float32)
@@ -351,7 +352,7 @@ with open(projectPath + 'log.txt', 'w') as log, open(projectPath + 'mesures.csv'
         interet = (interet / np.amax(interet)).astype(np.float32)
 
         # Création des rasters de capacité en surfaces sol et plancher
-        capaSol = np.zeros([rows, cols], np.uint32) + int(cellSurf * (maxBuiltRatio / 100))
+        capaSol = np.zeros([rows, cols], np.uint32) + int(srfCell * (maxBuiltRatio / 100))
         capaSol = np.where((restriction != 1) & (srfSol14 < capaSol), capaSol - srfSol14, 0).astype(np.uint16)
         capaPla = np.where(srfPla14 <= maxPla, maxPla - srfPla14, 0).astype(np.uint32)
         capaPla = np.where(restriction != 1, capaPla, 0)
@@ -363,7 +364,7 @@ with open(projectPath + 'log.txt', 'w') as log, open(projectPath + 'mesures.csv'
         m2SolHabEvo = (m2SolHab14 - m2SolHab09) / m2SolHab09 / 5
         srfSolNonRes = srfSol14 - srfSolRes14
         ratioPlaSol14 = np.where(srfSolRes14 != 0, srfPla14 / srfSolRes14, 0).astype(np.float32)
-        txArtif = (srfSol14 / cellSurf).astype(np.float32)
+        txArtif = (srfSol14 / srfCell).astype(np.float32)
 
         # Création du dictionnaire pour nombre de m² ouverts à l'urbanisation par année
         dicSrf = {}
@@ -392,12 +393,12 @@ with open(projectPath + 'log.txt', 'w') as log, open(projectPath + 'mesures.csv'
         log.write('Seuil en surface au sol par habitant calculé : ' + str(int(round(maxSrf))) + ' m²\n')
 
         # Instantanés de la situation à t0
-        to_tif(urb14, 'byte', proj, geot, projectPath + 'urbanisation_2014.tif')
-        to_tif(capaSol, 'uint16', proj, geot, projectPath + 'capacite_sol_2014.tif')
-        to_tif(capaPla, 'uint32', proj, geot, projectPath + 'capacite_plancher_2014.tif')
-        to_tif(txArtif, 'float32', proj, geot, projectPath + 'taux_artif_2014.tif')
-        to_tif(interet, 'float32', proj, geot, projectPath + 'interet_2014.tif')
-        to_tif(ratioPlaSol14, 'float32', proj, geot, projectPath + 'ratio_pla_sol_2014.tif')
+        to_tif(urb14, 'byte', proj, geot, project + 'urbanisation_2014.tif')
+        to_tif(capaSol, 'uint16', proj, geot, project + 'capacite_sol_2014.tif')
+        to_tif(capaPla, 'uint32', proj, geot, project + 'capacite_plancher_2014.tif')
+        to_tif(txArtif, 'float32', proj, geot, project + 'taux_artif_2014.tif')
+        to_tif(interet, 'float32', proj, geot, project + 'interet_2014.tif')
+        to_tif(ratioPlaSol14, 'float32', proj, geot, project + 'ratio_pla_sol_2014.tif')
 
         start_time = time()
         ##### Boucle principale #####
@@ -427,10 +428,10 @@ with open(projectPath + 'log.txt', 'w') as log, open(projectPath + 'mesures.csv'
             preLogee = -restePop
 
             # Snapshots
-            to_tif(demographie, 'uint16', proj, geot, projectPath + 'snapshots/demographie/demo_' + str(year) + '.tif')
-            to_tif(urb, 'byte', proj, geot, projectPath + 'snapshots/urbanisation/urb_' + str(year) + '.tif')
-            to_tif(srfSol, 'uint16', proj, geot, projectPath + 'snapshots/surface_sol/sol_' + str(year) + '.tif')
-            to_tif(srfPla, 'uint32', proj, geot, projectPath + 'snapshots/surface_plancher/plancher_' + str(year) + '.tif')
+            to_tif(demographie, 'uint16', proj, geot, project + 'snapshots/demographie/demo_' + str(year) + '.tif')
+            to_tif(urb, 'byte', proj, geot, project + 'snapshots/urbanisation/urb_' + str(year) + '.tif')
+            to_tif(srfSol, 'uint16', proj, geot, project + 'snapshots/surface_sol/sol_' + str(year) + '.tif')
+            to_tif(srfPla, 'uint32', proj, geot, project + 'snapshots/surface_plancher/plancher_' + str(year) + '.tif')
 
         if restePop > 0:
             nonLogee = int(round(restePop))
@@ -447,25 +448,26 @@ with open(projectPath + 'log.txt', 'w') as log, open(projectPath + 'mesures.csv'
         peuplementMoyen = round(np.nanmean(np.where(popNouv == 0, np.nan, popNouv)), 3)
         srfSolNouv = srfSol - srfSol14
         srfPlaNouv = srfPla - srfPla14
-        txArtifNouv = (srfSol / cellSurf).astype(np.float32)
+        txArtifNouv = (srfSolNouv / srfCell).astype(np.float32)
         txArtifMoyen = round(np.nanmean(np.where(txArtifNouv == 0, np.nan, txArtifNouv)) * 100, 3)
         ratioPlaSol = np.where(srfSolRes != 0, srfPla / srfSolRes, 0).astype(np.float32)
         expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
         expansionSum = expansion.sum()
         impactEnv = (txArtifNouv * eco).sum()
 
-        to_tif(urb, 'uint16', proj, geot, projectPath + 'urbanisation_' + str(finalYear) + '.tif')
-        to_tif(srfSol, 'uint16', proj, geot, projectPath + 'surface_sol_' + str(finalYear) + '.tif')
-        to_tif(srfPla, 'uint32', proj, geot, projectPath + 'surface_plancher_' + str(finalYear) + '.tif')
-        to_tif(demographie, 'uint16', proj, geot, projectPath + 'demographie_' + str(finalYear) + '.tif')
-        to_tif(txArtifNouv, 'float32', proj, geot, projectPath + 'taux_artif_' + str(finalYear) + '.tif')
-        to_tif(ratioPlaSol, 'float32', proj, geot, projectPath + 'ratio_pla_sol_' + str(finalYear) + '.tif')
-        to_tif(expansion, 'byte', proj, geot, projectPath + 'expansion.tif')
-        to_tif(srfSolNouv, 'uint16', proj, geot, projectPath + 'surface_sol_construite.tif')
-        to_tif(srfPlaNouv, 'uint32', proj, geot, projectPath + 'surface_plancher_construite.tif')
-        to_tif(popNouv, 'uint16', proj, geot, projectPath + 'population_nouvelle.tif')
+        to_tif(urb, 'uint16', proj, geot, project + 'output/urbanisation_' + str(finalYear) + '.tif')
+        to_tif(srfSol, 'uint16', proj, geot, project + 'output/surface_sol_' + str(finalYear) + '.tif')
+        to_tif(srfPla, 'uint32', proj, geot, project + 'output/surface_plancher_' + str(finalYear) + '.tif')
+        to_tif(demographie, 'uint16', proj, geot, project + 'output/demographie_' + str(finalYear) + '.tif')
+        to_tif(txArtifNouv, 'float32', proj, geot, project + 'output/taux_artif_' + str(finalYear) + '.tif')
+        to_tif(ratioPlaSol, 'float32', proj, geot, project + 'output/ratio_plancher_sol_' + str(finalYear) + '.tif')
+        to_tif(expansion, 'byte', proj, geot, project + 'output/expansion.tif')
+        to_tif(srfSolNouv, 'uint16', proj, geot, project + 'output/surface_sol_construite.tif')
+        to_tif(srfPlaNouv, 'uint32', proj, geot, project + 'output/surface_plancher_construite.tif')
+        to_tif(popNouv, 'uint16', proj, geot, project + 'output/population_nouvelle.tif')
 
         mesures.write("Population non logée, " + str(nonLogee) + '\n')
+        mesures.write("Surface au sol non construite, " + str(nonBuilt) + '\n')
         mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
         mesures.write("Expansion au sol, " + str(srfSolNouv.sum()) + "\n")
         mesures.write("Surface plancher construite, " + str(srfPlaNouv.sum()) + "\n")
@@ -480,12 +482,12 @@ with open(projectPath + 'log.txt', 'w') as log, open(projectPath + 'mesures.csv'
 
         if densifyGround:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
-            to_tif(densifSol, 'byte', proj, geot, projectPath + 'densification_sol.tif')
+            to_tif(densifSol, 'byte', proj, geot, project + 'output/densification_sol.tif')
             mesures.write("Cellules densifiées au sol, " + str(densificationSol.sum()) + "\n")
 
         if densifyOld:
             densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
-            to_tif(densifPla, 'byte', proj, geot, projectPath + 'densification_plancher.tif')
+            to_tif(densifPla, 'byte', proj, geot, project + 'output/densification_plancher.tif')
             mesures.write("Cellules densifiées au plancher, " + str(densificationPla.sum()) + "\n")
 
     except:
