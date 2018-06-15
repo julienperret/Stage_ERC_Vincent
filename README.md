@@ -80,6 +80,9 @@ ATTENTION : derrière -p : mettre les chemins en absolu
 
 ## Outils  
 
+### ./magic.py  
+Convertit les fichiers positionnels MAJIC III en CSV avec création de tables PSQL  
+
 ### ./toolbox.py   
 Contient les fonctions communes; à déplacer avec tout script sorti du dépôt.  
 
@@ -101,6 +104,3 @@ Trois paramètres au minimum:
 
 Usage :  
 ./tif_to_gif.py ./results/snapshots/surface_sol ./output/ uint16
-
-### ./magic.py  
-Convertit les fichiers positionnels MAJIC III en CSV avec création de tables PSQL  
