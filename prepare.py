@@ -849,6 +849,28 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             del clipBati, clipRes, clipPai
 
+            # Zone tampon de 10m de part et d'autre des voies ferrées
+            params = {
+                'INPUT': workspace + 'data/transport/troncon_voie_ferree.shp',
+                'EXPRESSION': """ "NATURE" != 'Transport urbain' """,
+                'OUTPUT': 'memory:voies_ferrees',
+                'FAIL_OUTPUT': 'memory:'
+            }
+            res = processing.run('native:extractbyexpression', params, feedback=feedback)
+            voiesFerrees = res['OUTPUT']
+            params = {
+                'INPUT': voiesFerrees,
+                'DISTANCE': 10,
+                'SEGMENTS': 5,
+                'END_CAP_STYLE': 0,
+                'JOIN_STYLE': 0,
+                'MITER_LIMIT': 2,
+                'DISSOLVE': True,
+                'OUTPUT': workspace + 'data/restriction/tampon_voies_ferrees.shp'
+            }
+            processing.run('native:buffer', params, feedback=feedback)
+            del voiesFerrees
+
             # Préparation de la couche arrêts de transport en commun
             transports = []
             if os.path.exists(localData + 'bus.shp'):
@@ -981,7 +1003,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             processing.run('native:mergevectorlayers', params, feedback=feedback)
             del zonagesEnv
 
-            # Traitement des autoroutes
+            # Traitement des autoroutes : bande de 100m de part et d'autre
             params = {
                 'INPUT': workspace + 'data/transport/route_primaire.shp',
                 'EXPRESSION': """ "NATURE" = 'Autoroute' """,
@@ -998,6 +1020,25 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 'MITER_LIMIT': 2,
                 'DISSOLVE': True,
                 'OUTPUT': workspace + 'data/restriction/tampon_autoroutes.shp'
+            }
+            processing.run('native:buffer', params, feedback=feedback)
+            # Traitement des autres routes : bande de 75m ===> voir Loi Barnier
+            params = {
+                'INPUT': workspace + 'data/transport/route_primaire.shp',
+                'EXPRESSION': """ "NATURE" != 'Autoroute' """,
+                'OUTPUT': 'memory:autoroutes',
+                'FAIL_OUTPUT': 'memory:'
+            }
+            res = processing.run('native:extractbyexpression', params, feedback=feedback)
+            params = {
+                'INPUT': res['OUTPUT'],
+                'DISTANCE': 75,
+                'SEGMENTS': 5,
+                'END_CAP_STYLE': 0,
+                'JOIN_STYLE': 0,
+                'MITER_LIMIT': 2,
+                'DISSOLVE': True,
+                'OUTPUT': workspace + 'data/restriction/tampon_routes_importantes.shp'
             }
             processing.run('native:buffer', params, feedback=feedback)
 
@@ -1230,11 +1271,14 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 (workspace + 'data/transport/arrets_transport.shp', workspace + 'data/' + pixRes + 'm/tif/arrets_transport.tif', None, 1),
                 (workspace + 'data/' + pixRes + 'm/restrict_grid.shp', workspace + 'data/' + pixRes + 'm/tif/restrict_grid.tif', 'restrict'),
                 (workspace + 'data/' + pixRes + 'm/stat_iris.shp', workspace + 'data/' + pixRes + 'm/tif/masque.tif', None, 1, True),
-                (workspace + 'data/restriction/zonages_protection.shp', workspace + 'data/' + pixRes + 'm/tif/zonages_protection.tif', None, 1),
+                (workspace + 'data/restriction/tampon_voies_ferrees.shp', workspace + 'data/' + pixRes + 'm/tif/tampon_voies_ferrees.tif', None, 1),
                 (workspace + 'data/restriction/tampon_autoroutes.shp', workspace + 'data/' + pixRes + 'm/tif/tampon_autoroutes.tif', None, 1),
+                (workspace + 'data/restriction/tampon_routes_importantes.shp', workspace + 'data/' + pixRes + 'm/tif/tampon_routes_importantes.tif', None, 1),
                 (workspace + 'data/restriction/exclusion.shp', workspace + 'data/' + pixRes + 'm/tif/exclusion.tif', None, 1),
+                (workspace + 'data/restriction/zonages_protection.shp', workspace + 'data/' + pixRes + 'm/tif/zonages_protection.tif', None, 1),
                 (workspace + 'data/pai/surf_activ_non_com.shp', workspace + 'data/' + pixRes + 'm/tif/surf_activ_non_com.tif', None, 1)
             ]
+
             if os.path.exists(workspace + 'data/restriction/ppr.shp'):
                 argList.append((workspace + 'data/restriction/ppr.shp', workspace + 'data/' + pixRes + 'm/tif/ppr.tif', None, 1))
             elif os.path.exists(workspace + 'data/plu.shp'):
@@ -1361,6 +1405,9 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
         geot = ds.GetGeoTransform()
         ds = None
 
+        # Traitement de l'intérêt écologique
+        ecologie = to_array(workspace + 'data/' + pixRes + 'm/tif/ecologie.tif', np.float32)
+        ecologie = np.where((ecologie == 0), 1, 1 - ecologie)
         # Conversion des rasters de distance
         distance_routes = to_array(workspace + 'data/' + pixRes + 'm/tif/distance_routes.tif', np.float32)
         routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
@@ -1394,16 +1441,14 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
         gridMask = to_array(workspace + 'data/' + pixRes + 'm/tif/restrict_grid.tif', np.byte)
         zonageMask = to_array(workspace + 'data/' + pixRes + 'm/tif/zonages_protection.tif', np.byte)
         highwayMask = to_array(workspace + 'data/' + pixRes + 'm/tif/tampon_autoroutes.tif', np.byte)
+        roadsMask = to_array(workspace + 'data/' + pixRes + 'm/tif/tampon_routes_importantes.tif', np.byte)
+        railsMask = to_array(workspace + 'data/' + pixRes + 'm/tif/tampon_voies_ferrees.tif', np.byte)
         pprMask = to_array(workspace + 'data/' + pixRes + 'm/tif/ppr.tif', np.byte)
         slope = to_array(workspace + 'data/' + pixRes + 'm/tif/slope.tif')
         slopeMask = np.where(slope > maxSlope, 1, 0).astype(np.byte)
         # Fusion
-        restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) |
-                                (zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
-        # Traitement de l'intérêt écologique
-        ecologie = to_array(workspace + 'data/' + pixRes + 'm/tif/ecologie.tif', np.float32)
-        ecologie = np.where((ecologie == 0), 1, 1 - ecologie)
-        ecologie = np.where((irisMask != 1), ecologie, 0)
+        restriction = np.where((irisMask == 1) | (exclusionMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (roadsMask == 1) |
+                               (railsMask == 1) | (zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
 
         to_tif(restriction, 'byte', proj, geot, project + 'interet/restriction_totale.tif')
         to_tif(ecologie, 'float32', proj, geot, project + 'interet/non-importance_ecologique.tif')
