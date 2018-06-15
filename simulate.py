@@ -85,6 +85,8 @@ if 'maxContig' not in globals():
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
 def choose(weight, size=1):
+    global countChoices
+    countChoices += size
     cells = []
     flatWeight = weight.flatten()
     choices = np.random.choice(flatWeight.size, size, p=flatWeight / flatWeight.sum())
@@ -411,7 +413,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         nonBuilt = 0
         preLogee = 0
         nonLogee = 0
-
+        countChoices = 0
         for year in range(2015, finalYear + 1):
             progres = "Année %i/%i" %(year, finalYear)
             printer(progres)
@@ -441,6 +443,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         end_time = time()
         execTime = round(end_time - start_time, 2)
         print('\nDurée de la simulation : ' + str(execTime) + ' secondes')
+        #print('Nombre total de cellules tirées aléatoirement : ' + str(countChoices))
 
         # Calcul et export des résultats
         popNouv = demographie - demographieDep
@@ -483,12 +486,12 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         if densifyGround:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
             to_tif(densifSol, 'byte', proj, geot, project + 'output/densification_sol.tif')
-            mesures.write("Cellules densifiées au sol, " + str(densificationSol.sum()) + "\n")
+            mesures.write("Cellules densifiées au sol, " + str(densifSol.sum()) + "\n")
 
         if densifyOld:
             densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
             to_tif(densifPla, 'byte', proj, geot, project + 'output/densification_plancher.tif')
-            mesures.write("Cellules densifiées au plancher, " + str(densificationPla.sum()) + "\n")
+            mesures.write("Cellules densifiées au plancher, " + str(densifPla.sum()) + "\n")
 
     except:
         print("\n*** Error :")
