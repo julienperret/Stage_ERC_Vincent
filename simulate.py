@@ -219,31 +219,30 @@ def urbanize(pop, maxSrf=0, zau=False):
         srfSolRes += tmpSrfSol
 
     # Construction de la surface plancher dans les cellules nouvellement urbanisées
-    if built >= maxSrf:
-        tmpInteret = np.where(newBuild > 0, interet, 0)
+    tmpInteret = np.where(newBuild > 0, interet, 0)
+    while count < pop and tmpInteret.sum() > 0:
+        row, col = choose(tmpInteret)
+        s = build(row, col)
+        if s > 0:
+            tmpSrfPla[row][col] += s
+            count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+        else:
+            tmpInteret[row][col] = 0
+
+    # Densification du bâti existant si on n'a pas pu loger tout le monde
+    if count < pop and densifyOld:
+        tmpInteret = np.where((urb == 1) & (capaPla > 0), interet, 0)
         while count < pop and tmpInteret.sum() > 0:
             row, col = choose(tmpInteret)
-            s = build(row, col)
+            s = densify('height', row, col)
             if s > 0:
                 tmpSrfPla[row][col] += s
                 count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
             else:
                 tmpInteret[row][col] = 0
 
-        # Densification du bâti existant si on n'a pas pu loger tout le monde
-        if count < pop and densifyOld:
-            tmpInteret = np.where((urb == 1) & (capaPla > 0), interet, 0)
-            while count < pop and tmpInteret.sum() > 0:
-                row, col = choose(tmpInteret)
-                s = densify('height', row, col)
-                if s > 0:
-                    tmpSrfPla[row][col] += s
-                    count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
-                else:
-                    tmpInteret[row][col] = 0
-
-        srfPla += tmpSrfPla
-        demographie += np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16)
+    srfPla += tmpSrfPla
+    demographie += np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16)
 
     return (pop - count, maxSrf - built)
 
@@ -417,12 +416,12 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         for year in range(2015, finalYear + 1):
             progres = "Année %i/%i" %(year, finalYear)
             printer(progres)
-            popALoger = popDic[year]
             maxSrf = dicSrf[year]
+            popALoger = popDic[year]
             newBuild = np.zeros([rows, cols], np.uint16)
             if hasPlu and pluPriority:
                 restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preBuilt,  True)
-                if resteSrf > 0:
+                if resteSrf > 0 or restePop > 0:
                     restePop, resteSrf = urbanize(restePop, resteSrf)
             else:
                 restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preBuilt)
@@ -443,7 +442,6 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         end_time = time()
         execTime = round(end_time - start_time, 2)
         print('\nDurée de la simulation : ' + str(execTime) + ' secondes')
-        #print('Nombre total de cellules tirées aléatoirement : ' + str(countChoices))
 
         # Calcul et export des résultats
         popNouv = demographie - demographieDep
@@ -462,8 +460,8 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         to_tif(srfSol, 'uint16', proj, geot, project + 'output/surface_sol_' + str(finalYear) + '.tif')
         to_tif(srfPla, 'uint32', proj, geot, project + 'output/surface_plancher_' + str(finalYear) + '.tif')
         to_tif(demographie, 'uint16', proj, geot, project + 'output/demographie_' + str(finalYear) + '.tif')
-        to_tif(txArtifNouv, 'float32', proj, geot, project + 'output/taux_artif_' + str(finalYear) + '.tif')
         to_tif(ratioPlaSol, 'float32', proj, geot, project + 'output/ratio_plancher_sol_' + str(finalYear) + '.tif')
+        to_tif(txArtifNouv, 'float32', proj, geot, project + 'output/taux_artificialisation.tif')
         to_tif(expansion, 'byte', proj, geot, project + 'output/expansion.tif')
         to_tif(srfSolNouv, 'uint16', proj, geot, project + 'output/surface_sol_construite.tif')
         to_tif(srfPlaNouv, 'uint32', proj, geot, project + 'output/surface_plancher_construite.tif')
@@ -482,6 +480,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         log.write("Population logée : " + str(popNouvCount) + '\n')
         log.write("Démographie définitive : " + str(demographie.sum()) + '\n')
         log.write("Temps d'execution : " + str(execTime))
+        log.write("Nombre total de cellules tirées aléatoirement : " + str(countChoices) + '\n')
 
         if densifyGround:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
