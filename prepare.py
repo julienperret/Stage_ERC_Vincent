@@ -406,21 +406,16 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
     params = {
         'INPUT': buildings,
-        'VALUES_FIELD_NAME': 'planch_g',
+        'VALUES_FIELD_NAME': 'NB_NIV',
         'CATEGORIES_FIELD_NAME': 'CODE_IRIS',
-        'OUTPUT': outdir + 'csv/iris_srf_pla.csv'
+        'OUTPUT': outdir + 'csv/iris_nb_niv.csv'
     }
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
     to_shp(buildings, outdir + 'bati_inter_grid.shp')
     del buildings, res
 
-    # Correction et changement de nom pour jointure des stat sur la grille et les IRIS
-    csvIplanch = QgsVectorLayer(outdir + 'csv/iris_srf_pla.csv')
-    csvIplanch.addExpressionField('round(to_real("max"))', QgsField('spl_max', QVariant.Int))
-    csvIplanch.addExpressionField('round(to_real("sum"))', QgsField('spl_sum', QVariant.Int))
-    csvIris.append(csvIplanch)
-
+    # Conversion des champs statistiques et attribution d'un nom
     csvGplanch = QgsVectorLayer(outdir + 'csv/grid_srf_pla.csv')
     csvGplanch.addExpressionField('round(to_real("sum"))', QgsField('srf_pla', QVariant.Int))
     csvGrid.append(csvGplanch)
@@ -441,6 +436,10 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     csvGpop = QgsVectorLayer(outdir + 'csv/grid_pop.csv')
     csvGpop.addExpressionField('to_int("sum")', QgsField('pop', QVariant.Int))
     csvGrid.append(csvGpop)
+
+    csvIniv = QgsVectorLayer(outdir + 'csv/iris_nb_niv.csv', 'nb_niv')
+    csvIniv.addExpressionField('to_int("max")', QgsField('nbniv_max', QVariant.Int))
+    csvIris.append(csvIniv)
 
     gridBlacklist = ['left', 'right', 'top', 'bottom']
     irisFields1 = []
@@ -1418,8 +1417,8 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             (workspace + 'data/' + pixRes + 'm/stat_grid.shp', project + 'srf_sol_2014.tif', 'ssol_14'),
             (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_ssr_med.tif', 'ssr_med'),
             (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_tx_ssr.tif', 'tx_ssr'),
-            (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_srf_pla_max.tif', 'spl_max'),
             (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_m2_hab.tif', 'm2_hab'),
+            (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_nbniv_max.tif', 'nbniv_max'),
             (workspace + 'data/ocsol.shp', project + 'interet/occupation_sol.tif', 'interet'),
             (workspace + 'data/ocsol.shp', project + 'classes_ocsol.tif', 'code')
         ]
