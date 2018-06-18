@@ -123,25 +123,25 @@ def expand(row, col):
     global capaSol, urb
     minV = ssrMed[row][col]
     maxV = capaSol[row][col]
-    s = 0
+    ss = 0
     if maxV > minV:
         sumContig = slidingWin(urb, row, col, winSize, 'sum')
         if minContig < sumContig <= maxContig:
             if maximumDensity:
-                s = maxV
+                ss = maxV
             else:
-                s = np.random.randint(minV, maxV + 1)
-            capaSol[row][col] -= s
+                ss = np.random.randint(minV, maxV + 1)
+            capaSol[row][col] -= ss
             urb[row][col] = 1
-    return s
+    return ss
 
 # Pour urbaniser verticalement à partir d'une surface au sol donnée et d'un nombre de niveaux tirés aléatoirement entre 1 et le nbNiv max par IRIS
-def build(row, col, ssol):
+def build(ss, row, col):
     sp = 0
     nivMin = 1
     nivMax = nbNivMax[row][col]
     nbNiv = np.random.randint(nivMin, nivMax + 1)
-    sp = ssol * nbNiv
+    sp = ss * nbNiv
     return sp
 
 # Densification d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
@@ -160,7 +160,7 @@ def densify(mode, row, col):
         return ss
     elif mode == 'height':
         sp = 0
-        nivMin = int(srfPla[row][col] / srfSolRes[row][col])
+        nivMin = int(srfPla[row][col] / srfSolRes[row][col]) + 1
         nivMax = nbNivMax[row][col]
         ssol = srfSolRes[row][col]
         if nivMin < nivMax:
@@ -168,6 +168,9 @@ def densify(mode, row, col):
         else:
             nbNiv = nivMax
         sp = ssol * nbNiv
+        sp -= srfPla[row][col]
+        if sp < m2PlaHab[row][col]:
+            sp = 0
         return sp
 
 # Fonction principale pour gérer etalement puis densification,
@@ -191,7 +194,7 @@ def urbanize(pop, maxSrf=0, zau=False):
             if ss > 0 :
                 artif += ss
                 tmpSrfSol[row][col] += ss
-                sp = build(row, col, ss)
+                sp = build(ss, row, col)
                 if sp > 0:
                     tmpSrfPla[row][col] += sp
                     count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
@@ -213,7 +216,7 @@ def urbanize(pop, maxSrf=0, zau=False):
                 if ss > 0 :
                     artif += ss
                     tmpSrfSol[row][col] += ss
-                    sp = build(row, col, ss)
+                    sp = build(ss, row, col)
                     if sp > 0:
                         tmpSrfPla[row][col] += sp
                         count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
@@ -319,14 +322,14 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         # Préparation des restrictions et gestion du PLU
         restriction = to_array(dataDir + 'interet/restriction_totale.tif')
         if os.path.exists(dataDir + 'interet/plu_restriction.tif') and os.path.exists(dataDir + 'interet/plu_priorite.tif'):
-            hasPlu = True
-            removedPlu = False
+            skipZau = False
             pluPrio = to_array(dataDir + 'interet/plu_priorite.tif')
             pluRest = to_array(dataDir + 'interet/plu_restriction.tif')
             restrictionNonPlu = restriction.copy()
             restriction = np.where(pluRest != 1, restriction, 1)
         else:
-            hasPlu = False
+            skipZau = True
+            pluPriority = False
 
         # Déclaration des matrices
         demographie14 = to_array(dataDir + 'demographie_2014.tif', np.uint16)
@@ -336,7 +339,6 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         ssrMed = to_array(dataDir + 'iris_ssr_med.tif', np.uint16)
         m2PlaHab = to_array(dataDir + 'iris_m2_hab.tif', np.uint16)
         srfPla14 = to_array(dataDir  + 'srf_pla.tif', np.uint32)
-        #maxPla = to_array(dataDir + 'iris_srf_pla_q3.tif', np.uint32)
         nbNivMax = to_array(dataDir + 'iris_nbniv_max.tif')
         if buildNonRes:
             txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
@@ -409,15 +411,18 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         preLogee = 0
         nonLogee = 0
         countChoices = 0
+        removedZau = False
         for year in range(2015, finalYear + 1):
             progres = "Année %i/%i" %(year, finalYear)
             printer(progres)
             maxSrf = dicSrf[year]
             popALoger = popDic[year]
-            if hasPlu and pluPriority:
+            if pluPriority and not skipZau:
                 restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preBuilt,  True)
-                if restePop > 0:
-                    restePop, resteSrf = urbanize(restePop, resteSrf)
+                if restePop > 0 and resteSrf > 0:
+                    skipZau = True
+                    print('\nSKIPPING ZAU FROM NOW ON')
+                    restePop, resteSrf = urbanize(restePop, resteSrf, False)
             else:
                 restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preBuilt)
             preBuilt = -resteSrf
