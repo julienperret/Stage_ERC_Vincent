@@ -105,7 +105,7 @@ def choose(weight, size=1):
 
 # Fenêtre glissante pour statistique dans le voisinage d'un pixel
 def slidingWin(array, row, col, size=3, calc='sum'):
-    if row > size - 1 and col > size - 1 :
+    if (row > size - 1 and row + size-1 < rows) and (col > size - 1 and col + size-1 < cols):
         s = 0
         pos = [i + 1 for i in range(- size//2, size//2)]
         for r in pos:
@@ -126,13 +126,14 @@ def expand(row, col):
     ss = 0
     if maxV > minV:
         sumContig = slidingWin(urb, row, col, winSize, 'sum')
-        if minContig < sumContig <= maxContig:
-            if maximumDensity:
-                ss = maxV
-            else:
-                ss = np.random.randint(minV, maxV + 1)
-            capaSol[row][col] -= ss
-            urb[row][col] = 1
+        if sumContig:
+            if minContig < sumContig <= maxContig:
+                if maximumDensity:
+                    ss = maxV
+                else:
+                    ss = np.random.randint(minV, maxV + 1)
+                capaSol[row][col] -= ss
+                urb[row][col] = 1
     return ss
 
 # Pour urbaniser verticalement à partir d'une surface au sol donnée et d'un nombre de niveaux tirés aléatoirement entre 1 et le nbNiv max par IRIS
