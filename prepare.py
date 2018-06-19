@@ -1099,7 +1099,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 'FAIL_OUTPUT': 'memory:'
             }
             processing.run('native:extractbyexpression', params, feedback=feedback)
-            # Si possible, on utilise plutôt les parcelles non résidentilles DGFIP fusionnées avec un tampon de 2m
+            # Si possible, on utilise les parcelles non résidentilles DGFIP fusionnées avec un tampon de 2m
             if os.path.exists(workspace + 'data/restriction/exclusion_parcelles.shp'):
                 parcelles = QgsVectorLayer(workspace + 'data/restriction/exclusion_parcelles.shp', 'parcelles')
                 parcelles.dataProvider().createSpatialIndex()

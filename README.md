@@ -95,7 +95,7 @@ Usage :
 ./insee_to_csv.py ../global_data/insee/  
 
 ### ./tif_to_gif.py  
-Génère un GIF à partir des tifs de population générés pour chaque année de la simulation.  
+Génère un GIF à partir des instantanés (TIF) générés pour chaque année de la simulation.  
 Trois paramètres au minimum:  
     1 : dossier contenant les images pour chaque année  
     2 : dossier de sortie
