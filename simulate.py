@@ -18,8 +18,8 @@ np.seterr(divide='ignore', invalid='ignore')
 # Stockage et contrôle de la validité des paramètres utilisateur
 dataDir = slashify(sys.argv[1])
 outputDir = slashify(sys.argv[2])
-rate = float(sys.argv[3])
-if rate > 3:
+growth = float(sys.argv[3])
+if growth > 3:
     print("Taux d'évolution trop élevé, valeur max acceptée : 3 %")
     sys.exit()
 if len(sys.argv) > 4:
@@ -121,17 +121,17 @@ def slidingWin(array, row, col, size=3, calc='sum'):
 # Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def expand(row, col):
     global capaSol, urb
-    minV = ssrMed[row][col]
-    maxV = capaSol[row][col]
+    minSrf = ssrMed[row][col]
+    maxSrf = capaSol[row][col]
     ss = 0
-    if maxV > minV:
+    if maxSrf > minSrf:
         sumContig = slidingWin(urb, row, col, winSize, 'sum')
         if sumContig:
             if minContig < sumContig <= maxContig:
                 if maximumDensity:
-                    ss = maxV
+                    ss = maxSrf
                 else:
-                    ss = np.random.randint(minV, maxV + 1)
+                    ss = np.random.randint(minSrf, maxSrf + 1)
                 capaSol[row][col] -= ss
                 urb[row][col] = 1
     return ss
@@ -150,13 +150,13 @@ def densify(mode, row, col):
     global capaSol
     if mode == 'ground':
         ss = 0
-        minV = ssrMed[row][col]
-        maxV = capaSol[row][col]
-        if maxV > minV:
+        minSrf = ssrMed[row][col]
+        maxSrf = capaSol[row][col]
+        if maxSrf > minSrf:
             if maximumDensity:
-                ss = maxV
+                ss = maxSrf
             else:
-                ss = np.random.randint(minV, maxV + 1)
+                ss = np.random.randint(minSrf, maxSrf + 1)
             capaSol[row][col] -= ss
         return ss
     elif mode == 'height':
@@ -175,18 +175,18 @@ def densify(mode, row, col):
         return sp
 
 # Fonction principale pour gérer etalement puis densification,
-def urbanize(pop, maxSrf=0, zau=False):
+def urbanize(pop, srfMax=0, zau=False):
     global demographie, capaSol, srfSol, srfSolRes, srfPla
     tmpSrfPla = np.zeros([rows, cols], np.uint32)
     tmpSrfSol = np.zeros([rows, cols], np.uint16)
     artif = 0
     count = 0
     # Expansion par ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
-    if maxSrf > 0:
+    if srfMax > 0:
         tmpInteret = np.where((capaSol >= ssrMed) & (urb == 0), interet, 0)
         if zau:
             tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
-        while artif < maxSrf and count < pop and tmpInteret.sum() > 0:
+        while artif < srfMax and count < pop and tmpInteret.sum() > 0:
             ss = 0
             sp = 0
             row, col = choose(tmpInteret)
@@ -205,11 +205,11 @@ def urbanize(pop, maxSrf=0, zau=False):
                 tmpInteret[row][col] = 0
 
         # On densifie l'existant si les cellules vides sont déjà saturées
-        if artif < maxSrf and count < pop and densifyGround:
+        if artif < srfMax and count < pop and densifyGround:
             tmpInteret = np.where((capaSol >= ssrMed) & (urb == 1), interet, 0)
             if zau:
                 tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
-            while artif < maxSrf and count < pop and tmpInteret.sum() > 0:
+            while artif < srfMax and count < pop and tmpInteret.sum() > 0:
                 ss = 0
                 sp = 0
                 row, col = choose(tmpInteret)
@@ -246,7 +246,7 @@ def urbanize(pop, maxSrf=0, zau=False):
     srfPla += tmpSrfPla
     demographie += np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16)
 
-    return (pop - count, maxSrf - artif)
+    return (pop - count, srfMax - artif)
 
 # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
 ds = gdal.Open(dataDir + 'demographie_2014.tif')
@@ -258,7 +258,7 @@ pixSize = int(geot[1])
 srfCell = pixSize * pixSize
 ds = None
 
-project = outputDir + str(pixSize) + 'm' + '_tx' + str(rate) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
+project = outputDir + str(pixSize) + 'm' + '_tx' + str(growth) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
 if pluPriority:
     project += '_pluPrio'
 if buildNonRes :
@@ -293,15 +293,15 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         pop09 = int(histPop['2009'])
         pop14 = int(histPop['2014'])
         evoPop = (pop14 - pop09) / pop09 / 5
-        if rate == -1.0:
-            rate = evoPop * 100
+        if growth == -1.0:
+            growth = evoPop * 100
 
         popDic = {}
         year = 2015
         pop = pop14
         while year <= finalYear:
-            popDic[year] = round(pop * (rate / 100))
-            pop += round(pop * (rate / 100))
+            popDic[year] = round(pop * (growth / 100))
+            pop += round(pop * (growth / 100))
             year += 1
 
         # Nombre total de personnes à loger - permet de vérifier si le raster capacité permet d'accueillir tout le monde
@@ -371,27 +371,27 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         dicSrf = {}
         year = 2015
         if scenario == 'tendanciel':
-            maxSrf = m2SolHab14
+            srfMax = m2SolHab14
             while year <= finalYear :
-                maxSrf += maxSrf * m2SolHabEvo
-                dicSrf[year] = int(round(maxSrf) * popDic[year])
+                srfMax += srfMax * m2SolHabEvo
+                dicSrf[year] = int(round(srfMax) * popDic[year])
                 year += 1
         elif scenario == 'stable':
-            maxSrf = m2SolHab14
+            srfMax = m2SolHab14
             while year <= finalYear :
-                dicSrf[year] = int(round(maxSrf) * popDic[year])
+                dicSrf[year] = int(round(srfMax) * popDic[year])
                 year += 1
         elif scenario == 'reduction':
-            maxSrf = m2SolHab14
+            srfMax = m2SolHab14
             totalYears = finalYear - year
             while year <= finalYear :
-                dicSrf[year] = int(round(maxSrf) * popDic[year])
-                maxSrf -= m2SolHab14 * (0.75 / totalYears)
+                dicSrf[year] = int(round(srfMax) * popDic[year])
+                srfMax -= m2SolHab14 * (0.75 / totalYears)
                 year += 1
 
         log.write('Consommation de surface au sol par habitant en 2014 : ' + str(int(round(m2SolHab14))) + ' m²\n')
         log.write('Evolution annuelle moyenne de la surface au sol par habitant : ' + str(round(m2SolHabEvo * 100, 4)) + ' %\n')
-        log.write('Seuil en surface au sol par habitant calculé : ' + str(int(round(maxSrf))) + ' m²\n')
+        log.write('Seuil en surface au sol par habitant calculé : ' + str(int(round(srfMax))) + ' m²\n')
 
         # Instantanés de la situation à t0
         to_tif(urb14, 'byte', proj, geot, project + 'urbanisation_2014.tif')
@@ -402,6 +402,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
 
         start_time = time()
         ##### Boucle principale #####
+        countChoices = 0
         demographie = demographie14.copy()
         srfSol = srfSol14.copy()
         srfSolRes = srfSolRes14.copy()
@@ -411,21 +412,18 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         nonBuilt = 0
         preLogee = 0
         nonLogee = 0
-        countChoices = 0
-        removedZau = False
         for year in range(2015, finalYear + 1):
             progres = "Année %i/%i" %(year, finalYear)
             printer(progres)
-            maxSrf = dicSrf[year]
+            srfMax = dicSrf[year]
             popALoger = popDic[year]
             if pluPriority and not skipZau:
-                restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preBuilt,  True)
+                restePop, resteSrf = urbanize(popALoger - preLogee, srfMax - preBuilt,  True)
                 if restePop > 0 and resteSrf > 0:
                     skipZau = True
-                    print('\nSKIPPING ZAU FROM NOW ON')
                     restePop, resteSrf = urbanize(restePop, resteSrf, False)
             else:
-                restePop, resteSrf = urbanize(popALoger - preLogee, maxSrf - preBuilt)
+                restePop, resteSrf = urbanize(popALoger - preLogee, srfMax - preBuilt)
             preBuilt = -resteSrf
             preLogee = -restePop
 
