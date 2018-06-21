@@ -35,7 +35,9 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 En cas de problème avec les "distance_trucmuche.tif", vérifier qu'il y a un header dans les fichiers csv.  
 
 Usage :  
+```shell
 python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "pixRes=50 speed"  
+```
 
 Dépendances pour python3 :  
     PyQt5, qgis, gdal, numpy  
@@ -64,19 +66,50 @@ Deux paramètres au minimum :
 | maxContig            | 0         | 8          | pixel  | 5                 | Nombre maximal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
 | local_data/poids.csv | 1         | +          | int    |                   | Poids de chaque raster d’aménités pour la création du raster final interet                                            |
 
-Usage :  
+Usage :
+```shell 
     ./simulate.py ./workspace/mtp/simulation_50m/ ./results/ 0.5 'scenario=tendanciel buildNonRes=True'
+```
 
 Dépendances pour python3 :  
     gdal, numpy  
 
 ### Commandes CARE qui semblent marcher :  
-
+```shell
 care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data/ 34  ./mtp/ ./results/ "pixRes=50 useTxrp=True levelHeight=3 force"  
 
 care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data/ /my/output/dir/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
+```
 
 ATTENTION : derrière -p : mettre les chemins en absolu
+
+### Commandes Docker :  
+
+#### 1. Construire une image docker
+
+Pour construire une image *docker* du projet, vous avez 2 options :
+##### Vous avez déjà le projet localement sur votre machine dans le répertoire ERC
+```shell
+cd ERC
+sudo docker build --tag erc .
+```
+
+Vous avez alors une image docker *erc* qui contient le projet.
+
+##### Vous n'avez pas le projet localement sur votre machine
+Ce n'est pas grave, vous n'avez pas besoin de le récupérer. Vous pouvez construire l'image docker directement :
+```shell
+sudo docker build --tag erc https://github.com/chapinux/Stage_ERC_Vincent.git
+```
+
+Vous avez alors une image docker *erc* qui contient le projet.
+
+#### 2. Sauver l'image docker dans une archive tar
+```shell
+sudo docker save erc > erc.tar
+```
+
+Votre image docker *erc* est sauvée dans l'archive *erc.tar*. Vous pouvez maintenant l'utiliser avec **OpenMOLE** par exemple...
 
 ## Outils  
 
@@ -91,8 +124,10 @@ Convertir les données XLS de l'INSEE en CSV en supprimant les champs inutiles, 
 Dépendances pour python3 :  
     pandas + xlrd (pour manipuler les .xls)  
 
-Usage :  
+Usage :
+```shell 
 ./insee_to_csv.py ../global_data/insee/  
+```
 
 ### ./tif_to_gif.py  
 Génère un GIF à partir des instantanés (TIF) générés pour chaque année de la simulation.  
@@ -102,5 +137,7 @@ Trois paramètres au minimum:
     3 : type de donnée des images (byte, uint16, uint32, float32)  
     4 : chaîne contenant la durée du GIF et la valeur max à utiliser (delay=n , maxValue=n)  
 
-Usage :  
+Usage :
+```shell 
 ./tif_to_gif.py ./results/snapshots/surface_sol ./output/ uint16
+```
