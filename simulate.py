@@ -366,7 +366,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         ratioPlaSol14 = np.where(srfSol14 != 0, srfPla14 / srfSol14, 0).astype(np.float32)
         txArtif = (srfSol14 / srfCell).astype(np.float32)
 
-        # Création du dictionnaire pour nombre de m² ouverts à l'urbanisation par année
+        # Création du dictionnaire pour nombre de m2 ouverts à l'urbanisation par année
         dicSrf = {}
         year = 2015
         if scenario == 'tendanciel':
@@ -388,9 +388,9 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
                 srfMax -= m2SolHab14 * (0.75 / totalYears)
                 year += 1
 
-        log.write('Area consumption per person in 2014: ' + str(int(round(m2SolHab14))) + ' m²\n')
+        log.write('Area consumption per person in 2014: ' + str(int(round(m2SolHab14))) + ' m2\n')
         log.write('Average annual evolution of area consumption per person: ' + str(round(m2SolHabEvo * 100, 4)) + ' %\n')
-        log.write('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m²\n')
+        log.write('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m2\n')
 
         # Instantanés de la situation à t0
         to_tif(urb14, 'byte', proj, geot, project + 'urbanisation_2014.tif')
