@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import os
-import re
 import sys
 import csv
 import gdal
 import traceback
 import numpy as np
-from toolbox import *
+from toolbox import slashify, to_tif, printer, to_array
 from shutil import rmtree
 from ast import literal_eval
-from time import strftime, time
+from time import time
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
@@ -20,7 +19,7 @@ dataDir = slashify(sys.argv[1])
 outputDir = slashify(sys.argv[2])
 growth = float(sys.argv[3])
 if growth > 3:
-    print("Taux d'évolution trop élevé, valeur max acceptée : 3 %")
+    print("Maximum evolution rate fixed at: 3 %")
     sys.exit()
 if len(sys.argv) > 4:
     argList = sys.argv[4].split()
@@ -28,7 +27,7 @@ if len(sys.argv) > 4:
         if 'scenario' in arg:
             scenario = arg.split('=')[1]
             if scenario not in ['tendanciel', 'stable', 'reduction']:
-                print('Erreur : le scénario doit être tendanciel, stable ou reduction.')
+                print('Error: scenario value must be tendanciel, stable or reduction.')
                 sys.exit()
         elif 'pluPriority' in arg:
             pluPriority = literal_eval(arg.split('=')[1])
@@ -306,7 +305,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
 
         # Nombre total de personnes à loger - permet de vérifier si le raster capacité permet d'accueillir tout le monde
         sumPopALoger = sum(popDic.values())
-        log.write("Population à loger d'ici à " + str(finalYear) + " : " + str(sumPopALoger) + "\n")
+        log.write("Population to put up until " + str(finalYear) + " : " + str(sumPopALoger) + "\n")
 
         # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
         with open(dataDir + 'interet/poids.csv') as r:
@@ -389,9 +388,9 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
                 srfMax -= m2SolHab14 * (0.75 / totalYears)
                 year += 1
 
-        log.write('Consommation de surface au sol par habitant en 2014 : ' + str(int(round(m2SolHab14))) + ' m²\n')
-        log.write('Evolution annuelle moyenne de la surface au sol par habitant : ' + str(round(m2SolHabEvo * 100, 4)) + ' %\n')
-        log.write('Seuil en surface au sol par habitant calculé : ' + str(int(round(srfMax))) + ' m²\n')
+        log.write('Area consumption per person in 2014: ' + str(int(round(m2SolHab14))) + ' m²\n')
+        log.write('Average annual evolution of area consumption per person: ' + str(round(m2SolHabEvo * 100, 4)) + ' %\n')
+        log.write('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m²\n')
 
         # Instantanés de la situation à t0
         to_tif(urb14, 'byte', proj, geot, project + 'urbanisation_2014.tif')
@@ -413,7 +412,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         preLogee = 0
         nonLogee = 0
         for year in range(2015, finalYear + 1):
-            progres = "Année %i/%i" %(year, finalYear)
+            progres = "Year %i/%i" %(year, finalYear)
             printer(progres)
             srfMax = dicSrf[year]
             popALoger = popDic[year]
@@ -440,7 +439,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
 
         end_time = time()
         execTime = round(end_time - start_time, 2)
-        print('\nDurée de la simulation : ' + str(execTime) + ' secondes')
+        print('\nDuration of the simulation: ' + str(execTime) + ' seconds')
 
         # Calcul et export des résultats
         popNouv = demographie - demographieDep
@@ -466,30 +465,30 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         to_tif(srfPlaNouv, 'uint32', proj, geot, project + 'output/surface_plancher_construite.tif')
         to_tif(popNouv, 'uint16', proj, geot, project + 'output/population_nouvelle.tif')
 
-        mesures.write("Population non logée, " + str(nonLogee) + '\n')
-        mesures.write("Surface au sol non construite, " + str(nonBuilt) + '\n')
-        mesures.write("Peuplement moyen des cellules, " + str(peuplementMoyen) + "\n")
-        mesures.write("Expansion au sol, " + str(srfSolNouv.sum()) + "\n")
-        mesures.write("Surface plancher construite, " + str(srfPlaNouv.sum()) + "\n")
-        mesures.write("Cellules ouvertes à l'urbanisation, " + str(expansion.sum()) + "\n")
-        mesures.write("Taux moyen d'artificialisation, " + str(txArtifMoyen) + "\n")
-        mesures.write("Impact environnemental cumulé, " + str(impactEnv) + "\n")
-        log.write("Surface au sol non construite : " + str(nonBuilt) + '\n')
-        log.write("Population non logée : " + str(nonLogee) + '\n')
-        log.write("Population logée : " + str(popNouvCount) + '\n')
-        log.write("Démographie définitive : " + str(demographie.sum()) + '\n')
-        log.write("Nombre total de cellules tirées aléatoirement : " + str(countChoices) + '\n')
-        log.write("Temps d'execution : " + str(execTime) + '\n')
+        mesures.write("Population not put up, " + str(nonLogee) + '\n')
+        mesures.write("Unbuilt area, " + str(nonBuilt) + '\n')
+        mesures.write("Average cell populating, " + str(peuplementMoyen) + "\n")
+        mesures.write("Area expansion, " + str(srfSolNouv.sum()) + "\n")
+        mesures.write("Built floor area, " + str(srfPlaNouv.sum()) + "\n")
+        mesures.write("Cells open to urbanisation, " + str(expansion.sum()) + "\n")
+        mesures.write("Average artificialisation rate, " + str(txArtifMoyen) + "\n")
+        mesures.write("Cumulated environnemental impact, " + str(impactEnv) + "\n")
+        log.write("Unbuilt area: " + str(nonBuilt) + '\n')
+        log.write("Population not put up: " + str(nonLogee) + '\n')
+        log.write("Population put up: " + str(popNouvCount) + '\n')
+        log.write("Final demography: " + str(demographie.sum()) + '\n')
+        log.write("Total number of randomly chosen cells: " + str(countChoices) + '\n')
+        log.write("Execution time: " + str(execTime) + '\n')
 
         if densifyGround:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
             to_tif(densifSol, 'byte', proj, geot, project + 'output/densification_sol.tif')
-            mesures.write("Cellules densifiées au sol, " + str(densifSol.sum()) + "\n")
+            mesures.write("Densified cells area, " + str(densifSol.sum()) + "\n")
 
         if densifyOld:
             densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
             to_tif(densifPla, 'byte', proj, geot, project + 'output/densification_plancher.tif')
-            mesures.write("Cellules densifiées au plancher, " + str(densifPla.sum()) + "\n")
+            mesures.write("Densified cells floor area, " + str(densifPla.sum()) + "\n")
 
     except:
         print("\n*** Error :")

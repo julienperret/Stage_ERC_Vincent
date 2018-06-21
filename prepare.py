@@ -7,7 +7,7 @@ import csv
 import gdal
 import traceback
 import numpy as np
-from toolbox import *
+from toolbox import slashify, printer, getDone, getTime, to_array, to_tif
 from ast import literal_eval
 from time import strftime, time
 from shutil import rmtree, copyfile
@@ -18,7 +18,6 @@ from qgis.core import (
     QgsCoordinateTransformContext,
     QgsCoordinateReferenceSystem,
     QgsField,
-    QgsFields,
     QgsProcessingFeedback,
     QgsRectangle,
     QgsVectorFileWriter,
@@ -132,7 +131,6 @@ if 'silent' not in globals():
 
 if force and os.path.exists(outputDir):
     rmtree(outputDir)
-studyAreaName = localData.split('/')[len(localData.split('/'))-2]
 
 if truth:
     workspace = outputDir  + 'tmp/'
@@ -140,6 +138,7 @@ if truth:
         rmtree(workspace)
     project = outputDir
 else:
+    studyAreaName = localData.split('/')[len(localData.split('/'))-2]
     workspace = outputDir + dpt + '/' + studyAreaName + '/'
     project = workspace + 'simulation/' + pixRes + 'm/'
     if os.path.exists(project):
@@ -152,7 +151,7 @@ statBlacklist = ['count', 'unique', 'min', 'max', 'range', 'sum', 'mean',
                  'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
 if not silent:
-    print('Commencé à ' + strftime('%H:%M:%S'))
+    print('Started at ' + strftime('%H:%M:%S'))
 
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
@@ -281,7 +280,7 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
         'INPUT': buildings,
         'OUTPUT': cleanedOut
     }
-    res = processing.run('native:saveselectedfeatures', params, feedback=feedback)
+    processing.run('native:saveselectedfeatures', params, feedback=feedback)
     del buildings, polygons, points, layer
 
 # Génère les statistiques de construction entre deux dates pour la grille et les IRIS
@@ -774,12 +773,13 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             os.mkdir(workspace + 'data/restriction')
 
             etape = 1
-            description = 'extraction et reprojection des données '
+            description = 'extracting and reprojecting data '
             progres = "Etape %i sur 8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             start_time = time()
             log.write(description + ': ')
+            log.flush
 
             # Tampon de 1000m autour de la zone pour extractions des quartiers et des PAI
             zone = QgsVectorLayer(localData + 'zone.shp', 'zone')
@@ -947,7 +947,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 for field in ecologie.fields():
                     ecoFields.append(field.name())
                 if 'importance' not in ecoFields:
-                    error = "Attribut requis 'importance' manquant ou mal nommé dans la couche d'importance écologique"
+                    error = "Attribut requis 'importance' manquant ou mal nomme dans la couche d'importance ecologique"
                     if not silent:
                         print(error)
                     log.write('Erreur : ' + error)
@@ -1080,7 +1080,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             start_time = time()
             etape = 2
-            description = "nettoyage du bâti pour l'estimation de la population "
+            description = "cleaning building to estimate the population "
             progres = "Etape %i sur 8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
@@ -1158,7 +1158,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             start_time = time()
             etape = 3
-            description =  "création d'une grille de " + pixRes + "m de côté "
+            description =  "creating a grid with resolution " + pixRes + "m "
             progres = "Etape %i sur 8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
@@ -1184,7 +1184,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             start_time = time()
             etape = 4
-            description = "analyse de l'évolution des zones bâties "
+            description = "analysing the evolution of build areas "
             progres = "Etape %i sur 8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
@@ -1218,7 +1218,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             start_time = time()
             etape = 5
-            description = "estimation de la population dans la grille "
+            description = "estimating the population in the grid "
             progres = "Etape %i sur 8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
@@ -1231,7 +1231,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             start_time = time()
             etape = 6
-            description = "calcul des restrictions "
+            description = "computing restrictions "
             progres = "Etape %i sur 8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
@@ -1286,7 +1286,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             start_time = time()
             etape = 7
-            description = "création des rasters de restriction et d'intérêt "
+            description = "creating restriction and interest rasters "
             progres = "Etape %i sur 8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
@@ -1493,12 +1493,12 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
         to_tif(transport, 'float32', proj, geot, project + 'interet/proximite_transport.tif')
 
         if not silent:
-            print('\nTerminée à ' + strftime('%H:%M:%S'))
+            print('\nFinished at ' + strftime('%H:%M:%S'))
         log.write(getTime(start_time) + '\n')
         if truth:
             rmtree(workspace)
             if not silent:
-                print('Suppression des données temporaires !')
+                print('Removing temporary data!')
 
     except:
         print("\n*** Error :")
