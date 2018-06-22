@@ -85,6 +85,28 @@ ATTENTION : derrière -p : mettre les chemins en absolu
 
 ### Commandes Docker :  
 
+#### 0. faire du docker à l'IGN avec une ubuntu 16.04 
+
+d'après [https://stackoverflow.com/questions/26550360/docker-ubuntu-behind-proxy]
+et grâce à l'aide inestimable de Mattia Bunel
+
+```shell
+sudo mkdir -p /etc/systemd/system/docker.service.d
+touch ./proxy.conf
+```
+on y met le contenu suivant: 
+
+```
+[Service]
+Environment="HTTPS_PROXY=https://proxy.ign.fr:3128"
+Environment="HTTP_PROXY=http://proxy.ign.fr:3128"
+```
+puis on redémarre le service docker
+```shell
+sudo systemctl daemon-reload
+sudo systemctl restart docker.service
+```
+
 #### 1. Construire une image docker
 
 Pour construire une image *docker* du projet, vous avez 2 options :
