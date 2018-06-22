@@ -36,7 +36,7 @@ val output = Val[File]
 val pythonTask =
   UDockerTask(workDirectory / "erc.tar",
 """xvfb-run python3 simulate.py /app/prepared_data /app/results ${taux} "${optionsPrep}"""") set (
-    inputDirectory := workDirectory / "results" / "departement34",
+    inputDirectory := workDirectory / "prepared_data_34",
     inputs += (taux),
     inputs +=optionsPrep,
     outputs += (taux),
