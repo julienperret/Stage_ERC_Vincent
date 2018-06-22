@@ -87,8 +87,8 @@ ATTENTION : derrière -p : mettre les chemins en absolu
 
 #### 0. faire du docker à l'IGN avec une ubuntu 16.04 
 
-d'après [https://stackoverflow.com/questions/26550360/docker-ubuntu-behind-proxy]
-et grâce à l'aide inestimable de Mattia Bunel
+d'après (https://stackoverflow.com/questions/26550360/docker-ubuntu-behind-proxy),
+et grâce à l'aide inestimable de Mattia Bunel, loué soit son nom.
 
 ```shell
 sudo mkdir -p /etc/systemd/system/docker.service.d
