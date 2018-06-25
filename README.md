@@ -67,7 +67,7 @@ Deux paramètres au minimum :
 | local_data/poids.csv | 1         | +          | int    |                   | Poids de chaque raster d’aménités pour la création du raster final interet                                            |
 
 Usage :
-```shell 
+```shell
     ./simulate.py ./workspace/mtp/simulation_50m/ ./results/ 0.5 'scenario=tendanciel buildNonRes=True'
 ```
 
@@ -85,7 +85,7 @@ ATTENTION : derrière -p : mettre les chemins en absolu
 
 ### Commandes Docker :  
 
-#### 0. faire du docker à l'IGN avec une ubuntu 16.04 
+#### 0. faire du docker à l'IGN avec une ubuntu 16.04
 
 d'après (https://stackoverflow.com/questions/26550360/docker-ubuntu-behind-proxy),
 et grâce à l'aide inestimable de Mattia Bunel, loué soit son nom.
@@ -94,7 +94,7 @@ et grâce à l'aide inestimable de Mattia Bunel, loué soit son nom.
 sudo mkdir -p /etc/systemd/system/docker.service.d
 touch ./proxy.conf
 ```
-on y met le contenu suivant: 
+on y met le contenu suivant:
 
 ```
 [Service]
@@ -147,7 +147,7 @@ Dépendances pour python3 :
     pandas + xlrd (pour manipuler les .xls)  
 
 Usage :
-```shell 
+```shell
 ./insee_to_csv.py ../global_data/insee/  
 ```
 
@@ -155,11 +155,11 @@ Usage :
 Génère un GIF à partir des instantanés (TIF) générés pour chaque année de la simulation.  
 Trois paramètres au minimum:  
     1 : dossier contenant les images pour chaque année  
-    2 : dossier de sortie
+    2 : dossier de sortie  
     3 : type de donnée des images (byte, uint16, uint32, float32)  
-    4 : chaîne contenant la durée du GIF et la valeur max à utiliser (delay=n , maxValue=n)  
+    4 : chaîne contenant la durée du GIF et la valeur max à utiliser ( delay=n , maxValue=n)  
 
 Usage :
-```shell 
-./tif_to_gif.py ./results/snapshots/surface_sol ./output/ uint16
+```shell
+./tif_to_gif.py ../results/snapshots/surface_sol ../output/ uint16
 ```

@@ -694,6 +694,73 @@ def irisExtractor(iris, overlay, csvdir, outdir):
     return reproj(res['OUTPUT'], outdir)
     del csvPop09, csvPop12, csvPop14, csvLog14
 
+# Attribution des valeurs d'intérêt dans la couche d'ocsol en fonction de la zone d'étude (studyAreaName)
+def ocsExtractor(ocsPath):
+    ocsol = None
+    if studyAreaName == 'mtp' or studyAreaName == 'montpellier':
+        params = {
+            'INPUT': ocsPath,
+            'OUTPUT': 'memory:ocsol'
+        }
+        res = processing.run('native:fixgeometries', params, feedback=feedback)
+        ocsol = res['OUTPUT']
+        expr = """
+            CASE
+                WHEN "lib15_niv1" = 'EAU' THEN 0
+                WHEN "lib15_niv1" = 'ESPACES AGRICOLES' THEN 0.9
+                WHEN "lib15_niv1" = 'ESPACES BOISES' THEN 0.3
+                WHEN "lib15_niv1" = 'ESPACES NATURELS NON BOISES' THEN 0.6
+                WHEN "lib15_niv1" = 'ESPACES RECREATIFS' THEN 0.1
+                WHEN "lib15_niv1" = 'ESPACES URBANISES' THEN 1
+                WHEN "lib15_niv1" = 'EXTRACTION DE MATERIAUX, DECHARGES, CHANTIERS' THEN 0
+                WHEN "lib15_niv1" = 'SURFACES INDUSTRIELLES OU COMMERCIALES ET INFRASTRUCTURES DE COMMUNICATION' THEN 0
+                ELSE 0
+            END
+        """
+        ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
+        ocsol.addExpressionField('"c2015_niv1"', QgsField('code', QVariant.Int))
+
+    elif studyAreaName == 'nim' or studyAreaName == 'nimes':
+        params = {
+            'INPUT': localData + 'ocsol.shp',
+            'OUTPUT': 'memory:ocsol'
+        }
+        res = processing.run('native:fixgeometries', params, feedback=feedback)
+        ocsol = res['OUTPUT']
+        # 1 = Urbain, 2 = Agricole, 3 = Espace naturel, 4 = Zone humide, 5 = Surface en eau
+        expr = """
+            CASE
+                WHEN "NIV1_12" = 1 THEN 1
+                WHEN "NIV1_12" = 2 THEN 0.8
+                WHEN "NIV1_12" = 3 THEN 0.5
+                WHEN "NIV1_12" = 4 THEN 0.2
+                WHEN "NIV1_12" = 5 THEN 0
+                ELSE 0
+            END
+        """
+        ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
+        ocsol.addExpressionField('"NIV1_12"', QgsField('code', QVariant.Int))
+
+    return ocsol
+
+# Séléctionne les zones restrictvies dans le PPRI
+def ppriExtractor(ppriPath):
+    params = {
+        'INPUT': ppriPath,
+        'OUTPUT': 'memory:ppri'
+    }
+    res = processing.run('native:fixgeometries', params, feedback=feedback)
+    ppri = res['OUTPUT']
+    expr = """ "NOM" LIKE '%-NU%' or "NOM" LIKE 'F-U%' """
+    params = {
+        'INPUT': ppri,
+        'EXPRESSION': expr,
+        'OUTPUT': 'memory:ppri',
+        'FAIL_OUTPUT': 'memory:'
+    }
+    res = processing.run('native:extractbyexpression', params, feedback=feedback)
+    return res['OUTPUT']
+
 # Corrige les géometries et reclasse un PLU
 def pluFixer(plu, overlay, outdir, encoding='utf-8'):
     plu.setProviderEncoding(encoding)
@@ -806,7 +873,6 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 globalData + 'rge/' + dpt + '/bdtopo_2016/BATI_INDUSTRIEL.SHP',
                 globalData + 'rge/' + dpt + '/bdtopo_2016/BATI_REMARQUABLE.SHP',
                 globalData + 'rge/' + dpt + '/bdtopo_2016/CIMETIERE.SHP',
-                globalData + 'rge/' + dpt + '/bdtopo_2016/CONSTRUCTION_LEGERE.SHP',
                 globalData + 'rge/' + dpt + '/bdtopo_2016/CONSTRUCTION_SURFACIQUE.SHP',
                 globalData + 'rge/' + dpt + '/bdtopo_2016/PISTE_AERODROME.SHP',
                 globalData + 'rge/' + dpt + '/bdtopo_2016/RESERVOIR.SHP',
@@ -826,8 +892,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             clipRes = [
                 globalData + 'rge/' + dpt + '/bdtopo_2016/ROUTE_PRIMAIRE.SHP',
                 globalData + 'rge/' + dpt + '/bdtopo_2016/ROUTE_SECONDAIRE.SHP',
-                globalData + 'rge/' + dpt + '/bdtopo_2016/TRONCON_VOIE_FERREE.SHP',
-                globalData + 'rge/' + dpt + '/bdtopo_2016/GARE.SHP'
+                globalData + 'rge/' + dpt + '/bdtopo_2016/TRONCON_VOIE_FERREE.SHP'
             ]
 
             argList = []
@@ -871,11 +936,11 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             del voiesFerrees
 
             # Préparation de la couche arrêts de transport en commun
-            transports = []
+            transList = []
             if os.path.exists(localData + 'bus.shp'):
                 reproj(clip(localData + 'bus.shp', zone_buffer), workspace + 'data/transport/')
                 bus = QgsVectorLayer(workspace + 'data/transport/bus.shp', 'bus')
-                transports.append(bus)
+                transList.append(bus)
                 del bus
 
             params = {
@@ -885,20 +950,24 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 'FAIL_OUTPUT': 'memory:'
             }
             res = processing.run('native:extractbyexpression', params, feedback=feedback)
-            transports.append(res['OUTPUT'])
-
-            gare = QgsVectorLayer(workspace + 'data/transport/gare.shp', 'gare')
-            params = {'INPUT': gare, 'ALL_PARTS': False, 'OUTPUT': 'memory:gare'}
-            res = processing.run('native:centroids', params, feedback=feedback)
-            transports.append(res['OUTPUT'])
+            transList.append(res['OUTPUT'])
 
             params = {
-                'LAYERS': transports,
+                'INPUT': workspace + 'data/pai/transport.shp',
+                'EXPRESSION': """ "NATURE" LIKE 'Gare voyageurs %' """,
+                'OUTPUT': workspace + 'data/transport/gare.shp',
+                'FAIL_OUTPUT': 'memory:'
+            }
+            res = processing.run('native:extractbyexpression', params, feedback=feedback)
+            transList.append(res['OUTPUT'])
+
+            params = {
+                'LAYERS': transList,
                 'CRS': 'EPSG:3035',
                 'OUTPUT': workspace + 'data/transport/arrets_transport.shp'
             }
             processing.run('native:mergevectorlayers', params, feedback=feedback)
-            del transports, gare
+            del transList
 
             # Traitement du PLU
             if os.path.exists(localData + 'plu.shp'):
@@ -911,33 +980,16 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             sireneSplitter(sirene, workspace + 'data/geosirene/')
 
             argList = []
-            # Correction de l'OCS ou extraction de l'OSO CESBIO si besoin
+            argList.append((clip(globalData + 'rge/' + dpt + '/bdtopo_2016/SURFACE_EAU.SHP', zone), workspace + 'data/restriction/'))
+
+            # Correction de l'OCS ou extraction de l'OSO CESBIO si besoin (penser à ajouter les valeurs d'intérêt !)
             if not os.path.exists(localData + 'ocsol.shp'):
                 ocsol = QgsVectorLayer( globalData + 'oso/departement_' + dpt + '.shp', 'ocsol')
                 ocsol.addExpressionField('"Classe"', QgsField('code', QVariant.Int))
                 ocsol.dataProvider().createSpatialIndex()
-            else:
-                params = {
-                    'INPUT': localData + 'ocsol.shp',
-                    'OUTPUT': 'memory:ocsol'
-                }
-                res = processing.run('native:fixgeometries', params, feedback=feedback)
-                ocsol = res['OUTPUT']
-                expr = """
-                    CASE
-                        WHEN "lib15_niv1" = 'EAU' THEN 0
-                        WHEN "lib15_niv1" = 'ESPACES AGRICOLES' THEN 0.9
-                        WHEN "lib15_niv1" = 'ESPACES BOISES' THEN 0.3
-                        WHEN "lib15_niv1" = 'ESPACES NATURELS NON BOISES' THEN 0.6
-                        WHEN "lib15_niv1" = 'ESPACES RECREATIFS' THEN 0.1
-                        WHEN "lib15_niv1" = 'ESPACES URBANISES' THEN 1
-                        WHEN "lib15_niv1" = 'EXTRACTION DE MATERIAUX, DECHARGES, CHANTIERS' THEN 0
-                        WHEN "lib15_niv1" = 'SURFACES INDUSTRIELLES OU COMMERCIALES ET INFRASTRUCTURES DE COMMUNICATION' THEN 0
-                        ELSE 0
-                    END
-                """
-                ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
-                ocsol.addExpressionField('"c2015_niv1"', QgsField('code', QVariant.Int))
+            else :
+                ocsol = ocsExtractor(localData + 'ocsol.shp')
+
             argList.append((clip(ocsol, zone), workspace + 'data/'))
 
             # Traitement du shape de l'intérêt écologique
@@ -959,16 +1011,16 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 res = processing.run('native:fixgeometries', params, feedback=feedback)
                 ecologie = res['OUTPUT']
                 del ecoFields, field
+                argList.append((clip(ecologie, zone), workspace + 'data/'))
+
             # Autrement déterminer l'intérêt écologique grâce à l'ocsol ?
             else:
                 pass
 
-            argList.append((clip(ecologie, zone), workspace + 'data/'))
-            argList.append((clip(globalData + 'rge/' + dpt + '/bdtopo_2016/SURFACE_EAU.SHP', zone), workspace + 'data/restriction/'))
-
             # Traitement d'une couche facultative du PPR
-            if os.path.exists('ppr.shp'):
-                argList.append((clip('ppr.shp', zone), workspace + 'data/restriction'))
+            if os.path.exists(localData + 'ppri.shp'):
+                ppri = ppriExtractor(localData + 'ppri.shp')
+                argList.append((clip(ppri, zone), workspace + 'data/restriction/'))
 
             # Utilisation des parcelles DGFIP pour exclure des bâtiments lors du calcul de densité
             if os.path.exists(localData + 'exclusion_parcelles.shp'):
@@ -976,7 +1028,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 res = processing.run('native:fixgeometries', params, feedback=feedback)
                 parcelles = res['OUTPUT']
                 argList.append((clip(parcelles, zone), workspace + 'data/restriction/'))
-            # Sinon, traitement d'une couche facultative pour exclusion de zones bâties lors du calcul et inclusion dans les restrictions
+            # + Traitement d'une couche facultative pour exclusion de zones bâties lors du calcul et inclusion dans les restrictions
             if os.path.exists(localData + 'exclusion_manuelle.shp'):
                 argList.append((clip(localData + 'exclusion_manuelle.shp', zone), workspace + 'data/restriction/'))
 
@@ -986,7 +1038,11 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 for a in argList:
                     reproj(*a)
 
-            del ecologie, ocsol
+            del ocsol
+            if 'ecologie' in globals():
+                del ecologie
+            if 'ppri' in globals():
+                del ppri
 
             # Traitement des couches de zonage de protection
             zonagesEnv = []
@@ -1296,7 +1352,6 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             # Rasterisations
             argList = [
-                (workspace + 'data/ecologie.shp', workspace + 'data/' + pixRes + 'm/tif/ecologie.tif', 'taux'),
                 (workspace + 'data/transport/routes.shp', workspace + 'data/' + pixRes + 'm/tif/routes.tif', None, 1),
                 (workspace + 'data/transport/arrets_transport.shp', workspace + 'data/' + pixRes + 'm/tif/arrets_transport.tif', None, 1),
                 (workspace + 'data/' + pixRes + 'm/restrict_grid.shp', workspace + 'data/' + pixRes + 'm/tif/restrict_grid.tif', 'restrict'),
@@ -1307,13 +1362,17 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 (workspace + 'data/restriction/zonages_protection.shp', workspace + 'data/' + pixRes + 'm/tif/zonages_protection.tif', None, 1),
                 (workspace + 'data/pai/surf_activ_non_com.shp', workspace + 'data/' + pixRes + 'm/tif/surf_activ_non_com.tif', None, 1)
             ]
+
+            if os.path.exists(workspace + 'data/ecologie.shp'):
+                argList.append((workspace + 'data/ecologie.shp', workspace + 'data/' + pixRes + 'm/tif/ecologie.tif', 'taux'))
+
             if os.path.exists(workspace + 'data/restriction/exclusion_parcelles.shp'):
                 argList.append((workspace + 'data/restriction/exclusion_parcelles.shp', workspace + 'data/' + pixRes + 'm/tif/exclusion_parcelles.tif', None, 1))
             if os.path.exists(workspace + 'data/restriction/exclusion_manuelle.shp'):
                 argList.append((workspace + 'data/restriction/exclusion_manuelle.shp', workspace + 'data/' + pixRes + 'm/tif/exclusion_manuelle.tif', None, 1))
 
-            if os.path.exists(workspace + 'data/restriction/ppr.shp'):
-                argList.append((workspace + 'data/restriction/ppr.shp', workspace + 'data/' + pixRes + 'm/tif/ppr.tif', None, 1))
+            if os.path.exists(workspace + 'data/restriction/ppri.shp'):
+                argList.append((workspace + 'data/restriction/ppri.shp', workspace + 'data/' + pixRes + 'm/tif/ppri.tif', None, 1))
             elif os.path.exists(workspace + 'data/plu.shp'):
                 argList.append((workspace + 'data/plu.shp', workspace + 'data/' + pixRes + 'm/tif/ppr.tif', 'ppr'))
 
@@ -1376,7 +1435,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
         start_time = time()
         etape = 8
-        description = "finalisation "
+        description = "finalizing... "
         progres = "%i/8 : %s" %(etape, description)
         if not silent:
             printer(progres)
@@ -1438,9 +1497,6 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
         geot = ds.GetGeoTransform()
         ds = None
 
-        # Traitement de l'intérêt écologique
-        ecologie = to_array(workspace + 'data/' + pixRes + 'm/tif/ecologie.tif', np.float32)
-        ecologie = np.where((ecologie == 0), 1, 1 - ecologie)
         # Conversion des rasters de distance
         distance_routes = to_array(workspace + 'data/' + pixRes + 'm/tif/distance_routes.tif', np.float32)
         routes = np.where(distance_routes > -1, 1 - (distance_routes / np.amax(distance_routes)), 0)
@@ -1475,19 +1531,24 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
         highwayMask = to_array(workspace + 'data/' + pixRes + 'm/tif/tampon_autoroutes.tif', np.byte)
         roadsMask = to_array(workspace + 'data/' + pixRes + 'm/tif/tampon_routes_importantes.tif', np.byte)
         railsMask = to_array(workspace + 'data/' + pixRes + 'm/tif/tampon_voies_ferrees.tif', np.byte)
-        pprMask = to_array(workspace + 'data/' + pixRes + 'm/tif/ppr.tif', np.byte)
+        ppriMask = to_array(workspace + 'data/' + pixRes + 'm/tif/ppri.tif', np.byte)
         slope = to_array(workspace + 'data/' + pixRes + 'm/tif/slope.tif')
         slopeMask = np.where(slope > maxSlope, 1, 0).astype(np.byte)
         # Fusion
         restriction = np.where((irisMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (roadsMask == 1) |
-                               (railsMask == 1) | (zonageMask == 1) | (highwayMask == 1) | (pprMask == 1) | (slopeMask == 1), 1, 0)
+                               (railsMask == 1) | (zonageMask == 1) | (highwayMask == 1) | (ppriMask == 1) | (slopeMask == 1), 1, 0)
 
         if os.path.exists(workspace + 'data/' + pixRes + 'm/tif/exclusion_manuelle.tif'):
             exclusionManuelle = to_array(workspace + 'data/' + pixRes + 'm/tif/exclusion_manuelle.tif', np.byte)
             restriction = np.where(exclusionManuelle == 1, 1, restriction)
 
+        # Traitement de l'intérêt écologique
+        if os.path.exists(workspace + 'data/' + pixRes + 'm/tif/ecologie.tif'):
+            ecologie = to_array(workspace + 'data/' + pixRes + 'm/tif/ecologie.tif', np.float32)
+            ecologie = np.where((ecologie == 0), 1, 1 - ecologie)
+            to_tif(ecologie, 'float32', proj, geot, project + 'interet/non-importance_ecologique.tif')
+
         to_tif(restriction, 'byte', proj, geot, project + 'interet/restriction_totale.tif')
-        to_tif(ecologie, 'float32', proj, geot, project + 'interet/non-importance_ecologique.tif')
         to_tif(sirene, 'float32', proj, geot, project + 'interet/densite_sirene.tif')
         to_tif(routes, 'float32', proj, geot, project + 'interet/proximite_routes.tif')
         to_tif(transport, 'float32', proj, geot, project + 'interet/proximite_transport.tif')
