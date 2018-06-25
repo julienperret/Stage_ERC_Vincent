@@ -774,7 +774,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             etape = 1
             description = 'extracting and reprojecting data '
-            progres = "Etape %i sur 8 : %s" %(etape, description)
+            progres = "%i/8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             start_time = time()
@@ -888,7 +888,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             transports.append(res['OUTPUT'])
 
             gare = QgsVectorLayer(workspace + 'data/transport/gare.shp', 'gare')
-            params = {'INPUT': gare, 'OUTPUT': 'memory:gare'}
+            params = {'INPUT': gare, 'ALL_PARTS': False, 'OUTPUT': 'memory:gare'}
             res = processing.run('native:centroids', params, feedback=feedback)
             transports.append(res['OUTPUT'])
 
@@ -1081,7 +1081,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             start_time = time()
             etape = 2
             description = "cleaning building to estimate the population "
-            progres = "Etape %i sur 8 : %s" %(etape, description)
+            progres = "%i/8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1159,7 +1159,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             start_time = time()
             etape = 3
             description =  "creating a grid with resolution " + pixRes + "m "
-            progres = "Etape %i sur 8 : %s" %(etape, description)
+            progres = "%i/8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1185,7 +1185,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             start_time = time()
             etape = 4
             description = "analysing the evolution of build areas "
-            progres = "Etape %i sur 8 : %s" %(etape, description)
+            progres = "%i/8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1219,7 +1219,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             start_time = time()
             etape = 5
             description = "estimating the population in the grid "
-            progres = "Etape %i sur 8 : %s" %(etape, description)
+            progres = "%i/8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1232,7 +1232,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             start_time = time()
             etape = 6
             description = "computing restrictions "
-            progres = "Etape %i sur 8 : %s" %(etape, description)
+            progres = "%i/8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1287,7 +1287,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             start_time = time()
             etape = 7
             description = "creating restriction and interest rasters "
-            progres = "Etape %i sur 8 : %s" %(etape, description)
+            progres = "%i/8 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1377,7 +1377,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
         start_time = time()
         etape = 8
         description = "finalisation "
-        progres = "Etape %i sur 8 : %s" %(etape, description)
+        progres = "%i/8 : %s" %(etape, description)
         if not silent:
             printer(progres)
         log.write(description + ': ')
