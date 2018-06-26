@@ -10,20 +10,20 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 
 *Paramètres disponibles :*  
 
-| Processus                                  | Variable ou fichier              | Minimum | Maximum | Unité | Valeur par défaut | Description                                                                                              |
-|--------------------------------------------|----------------------------------|---------|---------|-------|-------------------|----------------------------------------------------------------------------------------------------------|
-| Extraction des données                     | bufferDistance                   | 500     | 2000    | m     | 1000              | Taille de tampon utilisée pour extraire les données (dépend des distances max pour les raster d’intérêts |
-| Création de la grille                      | pixRes                           | 20      | 200     | m     | 50                | Résolution de la maille de la grille / des rasters                                                       |
-| Estimation de la population dans la grille | levelHeight                      | 2       | 3       | m     | 3                 | Hauteur utilisée pour estimer le nombre d’étages                                                         |
-|                                            | minSurf                          | 50      | 100     | m²    | 50                | Surface minimale pour un bâtiment habitable                                                              |
-|                                            | maxSurf                          | 5000    | 10000   | m²    | 10000             | Surface maximale pour un bâtiment habitable                                                              |
-|                                            | useTxrp                          | False   | True    | bool  | True              | Utilisation du taux de résidences principales pour réduire la surface plancher estimée                   |
-| Création des rasters de distance           | roadDist                         | 50      | 300     | m     | 200               | Distance maximale aux routes                                                                             |
-|                                            | transDist                        | 100     | 500     | m     | 300               | Distance maximale aux arrêts de transport                                                                |
-| Création du raster de restriction          | maxSlope                         | ?       | 30      | %     | 30                | Seuil de pente pour interdiction à la construction                                                       |
-|                                            | maxOverlapRatio                  | 0       | 1       | float | 0,2               | Seuil de chevauchement max entre une cellule et une couche (cimetières, surfaces en eau…) pour exclusion |
-| Création des rasters de densité SIRENE     | global_data/sirene/poids.csv     | 1       | +       | int   | 1                 | Poids de chaque raster de densité de points SIRENE                                                       |
-|                                            | global_data/sirene/distances.csv | 100     | bufferDistance  | m       |         | Distances maximales de recherche pour chaque raster de densité de points SIRENE                          |
+| Processus                                  | Variable ou fichier              | Minimum | Maximum | Unité | Valeur par défaut | Description                                                                     |
+|--------------------------------------------|----------------------------------|---------|---------|-------|-------------------|-------------------------------------------------------------------------------- |
+| Extraction des données                     | bufferDistance                   | 500     | 2000    | m     | 1000              | Taille de tampon utilisée pour extraire les données                             |
+| Création de la grille                      | pixRes                           | 20      | 200     | m     | 50                | Résolution de la maille de la grille / des rasters                              |
+| Estimation de la population dans la grille | levelHeight                      | 2       | 3       | m     | 3                 | Hauteur utilisée pour estimer le nombre d’étages                                |
+|                                            | minSurf                          | 50      | 100     | m²    | 50                | Surface minimale pour un bâtiment habitable                                     |
+|                                            | maxSurf                          | 5000    | 10000   | m²    | 10000             | Surface maximale pour un bâtiment habitable                                     |
+|                                            | useTxrp                          | False   | True    | bool  | True              | Utilisation du taux de résidences principales lors de l'estimation du plancher  |
+| Création des rasters de distance           | roadDist                         | 50      | 300     | m     | 200               | Distance maximale aux routes                                                    |
+|                                            | transDist                        | 100     | 500     | m     | 300               | Distance maximale aux arrêts de transport                                       |
+| Création du raster de restriction          | maxSlope                         | ?       | 30      | %     | 30                | Seuil de pente pour interdiction à la construction                              |
+|                                            | maxOverlapRatio                  | 0       | 1       | float | 0,2               | Seuil de chevauchement max entre une cellule et une couche pour exclusion       |
+| Création des rasters de densité SIRENE     | global_data/sirene/poids.csv     | 1       | +       | int   | 1                 | Poids de chaque raster de densité de points SIRENE                              |
+|                                            | global_data/sirene/distances.csv | 100     | 2000    | m     |                   | Distances maximales de recherche pour chaque raster de densité de points SIRENE |
 
 *Mots magiques :*  
 
