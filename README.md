@@ -161,5 +161,5 @@ Trois paramètres au minimum:
 
 Usage :
 ```shell
-.utils/tif_to_gif.py ../results/snapshots/surface_sol ../output/ uint16
+./utils/tif_to_gif.py ../results/snapshots/surface_sol ../output/ uint16
 ```
