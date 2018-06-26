@@ -20,9 +20,9 @@ RUN mkdir -p /app
 WORKDIR /app/
 
 # Copy python files to work directory
-COPY insee_to_csv.py /app
-COPY magic.py /app
-COPY prepare.py /app
-COPY simulate.py /app
-COPY tif_to_gif.py /app
-COPY toolbox.py /app
+COPY ../utils/insee_to_csv.py /app
+COPY ../utils/magic.py /app
+COPY ../utils/tif_to_gif.py /app
+COPY ../prepare.py /app
+COPY ../simulate.py /app
+COPY ../toolbox.py /app
