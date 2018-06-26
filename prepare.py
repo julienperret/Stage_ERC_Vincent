@@ -778,7 +778,7 @@ def pluFixer(plu, overlay, outdir, encoding='utf-8'):
             ELSE '0' END
         """
         plu.addExpressionField(expr, QgsField('classe', QVariant.String, len=3))
-    if 'coment' in fields and 'coment' in fields:
+    if 'coment' in fields:
         expr = """
                 IF ("coment" LIKE '%à protéger%'
                 OR "coment" LIKE 'Coupures%'
