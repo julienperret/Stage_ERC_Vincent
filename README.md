@@ -23,7 +23,7 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 | Création du raster de restriction          | maxSlope                         | ?       | 30      | %     | 30                | Seuil de pente pour interdiction à la construction                                                       |
 |                                            | maxOverlapRatio                  | 0       | 1       | float | 0,2               | Seuil de chevauchement max entre une cellule et une couche (cimetières, surfaces en eau…) pour exclusion |
 | Création des rasters de densité SIRENE     | global_data/sirene/poids.csv     | 1       | +       | int   | 1                 | Poids de chaque raster de densité de points SIRENE                                                       |
-|                                            | global_data/sirene/distances.csv | 100     | 1000    | m     | bufferDistance    | Distances maximales de recherche pour chaque raster de densité de points SIRENE                          |
+|                                            | global_data/sirene/distances.csv | 100     | bufferDistance  | m       |         | Distances maximales de recherche pour chaque raster de densité de points SIRENE                          |
 
 *Mots magiques :*  
 
@@ -148,7 +148,7 @@ Dépendances pour python3 :
 
 Usage :
 ```shell
-./insee_to_csv.py ../global_data/insee/  
+./utils/insee_to_csv.py ../global_data/insee/  
 ```
 
 ### ./tif_to_gif.py  
@@ -161,5 +161,5 @@ Trois paramètres au minimum:
 
 Usage :
 ```shell
-./tif_to_gif.py ../results/snapshots/surface_sol ../output/ uint16
+.utils/tif_to_gif.py ../results/snapshots/surface_sol ../output/ uint16
 ```
