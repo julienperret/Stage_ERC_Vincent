@@ -2,3 +2,5 @@
 *.autosave
 *.pyc
 *.kate-swp
+.RData
+.Rhistory
