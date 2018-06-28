@@ -307,16 +307,18 @@ def buildCsvGrid(name, path, iris, grid, outCsvDir):
     res = processing.run('qgis:intersection', params, feedback=feedback)
     buildings = res['OUTPUT']
     buildings.dataProvider().createSpatialIndex()
-    params = {
-        'INPUT': buildings,
-        'OVERLAY': grid,
-        'INPUT_FIELDS': [],
-        'OVERLAY_FIELDS': ['id'],
-        'OUTPUT': 'memory:' + name
-    }
-    res = processing.run('qgis:intersection', params, feedback=feedback)
-    buildings = res['OUTPUT']
-    buildings.dataProvider().createSpatialIndex()
+    if year == '14':
+        params = {
+            'INPUT': buildings,
+            'OVERLAY': grid,
+            'INPUT_FIELDS': [],
+            'OVERLAY_FIELDS': ['id'],
+            'OUTPUT': 'memory:' + name
+        }
+        res = processing.run('qgis:intersection', params, feedback=feedback)
+        buildings = res['OUTPUT']
+        buildings.dataProvider().createSpatialIndex()
+
     buildings.addExpressionField('$area', QgsField('AIRE', QVariant.Double))
     params = {
         'INPUT': buildings,
@@ -325,13 +327,14 @@ def buildCsvGrid(name, path, iris, grid, outCsvDir):
         'OUTPUT': outCsvDir + year + '_' + name + '_ssol_iris.csv'
     }
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
-    params = {
-        'INPUT': buildings,
-        'VALUES_FIELD_NAME': 'AIRE',
-        'CATEGORIES_FIELD_NAME': 'id_2',
-        'OUTPUT': outCsvDir + year + '_' + name + '_ssol_grid.csv'
-    }
-    processing.run('qgis:statisticsbycategories', params, feedback=feedback)
+    if year == '14':
+        params = {
+            'INPUT': buildings,
+            'VALUES_FIELD_NAME': 'AIRE',
+            'CATEGORIES_FIELD_NAME': 'id_2',
+            'OUTPUT': outCsvDir + year + '_' + name + '_ssol_grid.csv'
+        }
+        processing.run('qgis:statisticsbycategories', params, feedback=feedback)
 
 # Intersection entre la couche de bâti nettoyée jointe aux iris et la grille avec calcul et jointure des statistiques
 def statGridIris(buildings, grid, iris, outdir, csvDir):
@@ -442,9 +445,8 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
 
     gridBlacklist = ['left', 'right', 'top', 'bottom']
     irisFields1 = []
-    gridFields1 = []
     irisFields2 = []
-    gridFields2 = []
+    gridFields = []
     for path in os.listdir(csvDir):
         res = re.search('([0-9]{2})_([a-z]*)_ssol_([a-z]{4})\.csv', path)
         if res:
@@ -456,10 +458,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
             csvLayer.addExpressionField('to_real("sum")', QgsField(year + '_' + name, QVariant.Double))
             if idType == 'grid':
                 csvGrid.append(csvLayer)
-                if year == '09':
-                    gridFields1.append(year + '_' + name)
-                elif year == '14':
-                    gridFields2.append(year + '_' + name)
+                gridFields.append(year + '_' + name)
             elif idType == 'iris':
                 csvIris.append(csvLayer)
                 if year == '09':
@@ -474,19 +473,9 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
 
     cpt = 0
     expr = ''
-    for field in gridFields1:
+    for field in gridFields:
         cpt += 1
-        if cpt != len(gridFields1):
-            expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
-        else:
-            expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
-    grid.addExpressionField('round(' + expr + ')', QgsField('ssol_09', QVariant.Int))
-
-    cpt = 0
-    expr = ''
-    for field in gridFields2:
-        cpt += 1
-        if cpt != len(gridFields2):
+        if cpt != len(gridFields):
             expr += 'IF("' + field + '" IS NULL, 0, "' + field + '") + '
         else:
             expr += 'IF("' + field + '" IS NULL, 0, "' + field + '")'
@@ -517,7 +506,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
 
     params = {
         'INPUT': grid,
-        'COLUMN': gridBlacklist + gridFields1 + gridFields2,
+        'COLUMN': gridBlacklist + gridFields,
         'OUTPUT': outdir + '/stat_grid.shp'
     }
     processing.run('qgis:deletecolumn', params, feedback=feedback)
@@ -527,6 +516,16 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
         'OUTPUT': outdir + '/stat_iris.shp'
     }
     processing.run('qgis:deletecolumn', params, feedback=feedback)
+
+    ssol09 = 0
+    ssol14 = 0
+    for feat in iris.getFeatures():
+        ssol09 += feat.attribute('ssol_09')
+        ssol14 += feat.attribute('ssol_14')
+    with open(outdir + 'evo_surface_sol.csv', 'w') as w:
+        w.write('annee, surface\n')
+        w.write('2009, ' + str(ssol09) + '\n')
+        w.write('2014, ' + str(ssol14) + '\n')
 
 # Crée une grille avec des statistiques par cellule sur la surface couverte pour chaque couche en entrée
 def restrictGrid(layerList, grid, ratio, outdir):
@@ -694,53 +693,69 @@ def irisExtractor(iris, overlay, csvdir, outdir):
     return reproj(res['OUTPUT'], outdir)
     del csvPop09, csvPop12, csvPop14, csvLog14
 
-# Attribution des valeurs d'intérêt dans la couche d'ocsol en fonction de la zone d'étude (studyAreaName)
-def ocsExtractor(ocsPath):
-    ocsol = None
-    if studyAreaName == 'mtp' or studyAreaName == 'montpellier':
-        params = {
-            'INPUT': ocsPath,
-            'OUTPUT': 'memory:ocsol'
-        }
-        res = processing.run('native:fixgeometries', params, feedback=feedback)
-        ocsol = res['OUTPUT']
+# Aggrégation de classes et attribution d'une valeur d'intérêt
+def ocsExtractor(ocsPath, oso=False):
+    params = {
+        'INPUT': ocsPath,
+        'OUTPUT': 'memory:ocsol'
+    }
+    res = processing.run('native:fixgeometries', params, feedback=feedback)
+    ocsol = res['OUTPUT']
+    ocsol.dataProvider().createSpatialIndex()
+    if oso:
         expr = """
             CASE
-                WHEN "lib15_niv1" = 'EAU' THEN 0
-                WHEN "lib15_niv1" = 'ESPACES AGRICOLES' THEN 0.9
-                WHEN "lib15_niv1" = 'ESPACES BOISES' THEN 0.3
-                WHEN "lib15_niv1" = 'ESPACES NATURELS NON BOISES' THEN 0.6
-                WHEN "lib15_niv1" = 'ESPACES RECREATIFS' THEN 0.1
-                WHEN "lib15_niv1" = 'ESPACES URBANISES' THEN 1
-                WHEN "lib15_niv1" = 'EXTRACTION DE MATERIAUX, DECHARGES, CHANTIERS' THEN 0
-                WHEN "lib15_niv1" = 'SURFACES INDUSTRIELLES OU COMMERCIALES ET INFRASTRUCTURES DE COMMUNICATION' THEN 0
-                ELSE 0
+                WHEN to_string("Classe") LIKE '1%' or to_string("Classe") LIKE '2%' THEN 'ESPACE AGRICOLE'
+                WHEN to_string("Classe") LIKE '3%' or "Classe"=45 or "Classe"=46 or "Classe"=53 THEN 'ESPACE NATUREL'
+                WHEN "Classe"=41 or "Classe"=42 or "Classe"=43 or "Classe"=44 THEN 'ESPACE URBANISE'
+                WHEN "Classe"=53 THEN 'SURFACE EN EAU'
+                ELSE NULL
             END
         """
-        ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
-        ocsol.addExpressionField('"c2015_niv1"', QgsField('code', QVariant.Int))
+        ocsol.addExpressionField(expr, QgsField('classe_2', QVariant.String, len=30))
+        ocsol.addExpressionField('"Classe"', QgsField('code_orig', QVariant.Int))
+    else:
+        if studyAreaName == 'mtp' or studyAreaName == 'montpellier':
+            expr = """
+                CASE
+                    WHEN "lib15_niv1" = 'EAU' THEN 'SURFACE EN EAU'
+                    WHEN "lib15_niv1" = 'ESPACES AGRICOLES' THEN 'ESPACE AGRICOLE'
+                    WHEN "lib15_niv1" = 'ESPACES BOISES' THEN 'ESPACE NATUREL'
+                    WHEN "lib15_niv1" = 'ESPACES NATURELS NON BOISES' THEN 'ESPACE NATUREL'
+                    WHEN "lib15_niv1" = 'ESPACES RECREATIFS' THEN 'AUTRE'
+                    WHEN "lib15_niv1" = 'ESPACES URBANISES' THEN 'ESPACE URBANISE'
+                    WHEN "lib15_niv1" = 'EXTRACTION DE MATERIAUX, DECHARGES, CHANTIERS' THEN 'AUTRE'
+                    WHEN "lib15_niv1" = 'SURFACES INDUSTRIELLES OU COMMERCIALES ET INFRASTRUCTURES DE COMMUNICATION' THEN 'ESPACE URBANISE'
+                    ELSE 0
+                END
+            """
+            ocsol.addExpressionField(expr, QgsField('classe_2', QVariant.String, len=30))
+            ocsol.addExpressionField('"c2015_niv1"', QgsField('code_orig', QVariant.Int))
 
-    elif studyAreaName == 'nim' or studyAreaName == 'nimes':
-        params = {
-            'INPUT': localData + 'ocsol.shp',
-            'OUTPUT': 'memory:ocsol'
-        }
-        res = processing.run('native:fixgeometries', params, feedback=feedback)
-        ocsol = res['OUTPUT']
-        # 1 = Urbain, 2 = Agricole, 3 = Espace naturel, 4 = Zone humide, 5 = Surface en eau
-        expr = """
-            CASE
-                WHEN "NIV1_12" = 1 THEN 1
-                WHEN "NIV1_12" = 2 THEN 0.8
-                WHEN "NIV1_12" = 3 THEN 0.5
-                WHEN "NIV1_12" = 4 THEN 0.2
-                WHEN "NIV1_12" = 5 THEN 0
-                ELSE 0
-            END
-        """
-        ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
-        ocsol.addExpressionField('"NIV1_12"', QgsField('code', QVariant.Int))
+        elif studyAreaName == 'nim' or studyAreaName == 'nimes':
+            # 1 = Urbain, 2 = Agricole, 3 = Espace naturel, 4 = Zone humide, 5 = Surface en eau
+            expr = """
+                CASE
+                    WHEN "NIV1_12" = 1 THEN 'ESPACE URBANISE'
+                    WHEN "NIV1_12" = 2 THEN 'ESPACE AGRICOLE'
+                    WHEN "NIV1_12" = 3 THEN 'ESPACE NATUREL'
+                    WHEN "NIV1_12" = 4 THEN 'ESPACE NATUREL'
+                    WHEN "NIV1_12" = 5 THEN 'SURFACE EN EAU'
+                    ELSE 0
+                END
+            """
+            ocsol.addExpressionField(expr, QgsField('classe_2', QVariant.String, len=30))
+            ocsol.addExpressionField('"NIV1_12"', QgsField('code_orig', QVariant.Int))
 
+    expr = """
+        CASE
+            WHEN "classe_2" = 'ESPACE URBANISE' THEN 1
+            WHEN "classe_2" = 'ESPACE AGRICOLE' THEN 0.6
+            WHEN "classe_2" = 'ESPACE NATUREL' THEN 0.3
+            WHEN "classe_2" = 'SURFACE EN EAU' THEN 0
+            WHEN "classe_2" = 'AUTRE' THEN 0
+    """
+    ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
     return ocsol
 
 # Séléctionne les zones restrictvies dans le PPRI
@@ -798,7 +813,7 @@ def pluFixer(plu, overlay, outdir, encoding='utf-8'):
             """
         plu.addExpressionField(expr, QgsField('priority', QVariant.Int, len=1))
         expr = """ IF ("coment" LIKE '% protection contre risques naturels', 1, 0) """
-        plu.addExpressionField(expr, QgsField('ppr', QVariant.Int, len=1))
+        plu.addExpressionField(expr, QgsField('ppri', QVariant.Int, len=1))
 
     params = {'INPUT': plu, 'OUTPUT': 'memory:plu' }
     res = processing.run('native:fixgeometries', params, feedback=feedback)
@@ -984,9 +999,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             # Correction de l'OCS ou extraction de l'OSO CESBIO si besoin (penser à ajouter les valeurs d'intérêt !)
             if not os.path.exists(localData + 'ocsol.shp'):
-                ocsol = QgsVectorLayer( globalData + 'oso/departement_' + dpt + '.shp', 'ocsol')
-                ocsol.addExpressionField('"Classe"', QgsField('code', QVariant.Int))
-                ocsol.dataProvider().createSpatialIndex()
+                ocsol = ocsExtractor( globalData + 'oso/departement_' + dpt + '.shp', True)
             else :
                 ocsol = ocsExtractor(localData + 'ocsol.shp')
 
@@ -1374,7 +1387,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             if os.path.exists(workspace + 'data/restriction/ppri.shp'):
                 argList.append((workspace + 'data/restriction/ppri.shp', workspace + 'data/' + pixRes + 'm/tif/ppri.tif', None, 1))
             elif os.path.exists(workspace + 'data/plu.shp'):
-                argList.append((workspace + 'data/plu.shp', workspace + 'data/' + pixRes + 'm/tif/ppr.tif', 'ppr'))
+                argList.append((workspace + 'data/plu.shp', workspace + 'data/' + pixRes + 'm/tif/ppri.tif', 'ppri'))
 
             if speed:
                 getDone(rasterize, argList)
@@ -1467,19 +1480,19 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
         os.mkdir(project + 'interet')
         copyfile(localData + 'poids.csv', project + 'interet/poids.csv')
+        copyfile(workspace + 'data/' + pixRes + 'm/evo_surface_sol.csv', project + 'evo_surface_sol.csv')
         # Rasterisations
         argList = [
             (workspace + 'data/' + pixRes + 'm/stat_grid.shp', project + 'demographie_2014.tif', 'pop'),
             (workspace + 'data/' + pixRes + 'm/stat_grid.shp', project + 'srf_pla.tif', 'srf_pla'),
             (workspace + 'data/' + pixRes + 'm/stat_grid.shp', project + 'srf_sol_res.tif', 'ssol_res'),
-            (workspace + 'data/' + pixRes + 'm/stat_grid.shp', project + 'srf_sol_2009.tif', 'ssol_09'),
             (workspace + 'data/' + pixRes + 'm/stat_grid.shp', project + 'srf_sol_2014.tif', 'ssol_14'),
             (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_ssr_med.tif', 'ssr_med'),
             (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_tx_ssr.tif', 'tx_ssr'),
             (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_m2_hab.tif', 'm2_hab'),
             (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_nbniv_max.tif', 'nbniv_max'),
-            (workspace + 'data/ocsol.shp', project + 'interet/occupation_sol.tif', 'interet'),
-            (workspace + 'data/ocsol.shp', project + 'classes_ocsol.tif', 'code')
+            (workspace + 'data/ocsol.shp', project + 'interet/occupation_sol.tif', 'code_orig'),
+            (workspace + 'data/ocsol.shp', project + 'classes_ocsol.tif', 'code_orig')
         ]
         if os.path.exists(workspace + 'data/plu.shp'):
             argList.append((workspace + 'data/plu.shp', project + 'interet/plu_restriction.tif', 'restrict'))
@@ -1547,6 +1560,8 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             ecologie = to_array(workspace + 'data/' + pixRes + 'm/tif/ecologie.tif', np.float32)
             ecologie = np.where((ecologie == 0), 1, 1 - ecologie)
             to_tif(ecologie, 'float32', proj, geot, project + 'interet/non-importance_ecologique.tif')
+        else:
+            rasterize(workspace + 'data/ocsol.shp', project + 'interet/non-importance_ecologique.tif', 'interet')
 
         to_tif(restriction, 'byte', proj, geot, project + 'interet/restriction_totale.tif')
         to_tif(sirene, 'float32', proj, geot, project + 'interet/densite_sirene.tif')

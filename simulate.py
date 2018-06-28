@@ -333,7 +333,6 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
 
         # Déclaration des matrices
         demographie14 = to_array(dataDir + 'demographie_2014.tif', np.uint16)
-        srfSol09 = to_array(dataDir + 'srf_sol_2009.tif', np.uint16)
         srfSol14 = to_array(dataDir + 'srf_sol_2014.tif', np.uint16)
         srfSolRes14 = to_array(dataDir + 'srf_sol_res.tif', np.uint16)
         ssrMed = to_array(dataDir + 'iris_ssr_med.tif', np.uint16)
@@ -349,24 +348,28 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         tra = to_array(dataDir + 'interet/proximite_transport.tif', np.float32)
         sir = to_array(dataDir + 'interet/densite_sirene.tif', np.float32)
         # Création du raster final d'intérêt avec pondération
-        interet = np.where((restriction != 1), (eco * coef['ecologie']) + (ocs * coef['ocsol']) +
-                           (rou * coef['routes']) + (tra * coef['transport']) + (sir * poids['sirene']), 0)
+        interet = np.where((restriction != 1), (eco * coef['ecologie']) + (rou * coef['routes']) + (tra * coef['transport']) + (sir * poids['sirene']), 0)
         interet = (interet / np.amax(interet)).astype(np.float32)
 
         # Création des rasters de capacité en surfaces sol et plancher
         capaSol = np.zeros([rows, cols], np.uint32) + int(srfCell * (maxBuiltRatio / 100))
         capaSol = np.where((restriction != 1) & (srfSol14 < capaSol), capaSol - srfSol14, 0).astype(np.uint16)
         # Statistiques sur l'évolution du bâti
-        urb09 = np.where(srfSol09 > 0, 1, 0).astype(np.byte)
         urb14 = np.where(srfSol14 > 0, 1, 0).astype(np.byte)
-        m2SolHab09 = srfSol09.sum() / pop09
-        m2SolHab14 = srfSol14.sum() / pop14
-        m2SolHabEvo = (m2SolHab14 - m2SolHab09) / m2SolHab09 / 5
         srfSolNonRes = srfSol14 - srfSolRes14
         ratioPlaSol14 = np.where(srfSol14 != 0, srfPla14 / srfSol14, 0).astype(np.float32)
         txArtif = (srfSol14 / srfCell).astype(np.float32)
 
         # Création du dictionnaire pour nombre de m2 ouverts à l'urbanisation par année
+        with open(dataDir + 'evo_surface_sol.csv', 'r') as r:
+            reader = csv.reader(r)
+            next(reader, None)
+            dicSsol = {rows[0]:int(rows[1]) for rows in reader}
+
+        m2SolHab09 = dicSsol['2009'] / pop09
+        m2SolHab14 = dicSsol['2014'] / pop14
+        m2SolHabEvo = (m2SolHab14 - m2SolHab09) / m2SolHab09 / 5
+
         dicSrf = {}
         year = 2015
         if scenario == 'tendanciel':
@@ -452,7 +455,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         ratioPlaSol = np.where(srfSol != 0, srfPla / srfSol, 0).astype(np.float32)
         expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
         expansionSum = expansion.sum()
-        impactEnv = (txArtifNouv * eco).sum()
+        impactEnv = round((srfSolNouv * (1 - eco)).sum())
 
         to_tif(urb, 'uint16', proj, geot, project + 'output/urbanisation_' + str(finalYear) + '.tif')
         to_tif(srfSol, 'uint16', proj, geot, project + 'output/surface_sol_' + str(finalYear) + '.tif')
@@ -472,7 +475,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         mesures.write("Built floor area, " + str(srfPlaNouv.sum()) + "\n")
         mesures.write("Cells open to urbanisation, " + str(expansion.sum()) + "\n")
         mesures.write("Average artificialisation rate, " + str(txArtifMoyen) + "\n")
-        mesures.write("Cumulated environnemental impact, " + str(impactEnv) + "\n")
+        mesures.write("Cumulated environnemental impact, " + str(int(impactEnv)) + "\n")
         log.write("Unbuilt area: " + str(nonBuilt) + '\n')
         log.write("Population not put up: " + str(nonLogee) + '\n')
         log.write("Population put up: " + str(popNouvCount) + '\n')
