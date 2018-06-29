@@ -5,6 +5,7 @@ import re
 import sys
 import csv
 import gdal
+import decimal
 import traceback
 import numpy as np
 from toolbox import slashify, printer, getDone, getTime, to_array, to_tif
@@ -41,6 +42,8 @@ feedback = QgsProcessingFeedback()
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
+# Utilisation d'un arrondi au supérieur avec les objet Decimal()
+decimal.getcontext().rounding = 'ROUND_UP'
 
 # Import des paramètres d'entrée
 globalData = slashify(sys.argv[1])
@@ -93,7 +96,6 @@ if len(sys.argv) > 5:
         # Seuil de pente en % pour interdiction à la construction
         elif 'maxSlope' in arg:
             maxSlope = int(arg.split('=')[1])
-
 
 # Valeurs de paramètres par défaut
 if 'pixRes' not in globals():
@@ -343,33 +345,113 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     grid.dataProvider().createSpatialIndex()
     buildings.dataProvider().createSpatialIndex()
     buildings.addExpressionField('$area', QgsField('area_i', QVariant.Double))
-    expr = ' ("area_i" * "NB_NIV") '
+    expr = ' "area_i" * "NB_NIV" '
     if useTxrp :
-        expr +=  '* "TXRP14"'
+        expr +=  ' * "TXRP14" '
     buildings.addExpressionField(expr, QgsField('planch', QVariant.Double))
-    expr = ' ("planch" / sum("planch", group_by:="CODE_IRIS")) * "POP14" '
-    buildings.addExpressionField(expr, QgsField('pop_bati', QVariant.Double))
+    buildings.addExpressionField('concat("CODE_IRIS", "ID")', QgsField('pkey_iris', QVariant.String, len=50))
+
+    dicPop = {}
+    dicSumBuilds = {}
+    dicBuilds = {}
+    dicWeightedPop = {}
+    for feat in iris.getFeatures():
+        dicSumBuilds[feat.attribute('CODE_IRIS')] = 0
+        dicBuilds[feat.attribute('CODE_IRIS')] = {}
+        dicWeightedPop[feat.attribute('CODE_IRIS')] = {}
+        dicPop[feat.attribute('CODE_IRIS')] = feat.attribute('POP14')
+
+    for feat in buildings.getFeatures():
+        dicSumBuilds[feat.attribute('CODE_IRIS')] += feat.attribute('planch')
+    for feat in buildings.getFeatures():
+        dicBuilds[feat.attribute('CODE_IRIS')][feat.attribute('ID')] = feat.attribute('planch') / dicSumBuilds[feat.attribute('CODE_IRIS')]
+        dicWeightedPop[feat.attribute('CODE_IRIS')][feat.attribute('ID')] = 0
+
+    with open(outdir + 'pop_bati.csv', 'w') as w:
+        w.write('pkey_iris, pop\n')
+        for quartier, builds in dicBuilds.items():
+            keyList = list(builds.keys())
+            valueList = list(builds.values())
+            irisPop = dicPop[quartier]
+            reste = decimal.Decimal(0)
+            i = 0
+            for weight in valueList:
+                idBati = keyList[i]
+                popInt = int(weight * irisPop)
+                popFloat = decimal.Decimal(weight * irisPop)
+                reste += popFloat - popInt
+                dicWeightedPop[quartier][idBati] += popInt
+                i += 1
+            valuesArray = np.array(valueList)
+            for _ in range(round(reste)):
+                i = np.random.choice(valuesArray.size, 1, p=valuesArray/valuesArray.sum())[0]
+                idBati = keyList[i]
+                dicWeightedPop[quartier][idBati] += 1
+            for idBati, value in dicWeightedPop[quartier].items():
+                w.write(quartier + idBati + ',' + str(value) + '\n')
+
+    popCsv = QgsVectorLayer(outdir + 'pop_bati.csv')
+    popCsv.addExpressionField('to_int("pop")', QgsField('pop_bati', QVariant.Int))
+    join(buildings, 'pkey_iris', popCsv, 'pkey_iris', ['pop'])
+
+    dicPop = {}
+    dicBuilds = {}
+    for feat in buildings.getFeatures():
+        dicPop[feat.attribute('pkey_iris')] = feat.attribute('pop_bati')
+        dicBuilds[feat.attribute('pkey_iris')] = {}
+
     params = {
         'INPUT': buildings,
         'OVERLAY': grid,
-        'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV', 'CODE_IRIS', 'NOM_IRIS',
-                         'TYP_IRIS', 'POP14', 'TXRP14', 'area_i', 'planch', 'pop_bati'],
+        'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV', 'CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS',
+                          'POP14', 'TXRP14', 'area_i', 'planch', 'pkey_iris', 'pop_bati'],
         'OVERLAY_FIELDS': ['id'],
         'OUTPUT': 'memory:bati_inter_grid'
     }
     res = processing.run('qgis:intersection', params, feedback=feedback)
     buildings = res['OUTPUT']
+    buildings.dataProvider().createSpatialIndex()
+    buildings.addExpressionField('concat("CODE_IRIS", "ID", "id_2")', QgsField('pkey_grid', QVariant.String, len=50))
 
-    # Calcul de stat sur la bâti dans la grille
     buildings.addExpressionField('$area', QgsField('area_g', QVariant.Double))
-    expr = 'round("area_g" * "NB_NIV") '
+    expr = ' "area_g" * "NB_NIV" '
     if useTxrp:
-        expr = 'round(("area_g" * "NB_NIV") * "TXRP14")'
-    buildings.addExpressionField(expr, QgsField('planch_g', QVariant.Int))
-    expr = ' round("area_g" / "area_i" * "pop_bati") '
-    buildings.addExpressionField(expr, QgsField('pop_g', QVariant.Int))
-    expr = ' round("planch_g" / "pop_g") '
-    buildings.addExpressionField(expr, QgsField('nb_m2_hab', QVariant.Int))
+        expr += ' * "TXRP14"'
+    buildings.addExpressionField(expr, QgsField('planch_g', QVariant.Double))
+
+    for feat in buildings.getFeatures():
+        dicBuilds[feat.attribute('pkey_iris')][feat.attribute('id_2')] = feat.attribute('area_g') / feat.attribute('area_i')
+
+    dicWeightedPop = {}
+    for build, parts in dicBuilds.items():
+        dicWeightedPop[build] = {}
+        reste = decimal.Decimal(0)
+        for gid, weight in parts.items():
+            pop = dicPop[build]
+            popInt = int(weight * pop)
+            popFloat = decimal.Decimal(weight * pop)
+            dicWeightedPop[build][gid] = popInt
+            reste += popFloat - popInt
+        if reste > 0:
+            keyList = list(parts.keys())
+            valueList = list(parts.values())
+            valueArray = np.array(valueList)
+            for _ in range(round(reste)):
+                i = np.random.choice(valueArray.size, 1, p=valueArray/valueArray.sum())[0]
+                gid = keyList[i]
+                dicWeightedPop[build][gid] += 1
+
+    with open(outdir + 'pop_grid.csv', 'w') as w:
+        w.write('pkey_grid, pop\n')
+        for build, parts in dicWeightedPop.items():
+            for gid, pop in parts.items():
+                w.write(build + str(gid) + ', ' + str(pop) + '\n')
+
+    popCsv = QgsVectorLayer(outdir + 'pop_grid.csv')
+    popCsv.addExpressionField('to_int("pop")', QgsField('pop_g', QVariant.Int))
+    join(buildings, 'pkey_grid', popCsv, 'pkey_grid', ['pop'])
+    expr = ' "planch_g" / "pop_g" '
+    buildings.addExpressionField(expr, QgsField('nb_m2_hab', QVariant.Double))
 
     params = {
         'INPUT': buildings,
@@ -754,6 +836,8 @@ def ocsExtractor(ocsPath, oso=False):
             WHEN "classe_2" = 'ESPACE NATUREL' THEN 0.3
             WHEN "classe_2" = 'SURFACE EN EAU' THEN 0
             WHEN "classe_2" = 'AUTRE' THEN 0
+            ELSE 0
+        END
     """
     ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
     return ocsol
@@ -856,7 +940,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             etape = 1
             description = 'extracting and reprojecting data '
-            progres = "%i/8 : %s" %(etape, description)
+            progres = "%i/7 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             start_time = time()
@@ -999,7 +1083,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             # Correction de l'OCS ou extraction de l'OSO CESBIO si besoin (penser à ajouter les valeurs d'intérêt !)
             if not os.path.exists(localData + 'ocsol.shp'):
-                ocsol = ocsExtractor( globalData + 'oso/departement_' + dpt + '.shp', True)
+                ocsol = ocsExtractor(globalData + 'oso/departement_' + dpt + '.shp', True)
             else :
                 ocsol = ocsExtractor(localData + 'ocsol.shp')
 
@@ -1150,7 +1234,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             start_time = time()
             etape = 2
             description = "cleaning building to estimate the population "
-            progres = "%i/8 : %s" %(etape, description)
+            progres = "%i/7 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1228,7 +1312,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             start_time = time()
             etape = 3
             description =  "creating a grid with resolution " + pixRes + "m "
-            progres = "%i/8 : %s" %(etape, description)
+            progres = "%i/7 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1253,8 +1337,8 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             start_time = time()
             etape = 4
-            description = "analysing the evolution of build areas "
-            progres = "%i/8 : %s" %(etape, description)
+            description = "analysing the evolution of built areas "
+            progres = "%i/7 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1288,7 +1372,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             start_time = time()
             etape = 5
             description = "estimating the population in the grid "
-            progres = "%i/8 : %s" %(etape, description)
+            progres = "%i/7 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1300,8 +1384,8 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
 
             start_time = time()
             etape = 6
-            description = "computing restrictions "
-            progres = "%i/8 : %s" %(etape, description)
+            description = "computing restriction and interest rasters "
+            progres = "%i/7 : %s" %(etape, description)
             if not silent:
                 printer(progres)
             log.write(description + ': ')
@@ -1351,15 +1435,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 'slope', format='GTiff',
                 slopeFormat='percent'
             )
-            log.write(getTime(start_time) + '\n')
 
-            start_time = time()
-            etape = 7
-            description = "creating restriction and interest rasters "
-            progres = "%i/8 : %s" %(etape, description)
-            if not silent:
-                printer(progres)
-            log.write(description + ': ')
             # Chaîne à passer à QGIS pour l'étendue des rasterisations
             extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
@@ -1447,9 +1523,9 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             log.write(getTime(start_time) + '\n')
 
         start_time = time()
-        etape = 8
+        etape = 7
         description = "finalizing... "
-        progres = "%i/8 : %s" %(etape, description)
+        progres = "%i/7 : %s" %(etape, description)
         if not silent:
             printer(progres)
         log.write(description + ': ')
@@ -1577,9 +1653,10 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 print('Removing temporary data!')
 
     except:
-        print("\n*** Error :")
         exc = sys.exc_info()
-        traceback.print_exception(*exc, limit=3, file=sys.stdout)
+        if not silent:
+            print("\n*** Error :")
+            traceback.print_exception(*exc, limit=3, file=sys.stdout)
         traceback.print_exception(*exc, limit=3, file=log)
         sys.exit()
 
