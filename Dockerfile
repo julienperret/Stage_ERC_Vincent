@@ -20,15 +20,18 @@ RUN apt-get install -y qgis python-qgis python-gdal python3-gdal python3-numpy p
 ## Create work directory
 RUN useradd docker \
 	&& mkdir /home/docker \
-	&& chown docker:docker /home/docker \
+	&& mkdir /home/docker/app \
+	&& mkdir /home/docker/data \
 	&& addgroup docker staff
 
-WORKDIR /home/docker
+WORKDIR /home/docker/app
 
 # Copy python files to work directory
-COPY /utils/insee_to_csv.py /home/docker
-COPY /utils/magic.py /home/docker
-COPY /utils/tif_to_gif.py /home/docker
-COPY /prepare.py /home/docker
-COPY /simulate.py /home/docker
-COPY /toolbox.py /home/docker
+COPY /utils/insee_to_csv.py /home/docker/app
+COPY /utils/magic.py /home/docker/app
+COPY /utils/tif_to_gif.py /home/docker/app
+COPY /prepare.py /home/docker/app
+COPY /simulate.py /home/docker/app
+COPY /toolbox.py /home/docker/app
+
+RUN chown -R docker:docker /home/docker
