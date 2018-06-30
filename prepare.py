@@ -359,7 +359,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
         dicSumBuilds[feat.attribute('CODE_IRIS')] = 0
         dicBuilds[feat.attribute('CODE_IRIS')] = {}
         dicWeightedPop[feat.attribute('CODE_IRIS')] = {}
-        dicPop[feat.attribute('CODE_IRIS')] = feat.attribute('POP14')
+        dicPop[feat.attribute('CODE_IRIS')] = feat.attribute('POP14').toInt()
 
     for feat in buildings.getFeatures():
         dicSumBuilds[feat.attribute('CODE_IRIS')] += feat.attribute('planch')
