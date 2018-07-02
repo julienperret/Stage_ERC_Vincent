@@ -8,10 +8,10 @@ import gdal
 import decimal
 import traceback
 import numpy as np
-from toolbox import slashify, printer, getDone, getTime, to_array, to_tif
 from ast import literal_eval
 from time import strftime, time
 from shutil import rmtree, copyfile
+from toolbox import slashify, printer, getDone, getTime, to_array, to_tif
 
 from qgis.core import (
     QgsApplication,
@@ -217,7 +217,7 @@ def join(layer, field, joinLayer, joinField, blacklist=[], prefix=''):
     layer.addJoin(j)
 
 # Enregistre un objet QgsVectorLayer sur le disque
-def to_shp(layer, path, blacklist=None):
+def to_shp(layer, path):
     writer = QgsVectorFileWriter(path, 'utf-8', layer.fields(), layer.wkbType(), layer.sourceCrs(), 'ESRI Shapefile')
     writer.addFeatures(layer.getFeatures())
 
@@ -306,7 +306,7 @@ def buildCsvGrid(name, path, iris, grid, outCsvDir):
         'OVERLAY_FIELDS': ['CODE_IRIS'],
         'OUTPUT': 'memory:' + name
     }
-    res = processing.run('qgis:intersection', params, feedback=feedback)
+    res = processing.run('native:intersection', params, feedback=feedback)
     buildings = res['OUTPUT']
     buildings.dataProvider().createSpatialIndex()
     if year == '14':
@@ -317,7 +317,7 @@ def buildCsvGrid(name, path, iris, grid, outCsvDir):
             'OVERLAY_FIELDS': ['id'],
             'OUTPUT': 'memory:' + name
         }
-        res = processing.run('qgis:intersection', params, feedback=feedback)
+        res = processing.run('native:intersection', params, feedback=feedback)
         buildings = res['OUTPUT']
         buildings.dataProvider().createSpatialIndex()
 
@@ -408,7 +408,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
         'OVERLAY_FIELDS': ['id'],
         'OUTPUT': 'memory:bati_inter_grid'
     }
-    res = processing.run('qgis:intersection', params, feedback=feedback)
+    res = processing.run('native:intersection', params, feedback=feedback)
     buildings = res['OUTPUT']
     buildings.dataProvider().createSpatialIndex()
     buildings.addExpressionField('concat("CODE_IRIS", "ID", "id_2")', QgsField('pkey_grid', QVariant.String, len=50))
@@ -626,7 +626,7 @@ def restrictGrid(layerList, grid, ratio, outdir):
             'OVERLAY_FIELDS': ['id'],
             'OUTPUT': 'memory:' + name
         }
-        res = processing.run('qgis:intersection', params, feedback=feedback)
+        res = processing.run('native:intersection', params, feedback=feedback)
         layer = res['OUTPUT']
         layer.addExpressionField('$area', QgsField(
             'area_g', QVariant.Double, len=10, prec=2))
@@ -1301,7 +1301,7 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
                 'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14', 'TXRP14'],
                 'OUTPUT': workspace + 'data/2014_bati/bati_inter_iris.shp'
             }
-            processing.run('qgis:intersection', params, feedback=feedback)
+            processing.run('native:intersection', params, feedback=feedback)
             log.write(getTime(start_time) + '\n')
 
         if not os.path.exists(workspace + 'data/' + pixRes + 'm/'):
