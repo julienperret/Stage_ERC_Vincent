@@ -476,6 +476,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         mesures.write("Cells open to urbanisation, " + str(expansion.sum()) + "\n")
         mesures.write("Average artificialisation rate, " + str(txArtifMoyen) + "\n")
         mesures.write("Cumulated environnemental impact, " + str(int(impactEnv)) + "\n")
+        print("Cumulated environnemental impact = " + str(int(impactEnv)) + "\n")
         log.write("Unbuilt area: " + str(nonBuilt) + '\n')
         log.write("Population not put up: " + str(nonLogee) + '\n')
         log.write("Population put up: " + str(popNouvCount) + '\n')
