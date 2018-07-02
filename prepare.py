@@ -1567,7 +1567,6 @@ with open(project + strftime('%Y%m%d%H%M') + '_log.txt', 'x') as log:
             (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_tx_ssr.tif', 'tx_ssr'),
             (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_m2_hab.tif', 'm2_hab'),
             (workspace + 'data/' + pixRes + 'm/stat_iris.shp', project + 'iris_nbniv_max.tif', 'nbniv_max'),
-            (workspace + 'data/ocsol.shp', project + 'interet/occupation_sol.tif', 'code_orig'),
             (workspace + 'data/ocsol.shp', project + 'classes_ocsol.tif', 'code_orig')
         ]
         if os.path.exists(workspace + 'data/plu.shp'):
