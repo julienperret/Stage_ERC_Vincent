@@ -226,7 +226,7 @@ def urbanize(pop, srfMax=0, zau=False):
                     tmpInteret[row][col] = 0
 
     # Densification du bâti existant si on n'a pas pu loger tout le monde
-    if count < pop and densifyOld:
+    elif count < pop and densifyOld:
         tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
         while count < pop and tmpInteret.sum() > 0:
             sp = 0
@@ -423,8 +423,12 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
                 if restePop > 0 and resteSrf > 0:
                     skipZau = True
                     restePop, resteSrf = urbanize(restePop, resteSrf, False)
+                if restePop > 0 :
+                    restePop, _ = urbanize(restePop)
             else:
                 restePop, resteSrf = urbanize(popALoger - preLogee, srfMax - preBuilt)
+                if restePop > 0 :
+                    restePop, _ = urbanize(restePop)
             preBuilt = -resteSrf
             preLogee = -restePop
 
@@ -492,12 +496,12 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         if densifyGround:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
             to_tif(densifSol, 'byte', proj, geot, project + 'output/densification_sol.tif')
-            mesures.write("Densified cells area, " + str(densifSol.sum()) + "\n")
+            mesures.write("Ground densified cells count, " + str(densifSol.sum()) + "\n")
 
         if densifyOld:
             densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
             to_tif(densifPla, 'byte', proj, geot, project + 'output/densification_plancher.tif')
-            mesures.write("Densified cells floor area, " + str(densifPla.sum()) + "\n")
+            mesures.write("Floor densified cells count, " + str(densifPla.sum()) + "\n")
 
     except:
         print("\n*** Error :")
