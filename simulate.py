@@ -29,6 +29,8 @@ if len(sys.argv) > 4:
             if scenario not in ['tendanciel', 'stable', 'reduction']:
                 print('Error: scenario value must be tendanciel, stable or reduction.')
                 sys.exit()
+        elif 'finalYear' in arg:
+            finalYear = int(arg.split('=')[1])
         elif 'pluPriority' in arg:
             pluPriority = literal_eval(arg.split('=')[1])
         elif 'buildNonRes' in arg:
@@ -44,11 +46,9 @@ if len(sys.argv) > 4:
         elif 'winSize' in arg:
             winSize = int(arg.split('=')[1])
         elif 'minContig' in arg:
-            minContig = int(arg.split('=')[1])
+            minContig = literal_eval(arg.split('=')[1])
         elif 'maxContig' in arg:
-            maxContig = int(arg.split('=')[1])
-        elif 'finalYear' in arg:
-            finalYear = int(arg.split('=')[1])
+            maxContig = literal_eval(arg.split('=')[1])
 
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
@@ -81,6 +81,19 @@ if 'minContig' not in globals():
     minContig = 1
 if 'maxContig' not in globals():
     maxContig = 5
+
+# Contrôle des paramètres de contiguïté
+if winSize == 3:
+    if minContig > 8 or maxContig > 8:
+        print("Error : minContig and maxContig should be lower than winSize * winSize !")
+        sys.exit()
+elif winSize > 3:
+    if maxContig > 1 or minContig > 1:
+        print("Error : minContig and maxContig should be float numbers < 1 if winSize > 3 !")
+if minContig > maxContig:
+    print("Error : maxContig should be higher than minContig !")
+    sys.exit()
+
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
 def choose(weight, size=1):
@@ -120,13 +133,17 @@ def slidingWin(array, row, col, size=3, calc='sum'):
 # Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def expand(row, col):
     global capaSol, urb
+    contig = None
     minSrf = ssrMed[row][col]
     maxSrf = capaSol[row][col]
     ss = 0
     if maxSrf > minSrf:
-        sumContig = slidingWin(urb, row, col, winSize, 'sum')
-        if sumContig:
-            if minContig < sumContig <= maxContig:
+        if type(maxContig) == float or maxContig == 1:
+            contig = slidingWin(urb, row, col, winSize, 'mean')
+        elif winSize == 3:
+            contig = slidingWin(urb, row, col, winSize, 'sum')
+        if contig:
+            if minContig < contig <= maxContig:
                 if maximumDensity:
                     ss = maxSrf
                 else:
@@ -496,12 +513,12 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         if densifyGround:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
             to_tif(densifSol, 'byte', proj, geot, project + 'output/densification_sol.tif')
-            mesures.write("Ground densified cells count, " + str(densifSol.sum()) + "\n")
+            mesures.write("Ground-densified cells count, " + str(densifSol.sum()) + "\n")
 
         if densifyOld:
             densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
             to_tif(densifPla, 'byte', proj, geot, project + 'output/densification_plancher.tif')
-            mesures.write("Floor densified cells count, " + str(densifPla.sum()) + "\n")
+            mesures.write("Floor-densified cells count, " + str(densifPla.sum()) + "\n")
 
     except:
         print("\n*** Error :")
