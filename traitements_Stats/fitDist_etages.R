@@ -152,22 +152,86 @@ library(fitdistrplus)
 
 dd <- dfniv %>% filter(CODE_IRIS==IRISmaousse) 
 
+min(dd$NB_NIV)
 
-dd$NB_NIV <-  dd$NB_NIV - 1.0 
+
 
 
 library(actuar)
 
-actuar::
 #"binom", "nbinom", "geom", "hyper" or "pois"
+
+#celles qui marchent sans paramètres supplementaires 
+
 poiss <-  fitdist(dd$NB_NIV, discrete = T , "pois" )
+negbin <- fitdist(dd$NB_NIV, discrete = T , "nbinom" ,
+                  control=list(trace=1, REPORT=1))
 
-negbin <- fitdist(dd$NB_NIV, discrete = T , "nbinom" )
-bin <-  fitdist(dd$NB_NIV, discrete = T , "binom", fix.arg =  )
 geo <-  fitdist(dd$NB_NIV, discrete = T , "geom" )
-hyp <-  fitdist(dd$NB_NIV, discrete = T , "hyper" )
 
-lolog <-  fitdist(dd$NB_NIV, discrete = T , "ztpois" )
+
+
+
+
+#celles qui marchent avec des params 
+ztpoiss <-  fitdist(data = dd$NB_NIV, discrete = T ,
+                    start=list(lambda=1),
+                    distr = dztpois,
+                    control=list(trace=1, REPORT=1))
+
+
+pztbinom
+pztnbinom
+pztpois
+pztgeom
+plogarithmic
+pzmpois
+pzmnbinom
+pzmgeom
+pzmbinom
+pzmlogarithmic
+
+
+
+
+
+#celles qui marchent pas 
+bin <-  fitdist(dd$NB_NIV, discrete = T , 
+                method = "mle",
+                start=list( size=100, prob= 0.75),
+                distr = dztbinom )
+
+hyp <-  fitdist(dd$NB_NIV, discrete = T , 
+                start=list(p=0.75),
+                "hyper" ,
+                control=list(trace=1, REPORT=1))
+
+
+hyp <-  fitdist(dd$NB_NIV, discrete = T , 
+                start=list(p=0.75),
+                "hyper" ,
+                control=list(trace=1, REPORT=1))
+
+
+
+
+
+
+quantile()
+dztbinom()
+
+llogis
+
+dpoisinvgauss
+
+
+
+
+
+
+
+
+
 
 
 
