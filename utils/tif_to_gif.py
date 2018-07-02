@@ -6,7 +6,13 @@ import gdal
 import traceback
 import numpy as np
 from shutil import rmtree
-from toolbox import slashify, to_array
+
+# Pour la gestion des slashs en fin de chemin
+def slashify(path):
+    if path[len(path)-1] != '/':
+        return path + '/'
+    else:
+        return path
 
 inDir = slashify(sys.argv[1])
 outDir = slashify(sys.argv[2])
@@ -32,6 +38,16 @@ elif dType == 'float32':
     npType = np.float32
     highValue = (2 - 2 ** -23) * 2 ** 127
 
+# Convertit un tif en numpy array
+def to_array(tif, dtype=None):
+    ds = gdal.Open(tif)
+    if dtype :
+        return ds.ReadAsArray().astype(dtype)
+    else:
+        return ds.ReadAsArray()
+    ds = None
+
+# Version modifiée de to_tif sans géoréférencement
 def to_tif(array, dtype, path):
     cols, rows = array.shape[1], array.shape[0] # x, y
     driver = gdal.GetDriverByName('GTiff')

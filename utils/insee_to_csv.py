@@ -4,8 +4,14 @@ import os
 import sys
 import traceback
 import pandas as pd
-from toolbox import slashify
 from shutil import rmtree
+
+# Pour la gestion des slashs en fin de chemin
+def slashify(path):
+    if path[len(path)-1] != '/':
+        return path + '/'
+    else:
+        return path
 
 inseeDataPath = slashify(sys.argv[1])
 try:

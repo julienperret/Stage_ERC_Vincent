@@ -9,6 +9,8 @@ import traceback
 import multiprocessing as mp
 from ast import literal_eval
 from time import strftime, time
+
+sys.path.append(os.path.abspath('../'))
 from toolbox import slashify, printer
 
 nbCores  = int(sys.argv[1])
