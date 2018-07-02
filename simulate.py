@@ -343,7 +343,6 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
             txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
         # Amenités
         eco = to_array(dataDir + 'interet/non-importance_ecologique.tif', np.float32)
-        ocs = to_array(dataDir + 'interet/occupation_sol.tif', np.float32)
         rou = to_array(dataDir + 'interet/proximite_routes.tif', np.float32)
         tra = to_array(dataDir + 'interet/proximite_transport.tif', np.float32)
         sir = to_array(dataDir + 'interet/densite_sirene.tif', np.float32)
@@ -467,6 +466,13 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         to_tif(srfSolNouv, 'uint16', proj, geot, project + 'output/surface_sol_construite.tif')
         to_tif(srfPlaNouv, 'uint32', proj, geot, project + 'output/surface_plancher_construite.tif')
         to_tif(popNouv, 'uint16', proj, geot, project + 'output/population_nouvelle.tif')
+
+        ocs = to_array(dataDir + 'interet/occupation_sol.tif', np.float32)
+        with open(project + 'output/conso_ocs.csv', 'w') as w:
+            w.write('classe, surface\n')
+            for c in np.unique(ocs):
+                if int(c) != 0:
+                    w.write(str(int(c)) +', ' + str( ((ocs == c) * srfSolNouv).sum()) + '\n')
 
         mesures.write("Population not put up, " + str(nonLogee) + '\n')
         mesures.write("Unbuilt area, " + str(nonBuilt) + '\n')
