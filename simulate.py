@@ -467,7 +467,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         to_tif(srfPlaNouv, 'uint32', proj, geot, project + 'output/surface_plancher_construite.tif')
         to_tif(popNouv, 'uint16', proj, geot, project + 'output/population_nouvelle.tif')
 
-        ocs = to_array(dataDir + 'interet/occupation_sol.tif', np.float32)
+        ocs = to_array(dataDir + 'classes_ocsol.tif', np.float32)
         with open(project + 'output/conso_ocs.csv', 'w') as w:
             w.write('classe, surface\n')
             for c in np.unique(ocs):
