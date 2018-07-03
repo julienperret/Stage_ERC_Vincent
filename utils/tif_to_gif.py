@@ -7,6 +7,10 @@ import traceback
 import numpy as np
 from shutil import rmtree
 
+if sys.platform == 'windows':
+    print('Ce script fonctionne sur Linux uniquement.')
+    sys.exit()
+
 # Pour la gestion des slashs en fin de chemin
 def slashify(path):
     if path[len(path)-1] != '/':
