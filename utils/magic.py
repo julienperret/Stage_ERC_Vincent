@@ -40,7 +40,7 @@ if not outputDir.exists():
 
 # Fonctions
 def writeHeaders(prefix, dep, tab):
-    with (prefix/(tab + '.csv').open('w') as w:
+    with (prefix/(tab + '.csv')).open('w') as w:
         i = 0
         h = ''
         for field in modelSorted[tab]:
@@ -94,19 +94,19 @@ def writeLine(prefix, dep, tab, line, minLen, eCutList):
     e = line[eCutList[0]:eCutList[1]]
     res = re.search('[0-9]{2}', e)
     if res and e in eDic[tab]:
-        with (prefix/(tab + e + '.csv').open('a') as w:
+        with (prefix/(tab + e + '.csv')).open('a') as w:
             w.write(getTuple(line, tab + e))
 
 def parseTable(prefix, dep, tab):
     minLen = minLenDic[tab]
-    with (inputDir/('ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671').open('r') as r:
+    with (inputDir/('ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671')).open('r') as r:
         if tab in eCutDic.keys():
             eCutList = eCutDic[tab]
             for line in r:
                 if len(line) >= minLen:
                     writeLine(prefix, dep, tab, line, minLen, eCutList)
         else:
-            with (prefix/(tab + '.csv').open('a') as w:
+            with (prefix/(tab + '.csv')).open('a') as w:
                 for line in r:
                     if len(line) >= minLen:
                         w.write(getTuple(line, tab))
@@ -124,7 +124,7 @@ try:
         'PDLL': [25,27]
     }
     minLenDic = { 'BATI': 82, 'LLOC': 61, 'NBAT': 89, 'PDLL': 98, 'PROP': 121 }
-    modList = os.listdir(modelDir)
+    modList = os.listdir(str(modelDir))
     modList.sort()
     if 'tables' not in globals():
         tables = ['BATI','LLOC','NBAT','PDLL','PROP']
@@ -163,9 +163,9 @@ try:
     jobs = []
     # Itération dans les départements
     for dep in depList:
-        prefix = str(outputDir/dep)
+        prefix = outputDir/dep
         if not prefix.exists():
-            os.makedirs(prefix)
+            os.makedirs(str(prefix))
         for tab in tables:
             jobs.append(pool.apply_async(parseTable,(prefix, dep, tab)))
             if tab not in eDic.keys():
