@@ -8,29 +8,28 @@ import gdal
 import decimal
 import traceback
 import numpy as np
+from pathlib import Path
 from ast import literal_eval
 from time import strftime, time
 from shutil import rmtree, copyfile
-from pathlib import Path, PureWindowsPath
+
 from toolbox import printer, getDone, getTime, to_array, to_tif
 
-if sys.platform == 'windows':
+if sys.platform == 'win32':
     qgsDir = None
-    for root, dirs, _ in os.walk(str(PureWindowsPath('C:/Program Files'))):
-        for d in dirs:
-            if d == 'QGIS 3.2':
-                qgsDir = root + d
-            elif d == 'QGIS 3.0':
-                qgsDir = root + d
+    for d in Path('C:/Program Files').iterdir():
+        if 'QGIS 3.2' in str(d):
+            qgsDir = d
+        elif 'QGIS 3.0' in str(d):
+            qgsDir = d
     if not qgsDir:
-        for root, dirs, _ in os.walk(str(PureWindowsPath('D:/Program Files'))):
-            for d in dirs:
-                if d == 'QGIS 3.2':
-                    qgsDir = root + d
-                elif d == 'QGIS 3.0':
-                    qgsDir = root + d
+        for d in Path('D:/Program Files').iterdir():
+            if 'QGIS 3.2' in str(d):
+                qgsDir = d
+            elif 'QGIS 3.0' in str(d):
+                qgsDir = d
     if qgsDir:
-        sys.path.append(str(PureWindowsPath(qgsDir + '/python')))
+        sys.path.append(str(qgsDir/'apps/qgis/python'))
     else:
         print('Impossible de localiser QGIS...')
         sys.exit()
@@ -53,9 +52,9 @@ from PyQt5.QtCore import QVariant
 if sys.platform == 'linux':
     QgsApplication.setPrefixPath('/usr', True)
     sys.path.append('/usr/share/qgis/python/plugins')
-elif sys.platform == 'windows':
-    QgsApplication.setPrefixPath(str(PureWindowsPath(qgsDir)))
-    sys.path.append(str(PureWindowsPath(qgsDir + '/python/plugins')))
+elif sys.platform == 'win32':
+    QgsApplication.setPrefixPath(str(qgsDir/'apps/qgis'))
+    sys.path.append(str(qgsDir/'apps/qgis/python/plugins'))
 
 qgs = QgsApplication([], GUIenabled=False)
 qgs.initQgis()

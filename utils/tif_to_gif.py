@@ -7,7 +7,7 @@ import traceback
 import numpy as np
 from shutil import rmtree
 
-if sys.platform == 'windows':
+if sys.platform != 'linux':
     print('Ce script fonctionne sur Linux uniquement.')
     sys.exit()
 
