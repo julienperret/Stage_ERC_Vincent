@@ -28,7 +28,6 @@ def getTime(start):
 
 # Enregistre un fichier .tif à partir d'un array et de variables GDAL stockées au préalable
 def to_tif(array, dtype, proj, geot, path):
-    path = str(path)
     cols, rows = array.shape[1], array.shape[0] # x, y
     driver = gdal.GetDriverByName('GTiff')
     if dtype == 'byte':
@@ -41,7 +40,7 @@ def to_tif(array, dtype, proj, geot, path):
         dtype = gdal.GDT_UInt32
     else :
         dtype = gdal.GDT_Unknown
-    ds = driver.Create(path, cols, rows, 1, dtype)
+    ds = driver.Create(str(path), cols, rows, 1, dtype)
     ds.SetProjection(proj)
     ds.SetGeoTransform(geot)
     ds.GetRasterBand(1).WriteArray(array)
