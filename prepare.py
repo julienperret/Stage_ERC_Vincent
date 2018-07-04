@@ -313,7 +313,7 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
 
 # Génère les statistiques de construction entre deux dates pour la grille et les IRIS
 def buildCsvGrid(name, path, iris, grid, outCsvDir):
-    res = re.search('.*/20([0-9]{2})_bati/.*\.shp', path)
+    res = re.search('.*20([0-9]{2})_bati.*\.shp', path)
     year = res.group(1)
     hasId = False
     buildings = QgsVectorLayer(path, name)
