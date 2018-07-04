@@ -12,26 +12,22 @@ from pathlib import Path
 from ast import literal_eval
 from time import strftime, time
 from shutil import rmtree, copyfile
-
 from toolbox import printer, getDone, getTime, to_array, to_tif
 
+# Chercher les chemins de QGIS sur Windows
 if sys.platform == 'win32':
-    qgsDir = None
+    qgsRoot = None
     for d in Path('C:/Program Files').iterdir():
-        if 'QGIS 3.2' in str(d):
-            qgsDir = d
-        elif 'QGIS 3.0' in str(d):
-            qgsDir = d
-    if not qgsDir:
-        for d in Path('D:/Program Files').iterdir():
-            if 'QGIS 3.2' in str(d):
-                qgsDir = d
-            elif 'QGIS 3.0' in str(d):
-                qgsDir = d
-    if qgsDir:
-        sys.path.append(str(qgsDir/'apps/qgis/python'))
+        if 'QGIS 3' in str(d) or 'OSGeo4W64' in str(d):
+            qgsRoot = d
+    if not qgsRoot :
+        for d in Path('C:/').iterdir():
+            if 'OSGeo4W64' in str(d):
+                qgsRoot = d
+    if qgsRoot:
+        sys.path.append(str(qgsRoot/'apps/qgis/python'))
     else:
-        print('Impossible de localiser QGIS...')
+        print('Impossible de localiser QGIS 3...')
         sys.exit()
 
 from qgis.core import (
@@ -49,14 +45,13 @@ from qgis.core import (
 from qgis.analysis import QgsNativeAlgorithms
 from PyQt5.QtCore import QVariant
 
+qgs = QgsApplication([], GUIenabled=False)
 if sys.platform == 'linux':
-    QgsApplication.setPrefixPath('/usr', True)
+    qgs.setPrefixPath('/usr', True)
     sys.path.append('/usr/share/qgis/python/plugins')
 elif sys.platform == 'win32':
-    QgsApplication.setPrefixPath(str(qgsDir/'apps/qgis'))
-    sys.path.append(str(qgsDir/'apps/qgis/python/plugins'))
-
-qgs = QgsApplication([], GUIenabled=False)
+    qgs.setPrefixPath(str(qgsRoot/'apps/qgis'))
+    sys.path.append(str(qgsRoot/'apps/qgis/python/plugins'))
 qgs.initQgis()
 
 import processing
@@ -127,7 +122,8 @@ if len(sys.argv) > 5:
 
 # Valeurs de paramètres par défaut
 if 'pixRes' not in globals():
-    pixRes = '50'
+    pixRes = 50
+    pixResStr= str(pixRes) + 'm'
 elif not 200 >= pixRes >= 20:
     if not silent:
         print('La taille de la grille doit être comprise entre 20m et 200m')
@@ -973,7 +969,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 printer(progres)
             start_time = time()
             log.write(description + ': ')
-            log.flush
 
             # Tampon de 1000m autour de la zone pour extractions des quartiers et des PAI
             zone = QgsVectorLayer(str(localData/'zone.shp'), 'zone')

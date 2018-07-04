@@ -6,7 +6,10 @@ from multiprocessing import Process
 
 # Pour affichage dynamique de la progression
 def printer(string):
-	sys.stdout.write("\r\x1b[K" + string)
+	if sys.platform == 'linux':
+		sys.stdout.write("\r\x1b[K" + string)
+	elif sys.platform == 'win32':
+		sys.stdout.write("\r" + string)
 	sys.stdout.flush()
 
 def getDone(function, argList):

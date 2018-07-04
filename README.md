@@ -38,9 +38,17 @@ Usage :
 ```shell
 python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "pixRes=50 speed"  
 ```
-
 Dépendances pour python3 :  
     PyQt5, qgis, gdal, numpy  
+
+Windows : utiliser OSGeo4W Shell  
+```shell
+set QGSROOT=C:\OSGeo4W64 # ou C:\Program Files\QGIS 3.2
+py3_env
+qt5_env
+set QT_QPA_PLATFORM_PLUGIN_PATH=%ROOT%\apps\Qt5\plugins\platforms
+python-qgis %GIT_REPO% prepare.py *args
+````
 
 ## ./simulate.py  
 Deux paramètres au minimum :  
