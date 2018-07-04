@@ -100,6 +100,31 @@ dfnivDistinctByIRIS <- dfniv %>% group_by(CODE_IRIS) %>% summarize(count= n(),di
 # réordonne les niveaux de facteurs   par nombre de hauteurs distinctes
 dfnivDistinctByIRIS$CODE_IRIS <- factor(dfnivDistinctByIRIS$CODE_IRIS, levels = dfnivDistinctByIRIS$CODE_IRIS[order(-dfnivDistinctByIRIS$distcount)])
 
+
+
+
+
+library(scales)
+ddmike <-  dfniv %>% group_by(CODE_IRIS) %>% summarize(count= n(),distcount=n_distinct(NB_NIV))  
+
+
+ddmike$indicMike <-  rescale(ddmike$count, to =c(0.0 , 1.0)) / rescale(ddmike$distcount, to =c(0.0 , 1.0))
+
+ddmike$CODE_IRIS <- factor(ddmike$CODE_IRIS, levels = ddmike$CODE_IRIS[order(-ddmike$count)])
+
+ddmike <-  ddmike %>% arrange(desc(count))
+
+
+
+pindicMike<- ggplot(ddmike, aes( CODE_IRIS,indicMike))+
+  geom_bar(aes(fill=distcount) , colour="darkgrey", stat = "identity")+
+  ggtitle("ratio nombre d'étages distincts / nombre de bâtiments, par IRIS , ordonnées par ratio décroissant")+ 
+  labs(x="Code IRIS illisible, sauf si on étend l'image à 1800px de large", y="nombre d'étages distincts / nombre de batiments")+
+  theme(axis.text.x=element_text(angle = -90, hjust = 0))
+pindicMike
+
+
+
 pdistinct<- ggplot(dfnivDistinctByIRIS, aes( CODE_IRIS,distcount))+
   geom_bar(fill="darkolivegreen2", colour="darkgrey", stat = "identity")+
   ggtitle("nombre de hauteurs d'étages distinctes par IRIS , ordonnées par nombre décroissant")+ 
@@ -109,7 +134,9 @@ pdistinct
 
 
 
-IRISvarious <- dfnivDistinctByIRIS$CODE_IRIS[1]
+
+# c'est ANTIGONE 
+IRISvarious <- dfnivDistinctByIRIS$CODE_IRIS[2]
 
 dvarious <- dfniv %>% filter(CODE_IRIS==IRISvarious) 
 
@@ -154,6 +181,7 @@ dd <- dfniv %>% filter(CODE_IRIS==IRISmaousse)
 
 min(dd$NB_NIV)
 
+ddmike %>% filter(indicMike == max(ddmike$indicMike))
 
 
 
@@ -179,15 +207,72 @@ ztpoiss <-  fitdist(data = dd$NB_NIV, discrete = T ,
                     distr = dztpois,
                     control=list(trace=1, REPORT=1))
 
+ztgeom <-  fitdist(data = dd$NB_NIV, discrete = T ,
+                   start=list(prob= 0.5 ),
+                   distr = "ztgeom",
+                   control=list(trace=1, REPORT=1))
 
-pztbinom
-pztnbinom
-pztpois
-pztgeom
-plogarithmic
-pzmpois
-pzmnbinom
-pzmgeom
+
+
+AICmin <-  Inf
+bestfit <-  NULL
+pbestfit <- NULL
+for (p in seq(from=0.01, to = 0.99 , by=0.01 )){
+  cat("p=", p,"-----------\n")
+  lolog <- fitdist(data = dd$NB_NIV, discrete = T ,
+                   start=list(prob= 0.84 ),
+                   distr = "logarithmic")
+  
+  xx <- gofstat(lolog)
+  
+  if(xx$aic < AICmin){
+    cat ("AIC meilleur avec p = " , p ,"\n")
+    AICmin <-  xx$aic
+    bestfit  <-  lolog
+    pbestfit <- p
+  }
+  
+}
+
+
+
+optimMethods <-  c("Nelder-Mead", "BFGS", "CG", "L-BFGS-B", "SANN","Brent")
+for (m in optimMethods) {
+
+  cat("METHODE", m ,"==========\n")
+  tryCatch({
+    zmpois <- fitdist(data = dd$NB_NIV, discrete = T ,
+                      start=list(lambda = (c(1,2,3) )),
+                      distr = "zmpois")
+    
+    
+    },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  
+}
+
+
+
+
+
+for (m in optimMethods) {
+  
+  cat("METHODE", m ,"==========\n")
+  tryCatch({
+    zmpois <- fitdist(data = dd$NB_NIV, discrete = T ,
+                      start=list( size = 800 ,prob = 0.5 , p0=0),
+                      distr = "zmbinom")
+  },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  
+}
+
+
+
+
+plot(bestfit)
+
+
+
+
 pzmbinom
 pzmlogarithmic
 
@@ -213,28 +298,59 @@ hyp <-  fitdist(dd$NB_NIV, discrete = T ,
                 control=list(trace=1, REPORT=1))
 
 
+optimMethods <-  c("Nelder-Mead", "BFGS", "CG", "L-BFGS-B", "SANN","Brent")
+for (m in optimMethods) {
+  
+  cat("METHODE", m ,"==========\n")
+  tryCatch({
+    
+    ztbinom <- fitdist(data = dd$NB_NIV, discrete = T ,
+                       optim.method= m,
+                       start=list(size=800,prob= 0.5 ),
+                       distr = "ztbinom"
+    )
+  },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  
+}
+
+for (m in optimMethods) {
+  
+  cat("METHODE", m ,"==========\n")
+  tryCatch({
+    ztnbinom <- fitdist(data = dd$NB_NIV, discrete = T ,
+                        start=list(size= 800, prob= 0.5 ),
+                        distr = "ztnbinom")
+    
+  },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  
+}
 
 
+for (m in optimMethods) {
+  
+  cat("METHODE", m ,"==========\n")
+  tryCatch({
+    zmpois <- fitdist(data = dd$NB_NIV, discrete = T ,
+                      start=list(lambda = 1 , p0=0.2),
+                      distr = "zmpois")
+    
+    
+  },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  
+}
 
 
-quantile()
-dztbinom()
+for (m in optimMethods) {
+  
+  cat("METHODE", m ,"==========\n")
+  tryCatch({
+    zmpois <- fitdist(data = dd$NB_NIV, discrete = T ,
+                      start=list(size=200, prob = 0.5 , p0=0),
+                      distr = "zmbinom")
+    
+    
+  },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  
+}
 
-llogis
-
-dpoisinvgauss
-
-
-
-
-
-
-
-
-
-
-
-
-plot(poiss)
-plot(negbin)
 
