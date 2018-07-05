@@ -637,10 +637,8 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
 
 # Crée une grille avec des statistiques par cellule sur la surface couverte pour chaque couche en entrée
 def restrictGrid(layerList, grid, ratio, outdir):
-    grid.dataProvider().createSpatialIndex()
     csvList = []
     fieldList = []
-
     for layer in layerList:
         name = layer.name()
         fieldList.append(name)
