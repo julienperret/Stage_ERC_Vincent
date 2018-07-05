@@ -1146,6 +1146,11 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 res = processing.run('native:fixgeometries', params, feedback=feedback)
                 parcelles = res['OUTPUT']
                 argList.append((clip(parcelles, zone), workspace/'data/restriction/'))
+
+            elif (globalData/'majic'/dpt).exists():
+                parcelles = QgsVectorLayer(str(globalData/'majic'/dpt/'exclusion_parcelles.shp'), 'exclusion_parcelles')
+                argList.append((clip(parcelles, zone), workspace/'data/restriction/'))
+
             # + Traitement d'une couche facultative pour exclusion de zones bâties lors du calcul et inclusion dans les restrictions
             if (localData/'exclusion_manuelle.shp').exists():
                 argList.append((clip(localData/'exclusion_manuelle.shp', zone), workspace/'data/restriction/'))

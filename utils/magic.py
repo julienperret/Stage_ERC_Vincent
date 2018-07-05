@@ -13,7 +13,10 @@ from time import strftime, time
 
 # Pour affichage dynamique de la progression
 def printer(string):
-	sys.stdout.write("\r\x1b[K" + string)
+	if sys.platform == 'linux':
+		sys.stdout.write("\r\x1b[K" + string)
+	elif sys.platform == 'win32':
+		sys.stdout.write("\r" + string)
 	sys.stdout.flush()
 
 nbCores  = int(sys.argv[1])
@@ -121,7 +124,7 @@ try:
     eCutDic = {
         'BATI': [30, 32],
         'NBAT': [19, 21],
-        'PDLL': [25,27]
+        'PDLL': [25, 27]
     }
     minLenDic = { 'BATI': 82, 'LLOC': 61, 'NBAT': 89, 'PDLL': 98, 'PROP': 121 }
     modList = os.listdir(str(modelDir))
