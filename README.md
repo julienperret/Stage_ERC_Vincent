@@ -36,11 +36,15 @@ En cas de problème avec les "distance_trucmuche.tif", vérifier qu'il y a un he
 
 Usage :  
 ```shell
-python3 prepare.py ./global_data/ 34 ./mtp/ ./results/ "pixRes=50 speed"  
+./prepare.py ../global_data/ 34 ../mtp/ ../results/ "pixRes=50 speed"  
 ```
-
 Dépendances pour python3 :  
     PyQt5, qgis, gdal, numpy  
+
+Windows : utiliser OSGeo4W Shell  
+```shell
+python-qgis prepare.py *args
+````
 
 ## ./simulate.py  
 Deux paramètres au minimum :  

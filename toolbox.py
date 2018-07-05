@@ -4,16 +4,12 @@ import numpy as np
 from time import time
 from multiprocessing import Process
 
-# Pour la gestion des slashs en fin de chemin
-def slashify(path):
-    if path[len(path)-1] != '/':
-        return path + '/'
-    else:
-        return path
-
 # Pour affichage dynamique de la progression
 def printer(string):
-	sys.stdout.write("\r\x1b[K" + string)
+	if sys.platform == 'linux':
+		sys.stdout.write("\r\x1b[K" + string)
+	elif sys.platform == 'win32':
+		sys.stdout.write("\r" + string)
 	sys.stdout.flush()
 
 def getDone(function, argList):
@@ -47,7 +43,7 @@ def to_tif(array, dtype, proj, geot, path):
         dtype = gdal.GDT_UInt32
     else :
         dtype = gdal.GDT_Unknown
-    ds = driver.Create(path, cols, rows, 1, dtype)
+    ds = driver.Create(str(path), cols, rows, 1, dtype)
     ds.SetProjection(proj)
     ds.SetGeoTransform(geot)
     ds.GetRasterBand(1).WriteArray(array)
@@ -55,7 +51,7 @@ def to_tif(array, dtype, proj, geot, path):
 
 # Convertit un tif en numpy array
 def to_array(tif, dtype=None):
-    ds = gdal.Open(tif)
+    ds = gdal.Open(str(tif))
     if dtype :
         return ds.ReadAsArray().astype(dtype)
     else:

@@ -6,15 +6,20 @@ import sys
 import csv
 import operator
 import traceback
+from pathlib import Path
 import multiprocessing as mp
 from ast import literal_eval
 from time import strftime, time
-from toolbox import slashify, printer
+
+# Pour affichage dynamique de la progression
+def printer(string):
+	sys.stdout.write("\r\x1b[K" + string)
+	sys.stdout.flush()
 
 nbCores  = int(sys.argv[1])
-inputDir = slashify(sys.argv[2])
-modelDir = slashify(sys.argv[3])
-outputDir = slashify(sys.argv[4])
+inputDir = Path(sys.argv[2])
+modelDir = Path(sys.argv[3])
+outputDir = Path(sys.argv[4])
 if len(sys.argv) > 5:
     param = sys.argv[5]
     if param != 'all':
@@ -30,12 +35,12 @@ if len(sys.argv) > 6:
     elif len(param) == 2:
         depList = []
         depList.append(param)
-if not os.path.exists(outputDir):
-    os.makedirs(outputDir)
+if not outputDir.exists():
+    os.makedirs(str(outputDir))
 
 # Fonctions
 def writeHeaders(prefix, dep, tab):
-    with open(prefix + tab + '.csv', 'w') as w:
+    with (prefix/(tab + '.csv')).open('w') as w:
         i = 0
         h = ''
         for field in modelSorted[tab]:
@@ -46,7 +51,7 @@ def writeHeaders(prefix, dep, tab):
             else:
                 h += '\n'
         w.write(h)
-    with open(prefix + 'copy_csv.sql', 'a') as w:
+    with (prefix/'copy_csv.sql').open('a') as w:
         i = 0
         h = 'CREATE TABLE majic.d' + dep + '_' + tab.lower() + '('
         for field in modelSorted[tab]:
@@ -89,19 +94,19 @@ def writeLine(prefix, dep, tab, line, minLen, eCutList):
     e = line[eCutList[0]:eCutList[1]]
     res = re.search('[0-9]{2}', e)
     if res and e in eDic[tab]:
-        with open(prefix + tab + e + '.csv', 'a') as w:
+        with (prefix/(tab + e + '.csv')).open('a') as w:
             w.write(getTuple(line, tab + e))
 
 def parseTable(prefix, dep, tab):
     minLen = minLenDic[tab]
-    with open(inputDir + 'ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671', 'r') as r:
+    with (inputDir/('ART.DC21.W17' + dep + '0.' + tab + '.A2017.N000671')).open('r') as r:
         if tab in eCutDic.keys():
             eCutList = eCutDic[tab]
             for line in r:
                 if len(line) >= minLen:
                     writeLine(prefix, dep, tab, line, minLen, eCutList)
         else:
-            with open(prefix + tab + '.csv', 'a') as w:
+            with (prefix/(tab + '.csv')).open('a') as w:
                 for line in r:
                     if len(line) >= minLen:
                         w.write(getTuple(line, tab))
@@ -119,13 +124,13 @@ try:
         'PDLL': [25,27]
     }
     minLenDic = { 'BATI': 82, 'LLOC': 61, 'NBAT': 89, 'PDLL': 98, 'PROP': 121 }
-    modList = os.listdir(modelDir)
+    modList = os.listdir(str(modelDir))
     modList.sort()
     if 'tables' not in globals():
         tables = ['BATI','LLOC','NBAT','PDLL','PROP']
     if 'depList' not in globals():
         depList = []
-        fileList = os.listdir(inputDir)
+        fileList = os.listdir(str(inputDir))
         fileList.sort()
         for f in fileList:
             res = None
@@ -140,7 +145,7 @@ try:
 
     # Création de la structure de recherche des valeurs de découpe {'':{'':[]}}
     for tab in modList:
-        with open(modelDir + tab) as file:
+        with (modelDir/tab).open('r') as file:
             reader = csv.reader(file)
             next(reader, None)
             tab = tab.replace('.csv','')
@@ -158,9 +163,9 @@ try:
     jobs = []
     # Itération dans les départements
     for dep in depList:
-        prefix = outputDir + dep + '/'
-        if not os.path.exists(prefix):
-            os.makedirs(prefix)
+        prefix = outputDir/dep
+        if not prefix.exists():
+            os.makedirs(str(prefix))
         for tab in tables:
             jobs.append(pool.apply_async(parseTable,(prefix, dep, tab)))
             if tab not in eDic.keys():
@@ -184,7 +189,7 @@ try:
     print("\nTemps d'execution : %im %is" %(execMin, execSec))
 
 except:
-    exc_type, exc_value, exc_traceback = sys.exc_info()
     print("\n*** Error :")
-    traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout)
+    exc = sys.exc_info()
+    traceback.print_exception(*exc, limit=3, file=sys.stdout)
     sys.exit()

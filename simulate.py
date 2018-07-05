@@ -6,17 +6,18 @@ import csv
 import gdal
 import traceback
 import numpy as np
-from toolbox import slashify, to_tif, printer, to_array
+from time import time
+from pathlib import Path
 from shutil import rmtree
 from ast import literal_eval
-from time import time
+from toolbox import to_tif, printer, to_array
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
 
 # Stockage et contrôle de la validité des paramètres utilisateur
-dataDir = slashify(sys.argv[1])
-outputDir = slashify(sys.argv[2])
+dataDir = Path(sys.argv[1])
+outputDir = Path(sys.argv[2])
 growth = float(sys.argv[3])
 if growth > 3:
     print("Maximum evolution rate fixed at: 3 %")
@@ -29,6 +30,8 @@ if len(sys.argv) > 4:
             if scenario not in ['tendanciel', 'stable', 'reduction']:
                 print('Error: scenario value must be tendanciel, stable or reduction.')
                 sys.exit()
+        elif 'finalYear' in arg:
+            finalYear = int(arg.split('=')[1])
         elif 'pluPriority' in arg:
             pluPriority = literal_eval(arg.split('=')[1])
         elif 'buildNonRes' in arg:
@@ -44,11 +47,9 @@ if len(sys.argv) > 4:
         elif 'winSize' in arg:
             winSize = int(arg.split('=')[1])
         elif 'minContig' in arg:
-            minContig = int(arg.split('=')[1])
+            minContig = literal_eval(arg.split('=')[1])
         elif 'maxContig' in arg:
-            maxContig = int(arg.split('=')[1])
-        elif 'finalYear' in arg:
-            finalYear = int(arg.split('=')[1])
+            maxContig = literal_eval(arg.split('=')[1])
 
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
@@ -81,6 +82,19 @@ if 'minContig' not in globals():
     minContig = 1
 if 'maxContig' not in globals():
     maxContig = 5
+
+# Contrôle des paramètres de contiguïté
+if winSize == 3:
+    if minContig > 8 or maxContig > 8:
+        print("Error : minContig and maxContig should be lower than winSize * winSize !")
+        sys.exit()
+elif winSize > 3:
+    if maxContig > 1 or minContig > 1:
+        print("Error : minContig and maxContig should be float numbers < 1 if winSize > 3 !")
+if minContig > maxContig:
+    print("Error : maxContig should be higher than minContig !")
+    sys.exit()
+
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
 def choose(weight, size=1):
@@ -120,13 +134,17 @@ def slidingWin(array, row, col, size=3, calc='sum'):
 # Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def expand(row, col):
     global capaSol, urb
+    contig = None
     minSrf = ssrMed[row][col]
     maxSrf = capaSol[row][col]
     ss = 0
     if maxSrf > minSrf:
-        sumContig = slidingWin(urb, row, col, winSize, 'sum')
-        if sumContig:
-            if minContig < sumContig <= maxContig:
+        if type(maxContig) == float or maxContig == 1:
+            contig = slidingWin(urb, row, col, winSize, 'mean')
+        elif winSize == 3:
+            contig = slidingWin(urb, row, col, winSize, 'sum')
+        if contig:
+            if minContig < contig <= maxContig:
                 if maximumDensity:
                     ss = maxSrf
                 else:
@@ -226,7 +244,7 @@ def urbanize(pop, srfMax=0, zau=False):
                     tmpInteret[row][col] = 0
 
     # Densification du bâti existant si on n'a pas pu loger tout le monde
-    if count < pop and densifyOld:
+    elif count < pop and densifyOld:
         tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
         while count < pop and tmpInteret.sum() > 0:
             sp = 0
@@ -248,7 +266,7 @@ def urbanize(pop, srfMax=0, zau=False):
     return (pop - count, srfMax - artif)
 
 # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-ds = gdal.Open(dataDir + 'demographie_2014.tif')
+ds = gdal.Open(str(dataDir/'demographie_2014.tif'))
 demographieDep = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
 cols, rows = demographieDep.shape[1], demographieDep.shape[0] # x, y
 proj = ds.GetProjection()
@@ -257,34 +275,34 @@ pixSize = int(geot[1])
 srfCell = pixSize * pixSize
 ds = None
 
-project = outputDir + str(pixSize) + 'm' + '_tx' + str(growth) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
+projectStr = str(pixSize) + 'm' + '_tx' + str(growth) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
 if pluPriority:
-    project += '_pluPrio'
+    projectStr += '_pluPrio'
 if buildNonRes :
-    project += '_buildNonRes'
+    projectStr += '_buildNonRes'
 if densifyGround :
-    project += '_densifyGround'
+    projectStr += '_densifyGround'
 if densifyOld :
-    project += '_densifyOld'
+    projectStr += '_densifyOld'
 if maximumDensity :
-    project += '_maximumDensity'
+    projectStr += '_maximumDensity'
 if finalYear != 2040:
-    project += '_' + str(finalYear)
-project += '/'
+    projectStr += '_' + str(finalYear)
+project = outputDir/projectStr
 
-if os.path.exists(project):
-    rmtree(project)
-os.makedirs(project + 'output')
-os.mkdir(project + 'snapshots')
-os.mkdir(project + 'snapshots/demographie')
-os.mkdir(project + 'snapshots/urbanisation')
-os.mkdir(project + 'snapshots/surface_sol')
-os.mkdir(project + 'snapshots/surface_plancher')
+if project.exists():
+    rmtree(str(project))
+os.makedirs(str(project/'output'))
+os.mkdir(str(project/'snapshots'))
+os.mkdir(str(project/'snapshots/demographie'))
+os.mkdir(str(project/'snapshots/urbanisation'))
+os.mkdir(str(project/'snapshots/surface_sol'))
+os.mkdir(str(project/'snapshots/surface_plancher'))
 
-with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv', 'w') as mesures:
+with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('w') as mesures:
     try:
         # Création des dictionnaires contenant la population par année
-        with open(dataDir + 'population.csv') as csvFile:
+        with (dataDir/'population.csv').open('r') as csvFile:
             reader = csv.reader(csvFile)
             next(reader, None)
             histPop = {rows[0]:rows[1] for rows in reader}
@@ -308,23 +326,23 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         log.write("Population to put up until " + str(finalYear) + " : " + str(sumPopALoger) + "\n")
 
         # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
-        with open(dataDir + 'interet/poids.csv') as r:
+        with (dataDir/'interet/poids.csv').open('r') as r:
             reader = csv.reader(r)
             next(reader, None)
             poids = {rows[0]:int(rows[1]) for rows in reader}
 
         coef = {}
-        with open(project + 'coefficients_interet.csv', 'x') as w:
+        with (project/'coefficients_interet.csv').open('w') as w:
             for key in poids:
                 coef[key] = poids[key] / sum(poids.values())
                 w.write(key + ', ' + str(coef[key]) + '\n')
 
         # Préparation des restrictions et gestion du PLU
-        restriction = to_array(dataDir + 'interet/restriction_totale.tif')
-        if os.path.exists(dataDir + 'interet/plu_restriction.tif') and os.path.exists(dataDir + 'interet/plu_priorite.tif'):
+        restriction = to_array(dataDir/'interet/restriction_totale.tif')
+        if (dataDir/'interet/plu_restriction.tif').exists() and (dataDir/'interet/plu_priorite.tif').exists():
             skipZau = False
-            pluPrio = to_array(dataDir + 'interet/plu_priorite.tif')
-            pluRest = to_array(dataDir + 'interet/plu_restriction.tif')
+            pluPrio = to_array(dataDir/'interet/plu_priorite.tif')
+            pluRest = to_array(dataDir/'interet/plu_restriction.tif')
             restrictionNonPlu = restriction.copy()
             restriction = np.where(pluRest != 1, restriction, 1)
         else:
@@ -332,21 +350,20 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
             pluPriority = False
 
         # Déclaration des matrices
-        demographie14 = to_array(dataDir + 'demographie_2014.tif', np.uint16)
-        srfSol14 = to_array(dataDir + 'srf_sol_2014.tif', np.uint16)
-        srfSolRes14 = to_array(dataDir + 'srf_sol_res.tif', np.uint16)
-        ssrMed = to_array(dataDir + 'iris_ssr_med.tif', np.uint16)
-        m2PlaHab = to_array(dataDir + 'iris_m2_hab.tif', np.uint16)
-        srfPla14 = to_array(dataDir  + 'srf_pla.tif', np.uint32)
-        nbNivMax = to_array(dataDir + 'iris_nbniv_max.tif')
+        demographie14 = to_array(dataDir/'demographie_2014.tif', np.uint16)
+        srfSol14 = to_array(dataDir/'srf_sol_2014.tif', np.uint16)
+        srfSolRes14 = to_array(dataDir/'srf_sol_res.tif', np.uint16)
+        ssrMed = to_array(dataDir/'iris_ssr_med.tif', np.uint16)
+        m2PlaHab = to_array(dataDir/'iris_m2_hab.tif', np.uint16)
+        srfPla14 = to_array(dataDir/'srf_pla.tif', np.uint32)
+        nbNivMax = to_array(dataDir/'iris_nbniv_max.tif')
         if buildNonRes:
-            txSsr = to_array(dataDir + 'iris_tx_ssr.tif', np.float32)
+            txSsr = to_array(dataDir/'iris_tx_ssr.tif', np.float32)
         # Amenités
-        eco = to_array(dataDir + 'interet/non-importance_ecologique.tif', np.float32)
-        ocs = to_array(dataDir + 'interet/occupation_sol.tif', np.float32)
-        rou = to_array(dataDir + 'interet/proximite_routes.tif', np.float32)
-        tra = to_array(dataDir + 'interet/proximite_transport.tif', np.float32)
-        sir = to_array(dataDir + 'interet/densite_sirene.tif', np.float32)
+        eco = to_array(dataDir/'interet/non-importance_ecologique.tif', np.float32)
+        rou = to_array(dataDir/'interet/proximite_routes.tif', np.float32)
+        tra = to_array(dataDir/'interet/proximite_transport.tif', np.float32)
+        sir = to_array(dataDir/'interet/densite_sirene.tif', np.float32)
         # Création du raster final d'intérêt avec pondération
         interet = np.where((restriction != 1), (eco * coef['ecologie']) + (rou * coef['routes']) + (tra * coef['transport']) + (sir * poids['sirene']), 0)
         interet = (interet / np.amax(interet)).astype(np.float32)
@@ -361,7 +378,7 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         txArtif = (srfSol14 / srfCell).astype(np.float32)
 
         # Création du dictionnaire pour nombre de m2 ouverts à l'urbanisation par année
-        with open(dataDir + 'evo_surface_sol.csv', 'r') as r:
+        with (dataDir/'evo_surface_sol.csv').open('r') as r:
             reader = csv.reader(r)
             next(reader, None)
             dicSsol = {rows[0]:int(rows[1]) for rows in reader}
@@ -396,11 +413,11 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         log.write('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m2\n')
 
         # Instantanés de la situation à t0
-        to_tif(urb14, 'byte', proj, geot, project + 'urbanisation_2014.tif')
-        to_tif(capaSol, 'uint16', proj, geot, project + 'capacite_sol_2014.tif')
-        to_tif(txArtif, 'float32', proj, geot, project + 'taux_artif_2014.tif')
-        to_tif(interet, 'float32', proj, geot, project + 'interet_2014.tif')
-        to_tif(ratioPlaSol14, 'float32', proj, geot, project + 'ratio_plancher_sol_2014.tif')
+        to_tif(urb14, 'byte', proj, geot, project/'urbanisation_2014.tif')
+        to_tif(capaSol, 'uint16', proj, geot, project/'capacite_sol_2014.tif')
+        to_tif(txArtif, 'float32', proj, geot, project/'taux_artif_2014.tif')
+        to_tif(interet, 'float32', proj, geot, project/'interet_2014.tif')
+        to_tif(ratioPlaSol14, 'float32', proj, geot, project/'ratio_plancher_sol_2014.tif')
 
         start_time = time()
         ##### Boucle principale #####
@@ -424,16 +441,20 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
                 if restePop > 0 and resteSrf > 0:
                     skipZau = True
                     restePop, resteSrf = urbanize(restePop, resteSrf, False)
+                if restePop > 0 :
+                    restePop, _ = urbanize(restePop)
             else:
                 restePop, resteSrf = urbanize(popALoger - preLogee, srfMax - preBuilt)
+                if restePop > 0 :
+                    restePop, _ = urbanize(restePop)
             preBuilt = -resteSrf
             preLogee = -restePop
 
             # Snapshots
-            to_tif(demographie, 'uint16', proj, geot, project + 'snapshots/demographie/demo_' + str(year) + '.tif')
-            to_tif(urb, 'byte', proj, geot, project + 'snapshots/urbanisation/urb_' + str(year) + '.tif')
-            to_tif(srfSol, 'uint16', proj, geot, project + 'snapshots/surface_sol/sol_' + str(year) + '.tif')
-            to_tif(srfPla, 'uint32', proj, geot, project + 'snapshots/surface_plancher/plancher_' + str(year) + '.tif')
+            to_tif(demographie, 'uint16', proj, geot, project/('snapshots/demographie/demo_' + str(year) + '.tif'))
+            to_tif(urb, 'byte', proj, geot, project/('snapshots/urbanisation/urb_' + str(year) + '.tif'))
+            to_tif(srfSol, 'uint16', proj, geot, project/('snapshots/surface_sol/sol_' + str(year) + '.tif'))
+            to_tif(srfPla, 'uint32', proj, geot, project/('snapshots/surface_plancher/plancher_' + str(year) + '.tif'))
 
         if restePop > 0:
             nonLogee = int(round(restePop))
@@ -457,16 +478,23 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
         expansionSum = expansion.sum()
         impactEnv = round((srfSolNouv * (1 - eco)).sum())
 
-        to_tif(urb, 'uint16', proj, geot, project + 'output/urbanisation_' + str(finalYear) + '.tif')
-        to_tif(srfSol, 'uint16', proj, geot, project + 'output/surface_sol_' + str(finalYear) + '.tif')
-        to_tif(srfPla, 'uint32', proj, geot, project + 'output/surface_plancher_' + str(finalYear) + '.tif')
-        to_tif(demographie, 'uint16', proj, geot, project + 'output/demographie_' + str(finalYear) + '.tif')
-        to_tif(ratioPlaSol, 'float32', proj, geot, project + 'output/ratio_plancher_sol_' + str(finalYear) + '.tif')
-        to_tif(txArtifNouv, 'float32', proj, geot, project + 'output/taux_artificialisation.tif')
-        to_tif(expansion, 'byte', proj, geot, project + 'output/expansion.tif')
-        to_tif(srfSolNouv, 'uint16', proj, geot, project + 'output/surface_sol_construite.tif')
-        to_tif(srfPlaNouv, 'uint32', proj, geot, project + 'output/surface_plancher_construite.tif')
-        to_tif(popNouv, 'uint16', proj, geot, project + 'output/population_nouvelle.tif')
+        to_tif(urb, 'uint16', proj, geot, project/('output/urbanisation_' + str(finalYear) + '.tif'))
+        to_tif(srfSol, 'uint16', proj, geot, project/('output/surface_sol_' + str(finalYear) + '.tif'))
+        to_tif(srfPla, 'uint32', proj, geot, project/('output/surface_plancher_' + str(finalYear) + '.tif'))
+        to_tif(demographie, 'uint16', proj, geot, project/('output/demographie_' + str(finalYear) + '.tif'))
+        to_tif(ratioPlaSol, 'float32', proj, geot, project/('output/ratio_plancher_sol_' + str(finalYear) + '.tif'))
+        to_tif(txArtifNouv, 'float32', proj, geot, project/'output/taux_artificialisation.tif')
+        to_tif(expansion, 'byte', proj, geot, project/'output/expansion.tif')
+        to_tif(srfSolNouv, 'uint16', proj, geot, project/'output/surface_sol_construite.tif')
+        to_tif(srfPlaNouv, 'uint32', proj, geot, project/'output/surface_plancher_construite.tif')
+        to_tif(popNouv, 'uint16', proj, geot, project/'output/population_nouvelle.tif')
+
+        ocs = to_array(dataDir/'classes_ocsol.tif', np.float32)
+        with (project/'output/conso_ocs.csv').open('w') as w:
+            w.write('classe, surface\n')
+            for c in np.unique(ocs):
+                if int(c) != 0:
+                    w.write(str(int(c)) +', ' + str( ((ocs == c) * srfSolNouv).sum()) + '\n')
 
         mesures.write("Population not put up, " + str(nonLogee) + '\n')
         mesures.write("Unbuilt area, " + str(nonBuilt) + '\n')
@@ -486,13 +514,13 @@ with open(project + 'log.txt', 'w') as log, open(project + 'output/mesures.csv',
 
         if densifyGround:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
-            to_tif(densifSol, 'byte', proj, geot, project + 'output/densification_sol.tif')
-            mesures.write("Densified cells area, " + str(densifSol.sum()) + "\n")
+            to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
+            mesures.write("Ground-densified cells count, " + str(densifSol.sum()) + "\n")
 
         if densifyOld:
             densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
-            to_tif(densifPla, 'byte', proj, geot, project + 'output/densification_plancher.tif')
-            mesures.write("Densified cells floor area, " + str(densifPla.sum()) + "\n")
+            to_tif(densifPla, 'byte', proj, geot, project/'output/densification_plancher.tif')
+            mesures.write("Floor-densified cells count, " + str(densifPla.sum()) + "\n")
 
     except:
         print("\n*** Error :")
