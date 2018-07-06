@@ -23,8 +23,8 @@ growth = float(sys.argv[3])
 
 
 scenario = sys.argv[4]
-pluPriority = literal_eval(sys.argv[5])
-buildNonRes= literal_eval(sys.argv[6])
+pluPriority = eval(sys.argv[5])
+buildNonRes= eval(sys.argv[6])
 densifyGround= literal(sys.argv[7])
 maxBuiltRatio = float(sys.argv[8])
 densifyOld = literal_eval(sys.argv[9])
@@ -34,7 +34,7 @@ minContig=int(sys.argv[12])
 maxContig=int(sys.argv[13])
 
 
-
+# sys.argv[0:] in (True, False)
 
 if growth > 3:
     print("Maximum evolution rate fixed at: 3 %")
