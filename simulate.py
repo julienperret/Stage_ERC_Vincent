@@ -25,10 +25,10 @@ growth = float(sys.argv[3])
 scenario = sys.argv[4]
 pluPriority = eval(sys.argv[5])
 buildNonRes= eval(sys.argv[6])
-densifyGround= literal(sys.argv[7])
+densifyGround= eval(sys.argv[7])
 maxBuiltRatio = float(sys.argv[8])
-densifyOld = literal_eval(sys.argv[9])
-maximumDensity = literal_eval(sys.argv[10])
+densifyOld = eval(sys.argv[9])
+maximumDensity = eval(sys.argv[10])
 winSize = int(sys.argv[11])
 minContig=int(sys.argv[12])
 maxContig=int(sys.argv[13])
@@ -450,7 +450,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         nonLogee = 0
         for year in range(2015, finalYear + 1):
             progres = "Year %i/%i" %(year, finalYear)
-            printer(progres)
+            #printer(progres)
             srfMax = dicSrf[year]
             popALoger = popDic[year]
             if pluPriority and not skipZau:
