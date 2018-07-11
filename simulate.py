@@ -34,13 +34,15 @@ minContig=int(sys.argv[12])
 maxContig=int(sys.argv[13])
 
 
+
+print("lancement avec " + str(sys.argv))
 # sys.argv[0:] in (True, False)
 
 if growth > 3:
     print("Maximum evolution rate fixed at: 3 %")
     sys.exit()
-if len(sys.argv) > 4:
-    argList = sys.argv[4].split()
+if len(sys.argv) > 13:
+    argList = sys.argv[14].split()
     for arg in argList:
         if 'scenario' in arg:
             scenario = arg.split('=')[1]
