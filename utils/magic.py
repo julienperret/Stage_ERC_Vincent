@@ -56,7 +56,7 @@ def writeHeaders(prefix, dep, tab):
         w.write(h)
     with (prefix/'copy_csv.sql').open('a') as w:
         i = 0
-        h = 'CREATE TABLE majic.d' + dep + '_' + tab.lower() + '('
+        h = 'CREATE TABLE d' + dep + '_' + tab.lower() + '('
         for field in modelSorted[tab]:
             i += 1
             lgr = model[tab][field][2]
@@ -66,7 +66,7 @@ def writeHeaders(prefix, dep, tab):
             else:
                 h += ');\n'
         w.write(h)
-        w.write('\COPY majic.d' + dep + '_' + tab.lower() + ' FROM ' + tab + """.csv CSV HEADER QUOTE '"' DELIMITER ','; \n""")
+        w.write('\COPY d' + dep + '_' + tab.lower() + ' FROM ' + tab + """.csv CSV HEADER QUOTE '"' DELIMITER ','; \n""")
 
 def getTuple(l, tab):
     i = 0
@@ -144,7 +144,7 @@ try:
                     depList.append(dep)
 
     start_time = time()
-    print("Commencé à " + strftime('%H:%M:%S'))
+    print("Started at " + strftime('%H:%M:%S'))
 
     # Création de la structure de recherche des valeurs de découpe {'':{'':[]}}
     for tab in modList:
@@ -180,7 +180,7 @@ try:
     for j in jobs:
         j.get()
         c += 1
-        progres = "Tâches terminées : %i/%i" %(c, len(jobs))
+        progres = "Completed tasks : %i/%i" %(c, len(jobs))
         printer(progres)
     pool.close()
     pool.join()
@@ -189,7 +189,7 @@ try:
     execTime = end_time - start_time
     execMin = round(execTime // 60)
     execSec = round(execTime % 60)
-    print("\nTemps d'execution : %im %is" %(execMin, execSec))
+    print("\nTotal elapsed time : %im %is" %(execMin, execSec))
 
 except:
     print("\n*** Error :")
