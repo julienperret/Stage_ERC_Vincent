@@ -6,6 +6,7 @@ import sys
 import csv
 import gdal
 import decimal
+import logging
 import traceback
 import numpy as np
 from pathlib import Path
@@ -58,8 +59,7 @@ import processing
 from processing.core.Processing import Processing
 Processing.initialize()
 
-QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
-feedback = QgsProcessingFeedback()
+qgs.processingRegistry().addProvider(QgsNativeAlgorithms())
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
@@ -172,6 +172,34 @@ else:
     os.makedirs(str(project))
 if not workspace.exists():
     os.makedirs(str(workspace))
+
+# Pour un vrai feedback redirigé dans un fichier log
+class QgsLoggingFeedback(QgsProcessingFeedback):
+
+    def __init__(self):
+        super().__init__()
+        self.handler = logging.FileHandler(str(project/(strftime('%Y%m%d%H%M') + '_qgsLog.txt')))
+        logging.getLogger().addHandler(self.handler)
+
+    def reportError(self, msg, fatalError=False):
+        logging.log(logging.ERROR, msg)
+
+    def setProgressText(self, text):
+        logging.log(logging.INFO, msg)
+
+    def pushInfo(self, info):
+        super().pushInfo(info)
+
+    def pushCommandInfo(self, info):
+        super().pushCommandInfo(info)
+
+    def pushDebugInfo(self, info):
+        super().pushDebugInfo(info)
+
+    def pushConsoleInfo(self, info):
+        super().pushConsoleInfo(info)
+
+feedback = QgsLoggingFeedback()
 
 statBlacklist = ['count', 'unique', 'min', 'max', 'range', 'sum', 'mean',
                  'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
