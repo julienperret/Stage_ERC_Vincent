@@ -1724,12 +1724,14 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         highwayMask = to_array(workspace/'data'/pixResStr/'tif/tampon_autoroutes.tif', np.byte)
         roadsMask = to_array(workspace/'data'/pixResStr/'tif/tampon_routes_importantes.tif', np.byte)
         railsMask = to_array(workspace/'data'/pixResStr/'tif/tampon_voies_ferrees.tif', np.byte)
-        ppriMask = to_array(workspace/'data'/pixResStr/'tif/ppri.tif', np.byte)
         slope = to_array(str(workspace/'data'/pixResStr/'tif/slope.tif'))
         slopeMask = np.where(slope > maxSlope, 1, 0).astype(np.byte)
         # Fusion
         restriction = np.where((irisMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (roadsMask == 1) |
-                               (railsMask == 1) | (zonageMask == 1) | (highwayMask == 1) | (ppriMask == 1) | (slopeMask == 1), 1, 0)
+                               (railsMask == 1) | (zonageMask == 1) | (highwayMask == 1) | (slopeMask == 1), 1, 0)
+        if (workspace/'data'/pixResStr/'tif/ppri.tif').exists():
+            ppriMask = to_array(workspace/'data'/pixResStr/'tif/ppri.tif', np.byte)
+            restriction = np.where(ppriMask == 1, 1, restriction)
 
         if (workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif').exists():
             exclusionManuelle = to_array(workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif',  np.byte)
