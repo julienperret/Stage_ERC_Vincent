@@ -908,9 +908,7 @@ def ppriExtractor(ppriPath):
 def pluFixer(plu, overlay, outdir, encoding='utf-8'):
     plu.setProviderEncoding(encoding)
     plu.dataProvider().createSpatialIndex()
-    fields = []
-    for f in plu.fields():
-        fields.append(f.name())
+    fields = list(f.name() for f in plu.fields())
     if 'type' in fields:
         expr = """ CASE
             WHEN "type" LIKE '%AU%' THEN 'AU'
@@ -1155,22 +1153,19 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             # Traitement du shape de l'intérêt écologique
             if (localData/'ecologie.shp').exists():
                 ecologie = QgsVectorLayer(str(localData/'ecologie.shp'), 'ecologie')
-                ecoFields = []
-                for field in ecologie.fields():
-                    ecoFields.append(field.name())
-                if 'importance' not in ecoFields:
+                fields = list(f.name() for f in ecologie.fields())
+                if 'importance' not in fields:
                     error = "Attribut requis 'importance' manquant ou mal nomme dans la couche d'importance ecologique"
                     if not silent:
                         print(error)
                     log.write('Erreur : ' + error)
-                    log.close()
                     sys.exit()
                 ecologie.addExpressionField('"importance"/100', QgsField('taux', QVariant.Double))
 
                 params = {'INPUT': ecologie, 'OUTPUT': 'memory:ecologie'}
                 res = processing.run('native:fixgeometries', params, feedback=feedback)
                 ecologie = res['OUTPUT']
-                del ecoFields, field
+                del fields
                 argList.append((clip(ecologie, zone), workspace/'data/'))
 
             # Autrement déterminer l'intérêt écologique grâce à l'ocsol ?
@@ -1179,7 +1174,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
             # Traitement d'une couche facultative du PPRI
             if (localData/'ppri.shp').exists():
-                ppri = ppriExtractor(localData/'ppri.shp')
+                ppri = ppriExtractor(str(localData/'ppri.shp'))
                 argList.append((clip(ppri, zone), workspace/'data/restriction/'))
             # Sinon on utilise la couche AZI - zone d'innondations potentielles
             else:
@@ -1541,7 +1536,11 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             if (workspace/'data/restriction/ppri.shp').exists():
                 argList.append((workspace/'data/restriction/ppri.shp', workspace/'data'/pixResStr/'tif/ppri.tif', 'Byte', None, 1))
             elif (workspace/'data/plu.shp').exists():
-                argList.append((workspace/'data/plu.shp', workspace/'data'/pixResStr/'tif/ppri.tif', 'Byte', 'ppri'))
+                layer = QgsVectorLayer(str(workspace/'data/plu.shp'), 'plu')
+                fields = list(f.name() for f in layer.fields())
+                if 'ppri' in fields:
+                    argList.append((workspace/'data/plu.shp', workspace/'data'/pixResStr/'tif/ppri.tif', 'Byte', 'ppri'))
+                del layer, fields
 
             if speed:
                 getDone(rasterize, argList)
