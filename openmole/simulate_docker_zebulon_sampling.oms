@@ -26,7 +26,7 @@ val impact = Val[Double]
 
 // python task
 val pythonTask =
-  UDockerTask(workDirectory / "erc4.tar",
+  UDockerTask(workDirectory / "erc6.tar",
   // UDockerTask(DockerImage("juperret/erc"),
 """xvfb-run -a python3 simulate.py /tmp/prepared_data /tmp/results ${taux} ${scenario} ${pluPriority} ${buildNonRes} ${densifyGround} ${maxBuiltRatio} ${densifyOld}  ${maximumDensity} ${winSize} ${minContig} ${maxContig}   "${optionsPrep}"""")set (
     inputDirectory := workDirectory / "prepared_34",
@@ -35,8 +35,12 @@ val pythonTask =
     outputs += (taux, scenario, pluPriority, buildNonRes, densifyGround, maxBuiltRatio, densifyOld, maximumDensity, winSize, minContig, maxContig),
     inputFiles += (inputDirectory, "/tmp/prepared_data"),
     outputFiles += ("/tmp/results", output),
-
-    optionsPrep:=""
+    optionsPrep:="",
+    winSize := 3,
+    minContig := 1,
+    maxContig :=5
+    
+    
     
   )
 
@@ -51,24 +55,28 @@ val extract = ScalaTask("""
     outputs += impact
     )
     
-val copy = CopyFileHook(output, workDirectory /"results/sim_${taux}_${scenario}_${pluPriority}_${buildNonRes}_${densifyGround}_${maxBuiltRatio}_${densifyOld}_${maximumDensity}_${winSize}_${minContig}_{maxContig}.csv")
+val copy = CopyFileHook(output, workDirectory / "results" / "sim_${taux}_${scenario}_${pluPriority}_${buildNonRes}_${densifyGround}_${maxBuiltRatio}_${densifyOld}_${maximumDensity}_${winSize}_${minContig}_${maxContig}.csv")
 
 val stringHook = DisplayHook("The impact value is ${impact}.")
 
 //val env = EGIEnvironment("vo.complex-systems.eu",openMOLEMemory = 2500 megabytes)
-val env = LocalEnvironment(10)
+val env = LocalEnvironment(1)
 
-val sampling =DirectSampling ( sampling= ((taux in List(0.5)) x 
+
+val sampling =DirectSampling ( sampling= ((taux in (0.0 to 3.0 by 1.0)) x 
                            (scenario in List("reduction", "stable", "tendanciel"))x
                         (pluPriority in List("True", "False") ) x
                         (buildNonRes in List("True", "False") ) x
                         (densifyGround in List("True", "False") ) x
-                        ( maxBuiltRatio in  (50.0 to 100.0 by 5.0))  x
+                        ( maxBuiltRatio in  (50.0 to 100.0 by 10.0))  x
                         (densifyOld in List("True", "False") ) x
-                        (maximumDensity in List("True", "False") ) x
-                        (winSize in (3 to 9) )  x
-                        (minContig in (0 to 3) )  x
-                        (maxContig in (0 to 8) )) filter ("minContig<maxContig")
+                        (maximumDensity in List("True", "False") )) 
+                        //(winSize in List(3) )  x
+                        //(minContig in List(1) )  x
+                        //(maxContig in List(5) )) 
+                        //filter ("minContig<maxContig") 
+                        //filter("if (winSize == 3)  ( minContig <= 8 | maxContig <= 8 ) else true " ) 
+                        //filter(" if (winSize > 3) (minContig <= 1 | maxContig <= 1) else true ") 
   ,
   evaluation = ((pythonTask on env hook copy  ) -- (extract hook stringHook))
   )
