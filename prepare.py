@@ -1178,7 +1178,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 argList.append((clip(ppri, zone), workspace/'data/restriction/'))
             # Sinon on utilise la couche AZI - zone d'innondations potentielles
             else:
-                ppri = QgsVectorLayer(str(globalData/'azi/r_azi_zone_inond_pot_s_r76.shp', 'ppri'))
+                ppri = QgsVectorLayer(str(globalData/'azi/r_azi_zone_inond_pot_s_r76.shp'), 'ppri')
                 params = {
                     'INPUT': ppri,
                     'OUTPUT':'memory:ppri'
