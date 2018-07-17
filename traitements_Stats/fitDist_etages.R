@@ -189,6 +189,9 @@ library(actuar)
 
 #"binom", "nbinom", "geom", "hyper" or "pois"
 
+
+fitter <-  function(dd){
+
 #celles qui marchent sans paramètres supplementaires 
 
 poiss <-  fitdist(dd$NB_NIV, discrete = T , "pois" )
@@ -207,6 +210,7 @@ ztpoiss <-  fitdist(data = dd$NB_NIV, discrete = T ,
                     distr = dztpois,
                     control=list(trace=1, REPORT=1))
 
+
 ztgeom <-  fitdist(data = dd$NB_NIV, discrete = T ,
                    start=list(prob= 0.5 ),
                    distr = "ztgeom",
@@ -214,6 +218,8 @@ ztgeom <-  fitdist(data = dd$NB_NIV, discrete = T ,
 
 
 
+
+logfitter <-  function(dd){
 AICmin <-  Inf
 bestfit <-  NULL
 pbestfit <- NULL
@@ -226,55 +232,37 @@ for (p in seq(from=0.01, to = 0.99 , by=0.01 )){
   xx <- gofstat(lolog)
   
   if(xx$aic < AICmin){
-    cat ("AIC meilleur avec p = " , p ,"\n")
     AICmin <-  xx$aic
     bestfit  <-  lolog
     pbestfit <- p
   }
   
 }
+cat ("AIC meilleur avec p = " , pbestfit ,"\n")
+
+return(bestfit)
+}
+
+lolog <- logfitter(dd)
 
 
+candidats <-  list(poiss, negbin, geo, ztpoiss, ztgeom,lolog)
+gof <-  gofstat(candidats)
 
-optimMethods <-  c("Nelder-Mead", "BFGS", "CG", "L-BFGS-B", "SANN","Brent")
-for (m in optimMethods) {
+return(candidats[which(gof$aic == min(gof$aic))])
 
-  cat("METHODE", m ,"==========\n")
-  tryCatch({
-    zmpois <- fitdist(data = dd$NB_NIV, discrete = T ,
-                      start=list(lambda = (c(1,2,3) )),
-                      distr = "zmpois")
-    
-    
-    },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
-  
 }
 
 
 
 
 
-for (m in optimMethods) {
-  
-  cat("METHODE", m ,"==========\n")
-  tryCatch({
-    zmpois <- fitdist(data = dd$NB_NIV, discrete = T ,
-                      start=list( size = 800 ,prob = 0.5 , p0=0),
-                      distr = "zmbinom")
-  },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
-  
-}
+meilleureDist <- fitter(dd)[[1]]
 
+meilleureDist$distname
 
+#generer valeurs de 1 à max a partir du nom
 
-
-plot(bestfit)
-
-
-
-
-pzmbinom
-pzmlogarithmic
 
 
 

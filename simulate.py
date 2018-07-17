@@ -19,6 +19,23 @@ np.seterr(divide='ignore', invalid='ignore')
 dataDir = Path(sys.argv[1])
 outputDir = Path(sys.argv[2])
 growth = float(sys.argv[3])
+
+
+#scenario = sys.argv[4]
+#pluPriority = literal_eval(sys.argv[5])
+#buildNonRes= literal_eval(sys.argv[6])
+#densifyGround= literal(sys.argv[7])
+#maxBuiltRatio = float(sys.argv[8])
+#densifyOld = literal_eval(sys.argv[9])
+#maximumDensity = literal_eval(sys.argv[10])
+#winSize = int(sys.argv[11])
+#minContig=int(sys.argv[12])
+#maxContig=int(sys.argv[13])
+#
+
+
+
+
 if growth > 3:
     print("Maximum evolution rate fixed at: 3 %")
     sys.exit()
