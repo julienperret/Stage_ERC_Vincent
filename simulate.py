@@ -23,7 +23,7 @@ scenario = sys.argv[4]
 pluPriority = eval(sys.argv[5])
 buildNonRes= eval(sys.argv[6])
 densifyGround= eval(sys.argv[7])
-maxBuiltRatio = float(sys.argv[8])
+maxBuiltRatio = int(sys.argv[8])
 densifyOld = eval(sys.argv[9])
 maximumDensity = eval(sys.argv[10])
 winSize = int(sys.argv[11])
@@ -58,7 +58,7 @@ if len(sys.argv) > 13:
         elif 'maximumDensity' in arg:
             maximumDensity = literal_eval(arg.split('=')[1])
         elif 'maxBuiltRatio' in arg:
-            maxBuiltRatio = float(arg.split('=')[1])
+            maxBuiltRatio = int(arg.split('=')[1])
         elif 'winSize' in arg:
             winSize = int(arg.split('=')[1])
         elif 'minContig' in arg:
@@ -94,9 +94,9 @@ if 'maxBuiltRatio' not in globals():
 if 'winSize' not in globals():
     winSize = 3
 if 'minContig' not in globals():
-    minContig = 1
+    minContig = 0.1
 if 'maxContig' not in globals():
-    maxContig = 5
+    maxContig = 0.6
 if 'writingTifs' not in globals():
     writingTifs = False
 
@@ -128,17 +128,14 @@ def choose(weight, size=1):
         return None
 
 # Fenêtre glissante pour statistique dans le voisinage d'un pixel
-def slidingWin(array, row, col, size=3, calc='sum'):
+def slidingWin(array, row, col, size=3):
     if (row > size - 1 and row + size-1 < rows) and (col > size - 1 and col + size-1 < cols):
         s = 0
         pos = [i + 1 for i in range(- size//2, size//2)]
         for r in pos:
             for c in pos:
                 s += array[row + r][col + c]
-        if calc == 'sum':
-            return s
-        elif calc == 'mean':
-            return s / (size * size)
+        return s / (size * size)
     else:
         return None
 
@@ -150,10 +147,7 @@ def expand(row, col):
     maxSrf = capaSol[row][col]
     ss = 0
     if maxSrf > minSrf:
-        if type(maxContig) == float or maxContig == 1:
-            contig = slidingWin(urb, row, col, winSize, 'mean')
-        elif winSize == 3:
-            contig = slidingWin(urb, row, col, winSize, 'sum')
+        contig = slidingWin(urb, row, col, winSize)
         if contig:
             if minContig < contig <= maxContig:
                 if maximumDensity:
