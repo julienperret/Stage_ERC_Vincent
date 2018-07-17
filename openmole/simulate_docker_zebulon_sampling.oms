@@ -13,6 +13,7 @@ val maximumDensity = Val[String]
 val winSize = Val[Int] 
 val minContig = Val[Int]  
 val maxContig  = Val[Int] 
+val writingTifs = Val[String]
 
 val taux = Val[Double]
 val res = Val[Int]
@@ -28,7 +29,7 @@ val impact = Val[Double]
 val pythonTask =
   UDockerTask(workDirectory / "erc6.tar",
   // UDockerTask(DockerImage("juperret/erc"),
-"""xvfb-run -a python3 simulate.py /tmp/prepared_data /tmp/results ${taux} ${scenario} ${pluPriority} ${buildNonRes} ${densifyGround} ${maxBuiltRatio} ${densifyOld}  ${maximumDensity} ${winSize} ${minContig} ${maxContig}   "${optionsPrep}"""")set (
+"""xvfb-run -a python3 simulate.py /tmp/prepared_data /tmp/results ${taux} ${scenario} ${pluPriority} ${buildNonRes} ${densifyGround} ${maxBuiltRatio} ${densifyOld}  ${maximumDensity} ${winSize} ${minContig} ${maxContig}  ${wrtingTifs}  "${optionsPrep}"""")set (
     inputDirectory := workDirectory / "prepared_34",
     inputs += (taux, scenario, pluPriority, buildNonRes, densifyGround, maxBuiltRatio, densifyOld, maximumDensity, winSize, minContig, maxContig),
     inputs += optionsPrep,
@@ -38,7 +39,8 @@ val pythonTask =
     optionsPrep:="",
     winSize := 3,
     minContig := 1,
-    maxContig :=5
+    maxContig :=5,
+	writingTifs :="False"
     
     
     
