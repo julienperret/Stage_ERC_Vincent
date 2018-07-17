@@ -32,26 +32,41 @@ val res = Val[Int]
 val inputDirectory = Val[File]
 val output = Val[File]
 
+val impact = Val[Double]
+
 // python task
 val pythonTask =
-  UDockerTask(workDirectory / "erc.tar",
-"""xvfb-run python3 simulate.py /app/prepared_data /app/results ${taux} "${optionsPrep}"""") set (
-    inputDirectory := workDirectory / "prepared_data_34",
+  //UDockerTask(workDirectory / "erc.tar",
+    UDockerTask(DockerImage("juperret/erc"),
+"""xvfb-run -a python3 simulate.py /tmp/prepared_data /tmp/results ${taux} "${optionsPrep}"""") set (
+    inputDirectory := workDirectory / "prepared_34",
     inputs += (taux),
-    inputs +=optionsPrep,
+    inputs += optionsPrep,
     outputs += (taux),
-    inputFiles += (inputDirectory, "/app/prepared_data"),
-    outputFiles += ("/app/results", output),
+    inputFiles += (inputDirectory, "/tmp/prepared_data"),
+    outputFiles += ("/tmp/results", output),
+//    outputFiles += ("/tmp/results/200m_tx${taux}_tendanciel_buildRatio80_pluPrio_buildNonRes/output/mesures.csv", measures),
 //    customWorkDirectory := "/tmp",
     optionsPrep:="scenario=tendanciel buildNonRes=True"
   )
 
- 
-val exploration = ExplorationTask((taux in List(0.5)))
+val extract = ScalaTask("""
+|    import scala.io.Source
+|    val measures = output.listFiles().filter(_.isDirectory).flatMap(_.listFiles().filter(_.isDirectory)).flatMap(_.listFiles().filter(_.getName.equalsIgnoreCase("mesures.csv"))).head
+|    val src = Source.fromFile(measures)
+|    val lineArray = src.getLines().drop(7).next().split(",")
+|    val impact = lineArray(1).trim.toDouble
+    """.stripMargin) set (
+    inputs += output,
+    outputs += impact
+    )
+val exploration = ExplorationTask((taux in List(0.1)))
 //val copy = CopyFileHook(outputFiles, workDirectory / "prepare_${dept}")
 
 val copy = CopyFileHook(output, workDirectory /"simulation_${taux}")
 
-val env = EGIEnvironment("vo.complex-systems.eu",openMOLEMemory = 2500 megabytes)
-//val env = LocalEnvironment(4)
-exploration -< (pythonTask hook copy on env) 
+val stringHook = DisplayHook("The impact value is ${impact}.")
+
+//val env = EGIEnvironment("vo.complex-systems.eu",openMOLEMemory = 2500 megabytes)
+val env = LocalEnvironment(4)
+exploration -< ((pythonTask hook copy) -- (extract hook stringHook))

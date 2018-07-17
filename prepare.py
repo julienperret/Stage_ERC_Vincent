@@ -44,7 +44,7 @@ from qgis.core import (
     QgsVectorLayerJoinInfo
 )
 from qgis.analysis import QgsNativeAlgorithms
-from PyQt5.QtCore import QVariant
+from qgis.PyQt.QtCore import QVariant
 
 qgs = QgsApplication([], GUIenabled=False)
 if sys.platform == 'linux':
@@ -64,7 +64,7 @@ qgs.processingRegistry().addProvider(QgsNativeAlgorithms())
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
 # Utilisation d'un arrondi au supérieur avec les objet Decimal()
-decimal.getcontext().rounding = 'ROUND_UP'
+decimal.getcontext().rounding='ROUND_UP'
 
 # Import des paramètres d'entrée
 globalData = Path(sys.argv[1])
@@ -121,12 +121,14 @@ if len(sys.argv) > 5:
             maxSlope = int(arg.split('=')[1])
 
 # Valeurs de paramètres par défaut
+if 'silent' not in globals():
+    silent = False
 if 'pixRes' not in globals():
     pixRes = 50
     pixResStr= str(pixRes) + 'm'
 elif not 200 >= pixRes >= 20:
     if not silent:
-        print('La taille de la grille doit être comprise entre 20m et 200m')
+        print('Grid size should be between 20m and 200m')
     sys.exit()
 if 'bufferDistance' not in globals():
     bufferDistance = 1000
@@ -152,8 +154,6 @@ if 'speed' not in globals():
     speed = False
 if 'truth' not in globals():
     truth = False
-if 'silent' not in globals():
-    silent = False
 
 if force and outputDir.exists():
     rmtree(str(outputDir))
@@ -163,6 +163,7 @@ if truth:
     if workspace.exists() :
         rmtree(str(workspace))
     project = outputDir
+    studyAreaName = ''
 else:
     studyAreaName = localData.parts[len(localData.parts)-1]
     workspace = outputDir/dpt/studyAreaName
@@ -421,7 +422,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
         dicSumBuilds[feat.attribute('CODE_IRIS')] = 0
         dicBuilds[feat.attribute('CODE_IRIS')] = {}
         dicWeightedPop[feat.attribute('CODE_IRIS')] = {}
-        dicPop[feat.attribute('CODE_IRIS')] = feat.attribute('POP14')
+        dicPop[feat.attribute('CODE_IRIS')] = feat['POP14']
 
     for feat in buildings.getFeatures():
         dicSumBuilds[feat.attribute('CODE_IRIS')] += feat.attribute('planch')
@@ -1641,9 +1642,9 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         pop14 = 0
         iris = QgsVectorLayer(str(workspace/'data'/pixResStr/'stat_iris.shp'))
         for feat in iris.getFeatures():
-            pop09 += int(feat.attribute('POP09'))
-            pop12 += int(feat.attribute('POP12'))
-            pop14 += int(feat.attribute('POP14'))
+            pop09 += feat.attribute('POP09')
+            pop12 += feat.attribute('POP12')
+            pop14 += feat.attribute('POP14')
         with (project/'population.csv').open('w') as w:
             w.write('annee, demographie\n')
             w.write('2009, ' + str(pop09) + '\n')

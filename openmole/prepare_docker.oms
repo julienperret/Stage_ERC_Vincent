@@ -7,25 +7,26 @@ val globalDataDirectory = Val[File]
 val localDataDirectory = Val[File]
 val output = Val[File]
 
+//DockerImage("juperret/erc")
+//Vector.empty,"docker"
 val dockerTask =
-  UDockerTask(workDirectory / "erc.tar",
-"""xvfb-run python3 prepare.py /app/global_data ${dept} /app/local_data /app/results "${optionsPrep}"""") set (
+  //UDockerTask(workDirectory / "erc.tar",
+  UDockerTask(DockerImage("juperret/erc"),
+"""xvfb-run python3 prepare.py /tmp/global_data ${dept} /tmp/mtp /tmp/results "${optionsPrep}"""") set (
     (inputs, outputs) += (dept),
     (inputs, outputs) += optionsPrep,
     globalDataDirectory := workDirectory / "global_data",
     localDataDirectory := workDirectory / "local_data",
-    inputFiles += (globalDataDirectory, "/app/global_data"),
-    inputFiles += (localDataDirectory, "/app/local_data"),
-    outputFiles += ("/app/results", output),
-    optionsPrep := "pixRes=50 truth"
-    //uDockerUser := "casimir",
-    //reuseContainer := true
+    inputFiles += (globalDataDirectory, "/tmp/global_data"),
+    inputFiles += (localDataDirectory, "/tmp/mtp"),
+    outputFiles += ("/tmp/results/${dept}/mtp/simulation/200m", output),
+    optionsPrep := "pixRes=200"
   )
 
 val exploration = ExplorationTask(dept in List(34))
 
-val copy = CopyFileHook(output, workDirectory /"prepared_data_${dept}")
+val copy = CopyFileHook(output, workDirectory /"prepared_${dept}")
 
-val env = EGIEnvironment("vo.complex-systems.eu",openMOLEMemory = 2500 megabytes)
-//val env = LocalEnvironment(4)
+//val env = EGIEnvironment("vo.complex-systems.eu",openMOLEMemory = 2500 megabytes)
+val env = LocalEnvironment(4)
 exploration -< (dockerTask hook copy on env) 
