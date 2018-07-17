@@ -30,7 +30,7 @@ maximumDensity = float(sys.argv[10])
 winSize = int(sys.argv[11])
 minContig = float(sys.argv[12])
 maxContig = float(sys.argv[13])
-writingTifs = float(sys.argv[14])
+writingTifs = int(sys.argv[14])
 
 print("lancement avec " + str(sys.argv))
 # sys.argv[0:] in (True, False)
@@ -151,7 +151,7 @@ def expand(row, col):
         contig = slidingWin(urb, row, col, winSize)
         if contig:
             if minContig < contig <= maxContig:
-                if maximumDensity == 1.0:
+                if maximumDensity > 0.5:
                     ss = maxSrf
                 else:
                     ss = np.random.randint(minSrf, maxSrf + 1)
@@ -176,7 +176,7 @@ def densify(mode, row, col):
         minSrf = ssrMed[row][col]
         maxSrf = capaSol[row][col]
         if maxSrf > minSrf:
-            if maximumDensity == 1.0:
+            if maximumDensity > 0.5:
                 ss = maxSrf
             else:
                 ss = np.random.randint(minSrf, maxSrf + 1)
@@ -228,7 +228,7 @@ def urbanize(pop, srfMax=0, zau=False):
                 tmpInteret[row][col] = 0
 
         # On densifie l'existant si les cellules vides sont déjà saturées
-        if artif < srfMax and count < pop and densifyGround == 1.0:
+        if artif < srfMax and count < pop and densifyGround > 0.5:
             tmpInteret = np.where((capaSol >= ssrMed) & (urb == 1), interet, 0)
             if zau:
                 tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
@@ -250,7 +250,7 @@ def urbanize(pop, srfMax=0, zau=False):
                     tmpInteret[row][col] = 0
 
     # Densification du bâti existant si on n'a pas pu loger tout le monde
-    elif count < pop and densifyOld == 1.0:
+    elif count < pop and densifyOld > 0.5:
         tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
         while count < pop and tmpInteret.sum() > 0:
             sp = 0
@@ -263,7 +263,7 @@ def urbanize(pop, srfMax=0, zau=False):
                 tmpInteret[row][col] = 0
 
     srfSol += tmpSrfSol
-    if buildNonRes == 1.0:
+    if buildNonRes > 0.5:
         tmpSrfSol = (tmpSrfSol * txSsr).round().astype(np.uint16)
     srfSolRes += tmpSrfSol
     srfPla += tmpSrfPla
@@ -282,15 +282,15 @@ srfCell = pixSize * pixSize
 ds = None
 
 projectStr = str(pixSize) + 'm' + '_tx' + str(growth) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
-if pluPriority == 1.0:
+if pluPriority > 0.5:
     projectStr += '_pluPrio'
-if buildNonRes == 1.0:
+if buildNonRes > 0.5:
     projectStr += '_buildNonRes'
-if densifyGround == 1.0:
+if densifyGround > 0.5:
     projectStr += '_densifyGround'
-if densifyOld == 1.0:
+if densifyOld > 0.5:
     projectStr += '_densifyOld'
-if maximumDensity == 1.0:
+if maximumDensity > 0.5:
     projectStr += '_maximumDensity'
 if finalYear != 2040:
     projectStr += '_' + str(finalYear)
@@ -363,7 +363,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         m2PlaHab = to_array(dataDir/'iris_m2_hab.tif', np.uint16)
         srfPla14 = to_array(dataDir/'srf_pla.tif', np.uint32)
         nbNivMax = to_array(dataDir/'iris_nbniv_max.tif')
-        if buildNonRes == 1.0:
+        if buildNonRes > 0.5:
             txSsr = to_array(dataDir/'iris_tx_ssr.tif', np.float32)
         # Amenités
         eco = to_array(dataDir/'interet/non-importance_ecologique.tif', np.float32)
@@ -419,7 +419,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m2\n')
 
         # Instantanés de la situation à t0
-        if writingTifs == 1.0:
+        if writingTifs == 1:
             to_tif(urb14, 'byte', proj, geot, project/'urbanisation_2014.tif')
             to_tif(capaSol, 'uint16', proj, geot, project/'capacite_sol_2014.tif')
             to_tif(txArtif, 'float32', proj, geot, project/'taux_artif_2014.tif')
@@ -443,7 +443,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             #printer(progres)
             srfMax = dicSrf[year]
             popALoger = popDic[year]
-            if pluPriority == 1.0 and not skipZau:
+            if pluPriority > 0.5 and not skipZau:
                 restePop, resteSrf = urbanize(popALoger - preLogee, srfMax - preBuilt,  True)
                 if restePop > 0 and resteSrf > 0:
                     skipZau = True
@@ -458,7 +458,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             preLogee = -restePop
 
             # Snapshots
-            if writingTifs == 1.0:
+            if writingTifs == 1:
                 to_tif(demographie, 'uint16', proj, geot, project/('snapshots/demographie/demo_' + str(year) + '.tif'))
                 to_tif(urb, 'byte', proj, geot, project/('snapshots/urbanisation/urb_' + str(year) + '.tif'))
                 to_tif(srfSol, 'uint16', proj, geot, project/('snapshots/surface_sol/sol_' + str(year) + '.tif'))
@@ -485,7 +485,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
         expansionSum = expansion.sum()
         impactEnv = round((srfSolNouv * (1 - eco)).sum())
-        if writingTifs == 1.0:
+        if writingTifs == 1:
             to_tif(urb, 'uint16', proj, geot, project/('output/urbanisation_' + str(finalYear) + '.tif'))
             to_tif(srfSol, 'uint16', proj, geot, project/('output/surface_sol_' + str(finalYear) + '.tif'))
             to_tif(srfPla, 'uint32', proj, geot, project/('output/surface_plancher_' + str(finalYear) + '.tif'))
@@ -520,17 +520,17 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write("Total number of randomly chosen cells: " + str(countChoices) + '\n')
         log.write("Execution time: " + str(execTime) + '\n')
 
-        if densifyGround == 1.0:
+        if densifyGround > 0.5:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
-            if writingTifs == 1.0:
+            if writingTifs == 1:
                 to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
             mesures.write("Ground-densified cells count, " + str(densifSol.sum()) + "\n")
         else:
             mesures.write("Ground-densified cells count, na\n")
 
-        if densifyOld == 1.0:
+        if densifyOld > 0.5:
             densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
-            if writingTifs == 1.0:
+            if writingTifs == 1:
                 to_tif(densifPla, 'byte', proj, geot, project/'output/densification_plancher.tif')
             mesures.write("Floor-densified cells count, " + str(densifPla.sum()) + "\n")
         else:
