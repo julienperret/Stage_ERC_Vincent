@@ -1,3 +1,4 @@
+import os
 import sys
 import gdal
 import numpy as np
@@ -13,14 +14,17 @@ def printer(string):
 	sys.stdout.flush()
 
 def getDone(function, argList):
-    c = 0
-    jobs = []
-    for a in argList:
-        jobs.append(Process(target=function, args=a))
-    for j in jobs:
-        j.start()
-    for j in jobs:
-        j.join()
+	nbCores = os.cpu_count()
+	while len(argList) > 0:
+		jobs = []
+		tasks = nbCores - 1 if len(argList) > nbCores - 1 else len(argList)
+		for n in range(tasks):
+			a = argList.pop()
+			jobs.append(Process(target=function, args=a))
+		for j in jobs:
+			j.start()
+		for j in jobs:
+			j.join()
 
 # Calcul le temps d'exécution d'une étape
 def getTime(start):
