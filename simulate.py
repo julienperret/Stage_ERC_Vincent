@@ -50,18 +50,26 @@ if len(sys.argv) == 5:
 
 # *** Paramètres pour openMole
 elif len(sys.argv) > 5:
-    scenario = sys.argv[4]
+    scenario = float(sys.argv[4])
+    
+    if (scenario >=0) & (scenario < 1) : 
+        tmpscenario = "tendanciel"
+    if (scenario >=1) & (scenario < 2) : 
+        tmpscenario = "stable"
+    if (scenario >=2) & (scenario <= 3) : 
+        tmpscenario = "reduction"
+    scenario = tmpscenario    
     pluPriority = float(sys.argv[5])
     buildNonRes = float(sys.argv[6])
     densifyGround = float(sys.argv[7])
     maxBuiltRatio = float(sys.argv[8])
     densifyOld = float(sys.argv[9])
     maximumDensity = float(sys.argv[10])
-    winSize = int(sys.argv[11])
+    winSize = int(float(sys.argv[11]))
     minContig = float(sys.argv[12])
     maxContig = float(sys.argv[13])
-    writingTifs = int(sys.argv[14])
-    print("lancement avec " + str(sys.argv))
+    writingTifs = eval(sys.argv[14])
+    #print("lancement avec " + str(sys.argv))
 
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
