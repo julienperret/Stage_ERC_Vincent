@@ -19,26 +19,8 @@ np.seterr(divide='ignore', invalid='ignore')
 dataDir = Path(sys.argv[1])
 outputDir = Path(sys.argv[2])
 growth = float(sys.argv[3])
-scenario = sys.argv[4]
-pluPriority = float(sys.argv[5])
-buildNonRes = float(sys.argv[6])
-densifyGround = float(sys.argv[7])
-maxBuiltRatio = float(sys.argv[8])
-densifyOld = float(sys.argv[9])
-maximumDensity = float(sys.argv[10])
-winSize = int(sys.argv[11])
-minContig = float(sys.argv[12])
-maxContig = float(sys.argv[13])
-writingTifs = int(sys.argv[14])
-
-print("lancement avec " + str(sys.argv))
-# sys.argv[0:] in (True, False)
-
-if growth > 3:
-    print("Maximum evolution rate fixed at: 3 %")
-    sys.exit()
-if len(sys.argv) > 13:
-    argList = sys.argv[14].split()
+if len(sys.argv) == 5:
+    argList = sys.argv[4].split()
     for arg in argList:
         if 'scenario' in arg:
             scenario = arg.split('=')[1]
@@ -65,6 +47,21 @@ if len(sys.argv) > 13:
             minContig = literal_eval(arg.split('=')[1])
         elif 'maxContig' in arg:
             maxContig = literal_eval(arg.split('=')[1])
+
+# *** Paramètres pour openMole
+elif len(sys.argv) > 5:
+    scenario = sys.argv[4]
+    pluPriority = float(sys.argv[5])
+    buildNonRes = float(sys.argv[6])
+    densifyGround = float(sys.argv[7])
+    maxBuiltRatio = float(sys.argv[8])
+    densifyOld = float(sys.argv[9])
+    maximumDensity = float(sys.argv[10])
+    winSize = int(sys.argv[11])
+    minContig = float(sys.argv[12])
+    maxContig = float(sys.argv[13])
+    writingTifs = int(sys.argv[14])
+    print("lancement avec " + str(sys.argv))
 
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
@@ -100,9 +97,13 @@ if 'maxContig' not in globals():
 if 'writingTifs' not in globals():
     writingTifs = False
 
-# Contrôle des paramètres de contiguïté
+# Contrôle des paramètres
+if growth > 3:
+    print("Maximum evolution rate fixed at: 3 %")
+    sys.exit()
 if maxContig > 1 or minContig > 1:
     print("Error : minContig and maxContig should be float numbers < 1 !")
+    sys.exit()
 if minContig > maxContig:
     print("Error : maxContig should be higher than minContig !")
     sys.exit()
@@ -439,7 +440,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         nonLogee = 0
         for year in range(2015, finalYear + 1):
             progres = "Year %i/%i" %(year, finalYear)
-            #printer(progres)
+            printer(progres)
             srfMax = dicSrf[year]
             popALoger = popDic[year]
             if pluPriority > 0.5 and not skipZau:
