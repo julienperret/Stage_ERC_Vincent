@@ -1,14 +1,14 @@
-**__! Les dernières modifications sur prepare.py obligent à recharger la donnée locale depuis le SFTP !__**  
+**__! Les dernières modifications sur prepare.py obligent à recharger la donnée locale depuis le SFTP !__**
 
-## ./prepare.py  
-Ce script doit être lancé en ligne de commande avec au moins 2 arguments :  
-    1 : répertoire des données globales  
-    2 : n° de département dans lequel la zone d'étude est située  
-    3 : répertoire des données locales  
-    4 : répertoire des résultats (créé si besoin)  
-    5 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)  
+## ./prepare.py
+Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
+    1 : répertoire des données globales
+    2 : n° de département dans lequel la zone d'étude est située
+    3 : répertoire des données locales
+    4 : répertoire des résultats (créé si besoin)
+    5 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnel)
 
-*Paramètres disponibles :*  
+*Paramètres disponibles :*
 
 | Processus                                  | Variable ou fichier              | Minimum | Maximum | Unité | Valeur par défaut | Description                                                                     |
 |--------------------------------------------|----------------------------------|---------|---------|-------|-------------------|-------------------------------------------------------------------------------- |
@@ -25,35 +25,35 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 | Création des rasters de densité SIRENE     | global_data/sirene/poids.csv     | 1       | +       | int   | 1                 | Poids de chaque raster de densité de points SIRENE                              |
 |                                            | global_data/sirene/distances.csv | 100     | 2000    | m     |                   | Distances maximales de recherche pour chaque raster de densité de points SIRENE |
 
-*Mots magiques :*  
+*Mots magiques :*
 
-* force = suppression du répertoire de sortie si il existe  
-* speed = utilisation de plusieurs threads (peut coûter cher en RAM !)  
-* truth = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires  
-* silent = aucun 'print' durant l'exécution  
+* force = suppression du répertoire de sortie si il existe
+* speed = utilisation de plusieurs threads (peut coûter cher en RAM !)
+* truth = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires
+* silent = aucun 'print' durant l'exécution
 
-En cas de problème avec les "distance_trucmuche.tif", vérifier qu'il y a un header dans les fichiers csv.  
+En cas de problème avec les "distance_trucmuche.tif", vérifier qu'il y a un header dans les fichiers csv.
 
-Usage :  
+Usage :
 ```shell
-./prepare.py ../global_data/ 34 ../mtp/ ../results/ "pixRes=50 speed"  
+./prepare.py ../global_data/ 34 ../mtp/ ../results/ "pixRes=50 speed"
 ```
-Dépendances pour python3 :  
-    PyQt5, qgis, gdal, numpy  
+Dépendances pour python3 :
+    PyQt5, qgis, gdal, numpy
 
-Windows : utiliser OSGeo4W Shell  
+Windows : utiliser OSGeo4W Shell
 ```shell
 python-qgis prepare.py *args
 ````
 
-## ./simulate.py  
-Deux paramètres au minimum :  
-    1 : répertoire contenant la donnée  
-    2 : répertoire des résultats (créé si besoin)  
-    3 : le taux annuel d'évolution de la population (en %), -1 pour utiliser le taux moyen 2009 - 2014  
-    4 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnelle)  
+## ./simulate.py
+Deux paramètres au minimum :
+    1 : répertoire contenant la donnée
+    2 : répertoire des résultats (créé si besoin)
+    3 : le taux annuel d'évolution de la population (en %), -1 pour utiliser le taux moyen 2009 - 2014
+    4 : chaîne de paramètres séparés d'un espace, dans n'importe quel ordre (optionnelle)
 
-*Paramètres disponibles :*  
+*Paramètres disponibles :*
 
 | Variable ou fichier  | Minimum   | Maximum    | Unité  | Valeur par défaut | Description                                                                                                           |
 |----------------------|-----------|------------|--------|-------------------|-----------------------------------------------------------------------------------------------------------------------|
@@ -66,8 +66,8 @@ Deux paramètres au minimum :
 | densifyOld           | False     | True       | bool   | False             | Pour autoriser à augmenter la surface plancher dans des cellules urbanisées avant le début de la simulation           |
 | maximumDensifty      | False     | True       | bool   | False             | Pour utiliser le maximum de la surface autorisée dans chaque cellule - au sol ou en plancher                          |
 | winSize              | 3         | 9          | pixel  | 3                 | Taille en pixels du côté de la fenêtre glissante pour calcul de la somme ou de la moyenne des valeurs voisines        |
-| minContig            | 0         | 3          | pixel  | 1                 | Nombre minimal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
-| maxContig            | 0         | 8          | pixel  | 5                 | Nombre maximal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
+| minContig            | 0         | 0.3        | float  | 0.1               | Nombre minimal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
+| maxContig            | 0.6       | 1          | float  | 0.8               | Nombre maximal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
 | writeTifs            | False     | True       | bool   | true              | Indique si les tiffs sont sauvés en sortie                                                                            |
 | local_data/poids.csv | 1         | +          | int    |                   | Poids de chaque raster d’aménités pour la création du raster final interet                                            |
 
@@ -77,19 +77,19 @@ Usage :
     ./simulate.py  /prepared_34/ /tmp/tmp/  0.5 tendanciel 1 0  1  50.0 0 0  3 0.3 0.5 0
 ```
 
-Dépendances pour python3 :  
-    gdal, numpy  
+Dépendances pour python3 :
+    gdal, numpy
 
-### Commandes CARE qui semblent marcher :  
+### Commandes CARE qui semblent marcher :
 ```shell
-care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data/ 34  ./mtp/ ./results/ "pixRes=50 useTxrp=True levelHeight=3 force"  
+care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data/ 34  ./mtp/ ./results/ "pixRes=50 useTxrp=True levelHeight=3 force"
 
-care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data/ /my/output/dir/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"  
+care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data/ /my/output/dir/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"
 ```
 
 ATTENTION : derrière -p : mettre les chemins en absolu
 
-### Commandes Docker :  
+### Commandes Docker :
 
 #### 0. faire du docker à l'IGN avec une ubuntu 16.04
 
@@ -139,31 +139,31 @@ sudo docker save erc > erc.tar
 
 Votre image docker *erc* est sauvée dans l'archive *erc.tar*. Vous pouvez maintenant l'utiliser avec **OpenMOLE** par exemple...
 
-## Outils  
+## Outils
 
-### ./magic.py  
-Convertit les fichiers positionnels MAJIC III en CSV avec création de tables PSQL  
+### ./magic.py
+Convertit les fichiers positionnels MAJIC III en CSV avec création de tables PSQL
 
-### ./toolbox.py   
-Contient les fonctions communes; à déplacer avec tout script sorti du dépôt.  
+### ./toolbox.py
+Contient les fonctions communes; à déplacer avec tout script sorti du dépôt.
 
-### ./insee_to_csv.py   
-Convertir les données XLS de l'INSEE en CSV en supprimant les champs inutiles, à lancer une seule fois pour toute la région  
-Dépendances pour python3 :  
-    pandas + xlrd (pour manipuler les .xls)  
+### ./insee_to_csv.py
+Convertir les données XLS de l'INSEE en CSV en supprimant les champs inutiles, à lancer une seule fois pour toute la région
+Dépendances pour python3 :
+    pandas + xlrd (pour manipuler les .xls)
 
 Usage :
 ```shell
-./utils/insee_to_csv.py ../global_data/insee/  
+./utils/insee_to_csv.py ../global_data/insee/
 ```
 
-### ./tif_to_gif.py  
-Génère un GIF à partir des instantanés (TIF) générés pour chaque année de la simulation.  
-Trois paramètres au minimum:  
-    1 : dossier contenant les images pour chaque année  
-    2 : dossier de sortie  
-    3 : type de donnée des images (byte, uint16, uint32, float32)  
-    4 : chaîne contenant la durée du GIF et la valeur max à utiliser ( delay=n , maxValue=n)  
+### ./tif_to_gif.py
+Génère un GIF à partir des instantanés (TIF) générés pour chaque année de la simulation.
+Trois paramètres au minimum:
+    1 : dossier contenant les images pour chaque année
+    2 : dossier de sortie
+    3 : type de donnée des images (byte, uint16, uint32, float32)
+    4 : chaîne contenant la durée du GIF et la valeur max à utiliser ( delay=n , maxValue=n)
 
 Usage :
 ```shell

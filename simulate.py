@@ -93,7 +93,7 @@ if 'winSize' not in globals():
 if 'minContig' not in globals():
     minContig = 0.1
 if 'maxContig' not in globals():
-    maxContig = 0.6
+    maxContig = 0.8
 if 'writingTifs' not in globals():
     writingTifs = False
 
