@@ -440,7 +440,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         nonLogee = 0
         for year in range(2015, finalYear + 1):
             progres = "Year %i/%i" %(year, finalYear)
-            printer(progres)
+            # printer(progres)
             srfMax = dicSrf[year]
             popALoger = popDic[year]
             if pluPriority > 0.5 and not skipZau:
