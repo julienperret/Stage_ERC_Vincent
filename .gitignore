@@ -7,4 +7,5 @@ erc.tar
 .Rhistory
 .project
 .pydevproject
-.settings/
+.settings
+__pycache__

@@ -1206,15 +1206,15 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 ppri = ppriExtractor(str(localData/'ppri.shp'))
                 argList.append((clip(ppri, zone), workspace/'data/restriction/'))
             # Sinon on utilise la couche AZI - zone d'innondations potentielles
-            else:
-                ppri = QgsVectorLayer(str(globalData/'azi/r_azi_zone_inond_pot_s_r76.shp'), 'ppri')
+            elif (globalData/'azi').exists():
+                azi = QgsVectorLayer(str(globalData/'azi/r_azi_zone_inond_pot_s_r76.shp'), 'azi')
                 params = {
-                    'INPUT': ppri,
-                    'OUTPUT':'memory:ppri'
+                    'INPUT': azi,
+                    'OUTPUT':'memory:azi'
                 }
                 res = processing.run('native:fixgeometries', params, feedback=feedback)
-                ppri = res['OUTPUT']
-                argList.append((clip(ppri, zone), workspace/'data/restriction/'))
+                azi = res['OUTPUT']
+                argList.append((clip(azi, zone), workspace/'data/restriction/'))
 
             # Utilisation des parcelles DGFIP pour exclure des bâtiments lors du calcul de densité
             if (localData/'exclusion_parcelles.shp').exists():
@@ -1242,6 +1242,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 del ecologie
             if 'ppri' in globals():
                 del ppri
+            if 'azi' in globals():
+                del azi
 
             # Traitement des couches de zonage de protection
             zonagesEnv = []
@@ -1562,8 +1564,12 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             if (workspace/'data/restriction/exclusion_manuelle.shp').exists():
                 argList.append((workspace/'data/restriction/exclusion_manuelle.shp', workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif', 'Byte', None, 1))
 
+            if (workspace/'data/restriction/azi.shp').exists():
+                argList.append((workspace/'data/restriction/azi.shp', workspace/'data'/pixResStr/'tif/azi.tif', 'Byte', None, 1))
+
             if (workspace/'data/restriction/ppri.shp').exists():
                 argList.append((workspace/'data/restriction/ppri.shp', workspace/'data'/pixResStr/'tif/ppri.tif', 'Byte', None, 1))
+
             elif (workspace/'data/plu.shp').exists():
                 layer = QgsVectorLayer(str(workspace/'data/plu.shp'), 'plu')
                 fields = list(f.name() for f in layer.fields())
@@ -1730,9 +1736,14 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         # Fusion
         restriction = np.where((irisMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (roadsMask == 1) |
                                (railsMask == 1) | (zonageMask == 1) | (highwayMask == 1) | (slopeMask == 1), 1, 0)
+
         if (workspace/'data'/pixResStr/'tif/ppri.tif').exists():
             ppriMask = to_array(workspace/'data'/pixResStr/'tif/ppri.tif', np.byte)
             restriction = np.where(ppriMask == 1, 1, restriction)
+
+        elif (workspace/'data'/pixResStr/'tif/azi.tif').exists():
+            aziMask = to_array(workspace/'data'/pixResStr/'tif/azi.tif', np.byte)
+            restriction = np.where(aziMask == 1, 1, restriction)
 
         if (workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif').exists():
             exclusionManuelle = to_array(workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif',  np.byte)
