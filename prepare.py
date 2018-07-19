@@ -355,6 +355,12 @@ def buildCsvGrid(name, path, iris, grid, outCsvDir):
     hasId = False
     buildings = QgsVectorLayer(path, name)
     buildings.dataProvider().createSpatialIndex()
+    params = {
+        'INPUT': buildings,
+        'OUTPUT': 'memory:' + name
+    }
+    res = processing.run('native:fixgeometries', params, feedback=feedback)
+    buildings = res['OUTPUT']
 
     for field in buildings.fields():
         if field.name() == 'ID' or field.name() == 'id':
@@ -683,6 +689,12 @@ def restrictGrid(layerList, grid, ratio, outdir):
         name = layer.name()
         fieldList.append(name)
         layer.dataProvider().createSpatialIndex()
+        params = {
+            'INPUT': layer,
+            'OUTPUT': 'memory:' + layer.name()
+        }
+        res = processing.run('native:fixgeometries', params, feedback=feedback)
+        layer = res['OUTPUT']
         params = {
             'INPUT': layer,
             'OVERLAY': grid,
@@ -1349,13 +1361,22 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             cleanPolygons = []
             cleanPoints = []
             # On inclut les surfaces d'activités (autres que commerciales et industrielles) dans la couche de restriction
+            surf_activ = QgsVectorLayer(str(workspace/'data/pai/surface_activite.shp'), 'surf_activ')
             params = {
                 'INPUT': str(workspace/'data/pai/surface_activite.shp'),
+                'OUTPUT': 'memory:surf_activ'
+            }
+            res = processing.run('native:fixgeometries', params, feedback=feedback)
+            surf_activ = res['OUTPUT']
+            params = {
+                'INPUT': surf_activ,
                 'EXPRESSION': """ "CATEGORIE" != 'Industriel ou commercial' """,
                 'OUTPUT': str(workspace/'data/pai/surf_activ_non_com.shp'),
                 'FAIL_OUTPUT': 'memory:'
             }
             processing.run('native:extractbyexpression', params, feedback=feedback)
+            del surf_activ
+
             # Si possible, on utilise les parcelles non résidentilles DGFIP fusionnées avec un tampon de 2m
             if (workspace/'data/restriction/exclusion_parcelles.shp').exists():
                 parcelles = QgsVectorLayer(str(workspace/'data/restriction/exclusion_parcelles.shp'), 'parcelles')

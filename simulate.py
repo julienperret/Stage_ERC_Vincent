@@ -70,7 +70,7 @@ elif len(sys.argv) > 5:
     maxContig = float(sys.argv[13])
     writingTifs = eval(sys.argv[14])
     #print("lancement avec " + str(sys.argv))
-
+    
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
     finalYear = 2040
@@ -103,7 +103,7 @@ if 'minContig' not in globals():
 if 'maxContig' not in globals():
     maxContig = 0.8
 if 'writingTifs' not in globals():
-    writingTifs = False
+    writingTifs = 1.0
 
 # Contrôle des paramètres
 if growth > 3:
@@ -493,7 +493,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
         expansionSum = expansion.sum()
         impactEnv = round((srfSolNouv * (1 - eco)).sum())
-        if writingTifs == 1:
+        if writingTifs > 0.5 :
             to_tif(urb, 'uint16', proj, geot, project/('output/urbanisation_' + str(finalYear) + '.tif'))
             to_tif(srfSol, 'uint16', proj, geot, project/('output/surface_sol_' + str(finalYear) + '.tif'))
             to_tif(srfPla, 'uint32', proj, geot, project/('output/surface_plancher_' + str(finalYear) + '.tif'))
