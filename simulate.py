@@ -19,28 +19,26 @@ np.seterr(divide='ignore', invalid='ignore')
 dataDir = Path(sys.argv[1])
 outputDir = Path(sys.argv[2])
 growth = float(sys.argv[3])
+scenario = sys.argv[4]
+pluPriority = float(sys.argv[5])
+buildNonRes = float(sys.argv[6])
+densifyGround = float(sys.argv[7])
+maxBuiltRatio = float(sys.argv[8])
+densifyOld = float(sys.argv[9])
+maximumDensity = float(sys.argv[10])
+winSize = int(sys.argv[11])
+minContig = float(sys.argv[12])
+maxContig = float(sys.argv[13])
+writingTifs = int(sys.argv[14])
 
-
-#scenario = sys.argv[4]
-#pluPriority = literal_eval(sys.argv[5])
-#buildNonRes= literal_eval(sys.argv[6])
-#densifyGround= literal(sys.argv[7])
-#maxBuiltRatio = float(sys.argv[8])
-#densifyOld = literal_eval(sys.argv[9])
-#maximumDensity = literal_eval(sys.argv[10])
-#winSize = int(sys.argv[11])
-#minContig=int(sys.argv[12])
-#maxContig=int(sys.argv[13])
-#
-
-
-
+print("lancement avec " + str(sys.argv))
+# sys.argv[0:] in (True, False)
 
 if growth > 3:
     print("Maximum evolution rate fixed at: 3 %")
     sys.exit()
-if len(sys.argv) > 4:
-    argList = sys.argv[4].split()
+if len(sys.argv) > 13:
+    argList = sys.argv[14].split()
     for arg in argList:
         if 'scenario' in arg:
             scenario = arg.split('=')[1]
@@ -60,7 +58,7 @@ if len(sys.argv) > 4:
         elif 'maximumDensity' in arg:
             maximumDensity = literal_eval(arg.split('=')[1])
         elif 'maxBuiltRatio' in arg:
-            maxBuiltRatio = float(arg.split('=')[1])
+            maxBuiltRatio = int(arg.split('=')[1])
         elif 'winSize' in arg:
             winSize = int(arg.split('=')[1])
         elif 'minContig' in arg:
@@ -96,22 +94,18 @@ if 'maxBuiltRatio' not in globals():
 if 'winSize' not in globals():
     winSize = 3
 if 'minContig' not in globals():
-    minContig = 1
+    minContig = 0.1
 if 'maxContig' not in globals():
-    maxContig = 5
+    maxContig = 0.6
+if 'writingTifs' not in globals():
+    writingTifs = False
 
 # Contrôle des paramètres de contiguïté
-if winSize == 3:
-    if minContig > 8 or maxContig > 8:
-        print("Error : minContig and maxContig should be lower than winSize * winSize !")
-        sys.exit()
-elif winSize > 3:
-    if maxContig > 1 or minContig > 1:
-        print("Error : minContig and maxContig should be float numbers < 1 if winSize > 3 !")
+if maxContig > 1 or minContig > 1:
+    print("Error : minContig and maxContig should be float numbers < 1 !")
 if minContig > maxContig:
     print("Error : maxContig should be higher than minContig !")
     sys.exit()
-
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
 def choose(weight, size=1):
@@ -134,17 +128,14 @@ def choose(weight, size=1):
         return None
 
 # Fenêtre glissante pour statistique dans le voisinage d'un pixel
-def slidingWin(array, row, col, size=3, calc='sum'):
+def slidingWin(array, row, col, size=3):
     if (row > size - 1 and row + size-1 < rows) and (col > size - 1 and col + size-1 < cols):
         s = 0
         pos = [i + 1 for i in range(- size//2, size//2)]
         for r in pos:
             for c in pos:
                 s += array[row + r][col + c]
-        if calc == 'sum':
-            return s
-        elif calc == 'mean':
-            return s / (size * size)
+        return s / (size * size)
     else:
         return None
 
@@ -156,13 +147,10 @@ def expand(row, col):
     maxSrf = capaSol[row][col]
     ss = 0
     if maxSrf > minSrf:
-        if type(maxContig) == float or maxContig == 1:
-            contig = slidingWin(urb, row, col, winSize, 'mean')
-        elif winSize == 3:
-            contig = slidingWin(urb, row, col, winSize, 'sum')
+        contig = slidingWin(urb, row, col, winSize)
         if contig:
             if minContig < contig <= maxContig:
-                if maximumDensity:
+                if maximumDensity > 0.5:
                     ss = maxSrf
                 else:
                     ss = np.random.randint(minSrf, maxSrf + 1)
@@ -187,7 +175,7 @@ def densify(mode, row, col):
         minSrf = ssrMed[row][col]
         maxSrf = capaSol[row][col]
         if maxSrf > minSrf:
-            if maximumDensity:
+            if maximumDensity > 0.5:
                 ss = maxSrf
             else:
                 ss = np.random.randint(minSrf, maxSrf + 1)
@@ -239,7 +227,7 @@ def urbanize(pop, srfMax=0, zau=False):
                 tmpInteret[row][col] = 0
 
         # On densifie l'existant si les cellules vides sont déjà saturées
-        if artif < srfMax and count < pop and densifyGround:
+        if artif < srfMax and count < pop and densifyGround > 0.5:
             tmpInteret = np.where((capaSol >= ssrMed) & (urb == 1), interet, 0)
             if zau:
                 tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
@@ -261,7 +249,7 @@ def urbanize(pop, srfMax=0, zau=False):
                     tmpInteret[row][col] = 0
 
     # Densification du bâti existant si on n'a pas pu loger tout le monde
-    elif count < pop and densifyOld:
+    elif count < pop and densifyOld > 0.5:
         tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
         while count < pop and tmpInteret.sum() > 0:
             sp = 0
@@ -274,7 +262,7 @@ def urbanize(pop, srfMax=0, zau=False):
                 tmpInteret[row][col] = 0
 
     srfSol += tmpSrfSol
-    if buildNonRes:
+    if buildNonRes > 0.5:
         tmpSrfSol = (tmpSrfSol * txSsr).round().astype(np.uint16)
     srfSolRes += tmpSrfSol
     srfPla += tmpSrfPla
@@ -293,15 +281,15 @@ srfCell = pixSize * pixSize
 ds = None
 
 projectStr = str(pixSize) + 'm' + '_tx' + str(growth) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
-if pluPriority:
+if pluPriority > 0.5:
     projectStr += '_pluPrio'
-if buildNonRes :
+if buildNonRes > 0.5:
     projectStr += '_buildNonRes'
-if densifyGround :
+if densifyGround > 0.5:
     projectStr += '_densifyGround'
-if densifyOld :
+if densifyOld > 0.5:
     projectStr += '_densifyOld'
-if maximumDensity :
+if maximumDensity > 0.5:
     projectStr += '_maximumDensity'
 if finalYear != 2040:
     projectStr += '_' + str(finalYear)
@@ -374,7 +362,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         m2PlaHab = to_array(dataDir/'iris_m2_hab.tif', np.uint16)
         srfPla14 = to_array(dataDir/'srf_pla.tif', np.uint32)
         nbNivMax = to_array(dataDir/'iris_nbniv_max.tif')
-        if buildNonRes:
+        if buildNonRes > 0.5:
             txSsr = to_array(dataDir/'iris_tx_ssr.tif', np.float32)
         # Amenités
         eco = to_array(dataDir/'interet/non-importance_ecologique.tif', np.float32)
@@ -430,11 +418,12 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m2\n')
 
         # Instantanés de la situation à t0
-        to_tif(urb14, 'byte', proj, geot, project/'urbanisation_2014.tif')
-        to_tif(capaSol, 'uint16', proj, geot, project/'capacite_sol_2014.tif')
-        to_tif(txArtif, 'float32', proj, geot, project/'taux_artif_2014.tif')
-        to_tif(interet, 'float32', proj, geot, project/'interet_2014.tif')
-        to_tif(ratioPlaSol14, 'float32', proj, geot, project/'ratio_plancher_sol_2014.tif')
+        if writingTifs == 1:
+            to_tif(urb14, 'byte', proj, geot, project/'urbanisation_2014.tif')
+            to_tif(capaSol, 'uint16', proj, geot, project/'capacite_sol_2014.tif')
+            to_tif(txArtif, 'float32', proj, geot, project/'taux_artif_2014.tif')
+            to_tif(interet, 'float32', proj, geot, project/'interet_2014.tif')
+            to_tif(ratioPlaSol14, 'float32', proj, geot, project/'ratio_plancher_sol_2014.tif')
 
         start_time = time()
         ##### Boucle principale #####
@@ -450,10 +439,10 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         nonLogee = 0
         for year in range(2015, finalYear + 1):
             progres = "Year %i/%i" %(year, finalYear)
-            printer(progres)
+            #printer(progres)
             srfMax = dicSrf[year]
             popALoger = popDic[year]
-            if pluPriority and not skipZau:
+            if pluPriority > 0.5 and not skipZau:
                 restePop, resteSrf = urbanize(popALoger - preLogee, srfMax - preBuilt,  True)
                 if restePop > 0 and resteSrf > 0:
                     skipZau = True
@@ -468,10 +457,11 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             preLogee = -restePop
 
             # Snapshots
-            to_tif(demographie, 'uint16', proj, geot, project/('snapshots/demographie/demo_' + str(year) + '.tif'))
-            to_tif(urb, 'byte', proj, geot, project/('snapshots/urbanisation/urb_' + str(year) + '.tif'))
-            to_tif(srfSol, 'uint16', proj, geot, project/('snapshots/surface_sol/sol_' + str(year) + '.tif'))
-            to_tif(srfPla, 'uint32', proj, geot, project/('snapshots/surface_plancher/plancher_' + str(year) + '.tif'))
+            if writingTifs == 1:
+                to_tif(demographie, 'uint16', proj, geot, project/('snapshots/demographie/demo_' + str(year) + '.tif'))
+                to_tif(urb, 'byte', proj, geot, project/('snapshots/urbanisation/urb_' + str(year) + '.tif'))
+                to_tif(srfSol, 'uint16', proj, geot, project/('snapshots/surface_sol/sol_' + str(year) + '.tif'))
+                to_tif(srfPla, 'uint32', proj, geot, project/('snapshots/surface_plancher/plancher_' + str(year) + '.tif'))
 
         if restePop > 0:
             nonLogee = int(round(restePop))
@@ -494,17 +484,17 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
         expansionSum = expansion.sum()
         impactEnv = round((srfSolNouv * (1 - eco)).sum())
-
-        to_tif(urb, 'uint16', proj, geot, project/('output/urbanisation_' + str(finalYear) + '.tif'))
-        to_tif(srfSol, 'uint16', proj, geot, project/('output/surface_sol_' + str(finalYear) + '.tif'))
-        to_tif(srfPla, 'uint32', proj, geot, project/('output/surface_plancher_' + str(finalYear) + '.tif'))
-        to_tif(demographie, 'uint16', proj, geot, project/('output/demographie_' + str(finalYear) + '.tif'))
-        to_tif(ratioPlaSol, 'float32', proj, geot, project/('output/ratio_plancher_sol_' + str(finalYear) + '.tif'))
-        to_tif(txArtifNouv, 'float32', proj, geot, project/'output/taux_artificialisation.tif')
-        to_tif(expansion, 'byte', proj, geot, project/'output/expansion.tif')
-        to_tif(srfSolNouv, 'uint16', proj, geot, project/'output/surface_sol_construite.tif')
-        to_tif(srfPlaNouv, 'uint32', proj, geot, project/'output/surface_plancher_construite.tif')
-        to_tif(popNouv, 'uint16', proj, geot, project/'output/population_nouvelle.tif')
+        if writingTifs == 1:
+            to_tif(urb, 'uint16', proj, geot, project/('output/urbanisation_' + str(finalYear) + '.tif'))
+            to_tif(srfSol, 'uint16', proj, geot, project/('output/surface_sol_' + str(finalYear) + '.tif'))
+            to_tif(srfPla, 'uint32', proj, geot, project/('output/surface_plancher_' + str(finalYear) + '.tif'))
+            to_tif(demographie, 'uint16', proj, geot, project/('output/demographie_' + str(finalYear) + '.tif'))
+            to_tif(ratioPlaSol, 'float32', proj, geot, project/('output/ratio_plancher_sol_' + str(finalYear) + '.tif'))
+            to_tif(txArtifNouv, 'float32', proj, geot, project/'output/taux_artificialisation.tif')
+            to_tif(expansion, 'byte', proj, geot, project/'output/expansion.tif')
+            to_tif(srfSolNouv, 'uint16', proj, geot, project/'output/surface_sol_construite.tif')
+            to_tif(srfPlaNouv, 'uint32', proj, geot, project/'output/surface_plancher_construite.tif')
+            to_tif(popNouv, 'uint16', proj, geot, project/'output/population_nouvelle.tif')
 
         ocs = to_array(dataDir/'classes_ocsol.tif', np.float32)
         with (project/'output/conso_ocs.csv').open('w') as w:
@@ -521,6 +511,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         mesures.write("Cells open to urbanisation, " + str(expansion.sum()) + "\n")
         mesures.write("Average artificialisation rate, " + str(txArtifMoyen) + "\n")
         mesures.write("Cumulated environnemental impact, " + str(int(impactEnv)) + "\n")
+        print("Cumulated environnemental impact = " + str(int(impactEnv)) + "\n")
         log.write("Unbuilt area: " + str(nonBuilt) + '\n')
         log.write("Population not put up: " + str(nonLogee) + '\n')
         log.write("Population put up: " + str(popNouvCount) + '\n')
@@ -528,15 +519,21 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write("Total number of randomly chosen cells: " + str(countChoices) + '\n')
         log.write("Execution time: " + str(execTime) + '\n')
 
-        if densifyGround:
+        if densifyGround > 0.5:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
-            to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
+            if writingTifs == 1:
+                to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
             mesures.write("Ground-densified cells count, " + str(densifSol.sum()) + "\n")
+        else:
+            mesures.write("Ground-densified cells count, na\n")
 
-        if densifyOld:
+        if densifyOld > 0.5:
             densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
-            to_tif(densifPla, 'byte', proj, geot, project/'output/densification_plancher.tif')
+            if writingTifs == 1:
+                to_tif(densifPla, 'byte', proj, geot, project/'output/densification_plancher.tif')
             mesures.write("Floor-densified cells count, " + str(densifPla.sum()) + "\n")
+        else:
+            mesures.write("Floor-densified cells count, na\n")
 
     except:
         print("\n*** Error :")

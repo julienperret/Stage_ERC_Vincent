@@ -44,7 +44,7 @@ from qgis.core import (
     QgsVectorLayerJoinInfo
 )
 from qgis.analysis import QgsNativeAlgorithms
-from PyQt5.QtCore import QVariant
+from qgis.PyQt.QtCore import QVariant
 
 qgs = QgsApplication([], GUIenabled=False)
 if sys.platform == 'linux':
@@ -64,7 +64,7 @@ qgs.processingRegistry().addProvider(QgsNativeAlgorithms())
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
 # Utilisation d'un arrondi au supérieur avec les objet Decimal()
-decimal.getcontext().rounding = 'ROUND_UP'
+decimal.getcontext().rounding='ROUND_UP'
 
 # Import des paramètres d'entrée
 globalData = Path(sys.argv[1])
@@ -121,12 +121,14 @@ if len(sys.argv) > 5:
             maxSlope = int(arg.split('=')[1])
 
 # Valeurs de paramètres par défaut
+if 'silent' not in globals():
+    silent = False
 if 'pixRes' not in globals():
     pixRes = 50
     pixResStr= str(pixRes) + 'm'
 elif not 200 >= pixRes >= 20:
     if not silent:
-        print('La taille de la grille doit être comprise entre 20m et 200m')
+        print('Grid size should be between 20m and 200m')
     sys.exit()
 if 'bufferDistance' not in globals():
     bufferDistance = 1000
@@ -152,8 +154,6 @@ if 'speed' not in globals():
     speed = False
 if 'truth' not in globals():
     truth = False
-if 'silent' not in globals():
-    silent = False
 
 if force and outputDir.exists():
     rmtree(str(outputDir))
@@ -163,6 +163,7 @@ if truth:
     if workspace.exists() :
         rmtree(str(workspace))
     project = outputDir
+    studyAreaName = ''
 else:
     studyAreaName = localData.parts[len(localData.parts)-1]
     workspace = outputDir/dpt/studyAreaName
@@ -421,7 +422,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
         dicSumBuilds[feat.attribute('CODE_IRIS')] = 0
         dicBuilds[feat.attribute('CODE_IRIS')] = {}
         dicWeightedPop[feat.attribute('CODE_IRIS')] = {}
-        dicPop[feat.attribute('CODE_IRIS')] = feat.attribute('POP14')
+        dicPop[feat.attribute('CODE_IRIS')] = feat['POP14']
 
     for feat in buildings.getFeatures():
         dicSumBuilds[feat.attribute('CODE_IRIS')] += feat.attribute('planch')
@@ -1205,15 +1206,15 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 ppri = ppriExtractor(str(localData/'ppri.shp'))
                 argList.append((clip(ppri, zone), workspace/'data/restriction/'))
             # Sinon on utilise la couche AZI - zone d'innondations potentielles
-            else:
-                ppri = QgsVectorLayer(str(globalData/'azi/r_azi_zone_inond_pot_s_r76.shp'), 'ppri')
+            elif (globalData/'azi').exists():
+                azi = QgsVectorLayer(str(globalData/'azi/r_azi_zone_inond_pot_s_r76.shp'), 'azi')
                 params = {
-                    'INPUT': ppri,
-                    'OUTPUT':'memory:ppri'
+                    'INPUT': azi,
+                    'OUTPUT':'memory:azi'
                 }
                 res = processing.run('native:fixgeometries', params, feedback=feedback)
-                ppri = res['OUTPUT']
-                argList.append((clip(ppri, zone), workspace/'data/restriction/'))
+                azi = res['OUTPUT']
+                argList.append((clip(azi, zone), workspace/'data/restriction/'))
 
             # Utilisation des parcelles DGFIP pour exclure des bâtiments lors du calcul de densité
             if (localData/'exclusion_parcelles.shp').exists():
@@ -1241,6 +1242,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 del ecologie
             if 'ppri' in globals():
                 del ppri
+            if 'azi' in globals():
+                del azi
 
             # Traitement des couches de zonage de protection
             zonagesEnv = []
@@ -1561,8 +1564,12 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             if (workspace/'data/restriction/exclusion_manuelle.shp').exists():
                 argList.append((workspace/'data/restriction/exclusion_manuelle.shp', workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif', 'Byte', None, 1))
 
+            if (workspace/'data/restriction/azi.shp').exists():
+                argList.append((workspace/'data/restriction/azi.shp', workspace/'data'/pixResStr/'tif/azi.tif', 'Byte', None, 1))
+
             if (workspace/'data/restriction/ppri.shp').exists():
                 argList.append((workspace/'data/restriction/ppri.shp', workspace/'data'/pixResStr/'tif/ppri.tif', 'Byte', None, 1))
+
             elif (workspace/'data/plu.shp').exists():
                 layer = QgsVectorLayer(str(workspace/'data/plu.shp'), 'plu')
                 fields = list(f.name() for f in layer.fields())
@@ -1641,9 +1648,9 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         pop14 = 0
         iris = QgsVectorLayer(str(workspace/'data'/pixResStr/'stat_iris.shp'))
         for feat in iris.getFeatures():
-            pop09 += int(feat.attribute('POP09'))
-            pop12 += int(feat.attribute('POP12'))
-            pop14 += int(feat.attribute('POP14'))
+            pop09 += feat.attribute('POP09')
+            pop12 += feat.attribute('POP12')
+            pop14 += feat.attribute('POP14')
         with (project/'population.csv').open('w') as w:
             w.write('annee, demographie\n')
             w.write('2009, ' + str(pop09) + '\n')
@@ -1729,9 +1736,14 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         # Fusion
         restriction = np.where((irisMask == 1) | (surfActivMask == 1) | (gridMask == 1) | (roadsMask == 1) |
                                (railsMask == 1) | (zonageMask == 1) | (highwayMask == 1) | (slopeMask == 1), 1, 0)
+
         if (workspace/'data'/pixResStr/'tif/ppri.tif').exists():
             ppriMask = to_array(workspace/'data'/pixResStr/'tif/ppri.tif', np.byte)
             restriction = np.where(ppriMask == 1, 1, restriction)
+
+        elif (workspace/'data'/pixResStr/'tif/azi.tif').exists():
+            aziMask = to_array(workspace/'data'/pixResStr/'tif/azi.tif', np.byte)
+            restriction = np.where(aziMask == 1, 1, restriction)
 
         if (workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif').exists():
             exclusionManuelle = to_array(workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif',  np.byte)

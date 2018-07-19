@@ -1,0 +1,85 @@
+// departement
+val dept = Val[Int]
+//options passées en string
+val optionsPrep = Val[String]
+
+val scenario = Val[String]
+val pluPriority = Val[String]
+val buildNonRes= Val[String]
+val densifyGround= Val[String]
+val maxBuiltRatio = Val[Double]
+val densifyOld = Val[String]
+val maximumDensity = Val[String]
+val winSize = Val[Int]
+val minContig = Val[Double]
+val maxContig  = Val[Double]
+val writingTifs = Val[String]
+
+val taux = Val[Double]
+val res = Val[Int]
+
+//=========================
+val inputDirectory = Val[File]
+val output = Val[File]
+
+val impact = Val[Double]
+
+
+// python task
+val pythonTask =
+  UDockerTask(workDirectory / "erc6.tar",
+  // UDockerTask(DockerImage("juperret/erc"),
+"""xvfb-run -a python3 simulate.py /tmp/prepared_data /tmp/results ${taux} ${scenario} ${pluPriority} ${buildNonRes} ${densifyGround} ${maxBuiltRatio} ${densifyOld}  ${maximumDensity} ${winSize} ${minContig} ${maxContig}  ${wrtingTifs}  "${optionsPrep}"""")set (
+    inputDirectory := workDirectory / "prepared_34",
+    inputs += (taux, scenario, pluPriority, buildNonRes, densifyGround, maxBuiltRatio, densifyOld, maximumDensity, winSize, minContig, maxContig),
+    inputs += optionsPrep,
+    outputs += (taux, scenario, pluPriority, buildNonRes, densifyGround, maxBuiltRatio, densifyOld, maximumDensity, winSize, minContig, maxContig),
+    inputFiles += (inputDirectory, "/tmp/prepared_data"),
+    outputFiles += ("/tmp/results", output),
+    optionsPrep:="",
+    winSize := 3,
+    minContig := 0.1,
+    maxContig :=0.6,
+	writingTifs :="False"
+
+
+
+  )
+
+val extract = ScalaTask("""
+|    import scala.io.Source
+|    val measures = output.listFiles().filter(_.isDirectory).flatMap(_.listFiles().filter(_.isDirectory)).flatMap(_.listFiles().filter(_.getName.equalsIgnoreCase("mesures.csv"))).head
+|    val src = Source.fromFile(measures)
+|    val lineArray = src.getLines().drop(7).next().split(",")
+|    val impact = lineArray(1).trim.toDouble
+    """.stripMargin) set (
+    inputs += output,
+    outputs += impact
+    )
+
+val copy = CopyFileHook(output, workDirectory / "results" / "sim_${taux}_${scenario}_${pluPriority}_${buildNonRes}_${densifyGround}_${maxBuiltRatio}_${densifyOld}_${maximumDensity}_${winSize}_${minContig}_${maxContig}.csv")
+
+val stringHook = DisplayHook("The impact value is ${impact}.")
+
+//val env = EGIEnvironment("vo.complex-systems.eu",openMOLEMemory = 2500 megabytes)
+val env = LocalEnvironment(1)
+
+
+val sampling =DirectSampling ( sampling= ((taux in (0.0 to 3.0 by 1.0)) x
+                           (scenario in List("reduction", "stable", "tendanciel"))x
+                        (pluPriority in List("True", "False") ) x
+                        (buildNonRes in List("True", "False") ) x
+                        (densifyGround in List("True", "False") ) x
+                        ( maxBuiltRatio in  (50.0 to 100.0 by 10.0))  x
+                        (densifyOld in List("True", "False") ) x
+                        (maximumDensity in List("True", "False") ))
+                        //(winSize in List(3) )  x
+                        //(minContig in List(1) )  x
+                        //(maxContig in List(5) ))
+                        //filter ("minContig<maxContig")
+                        //filter("if (winSize == 3)  ( minContig <= 8 | maxContig <= 8 ) else true " )
+                        //filter(" if (winSize > 3) (minContig <= 1 | maxContig <= 1) else true ")
+  ,
+  evaluation = ((pythonTask on env hook copy  ) -- (extract hook stringHook))
+  )
+sampling

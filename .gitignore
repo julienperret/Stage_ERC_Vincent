@@ -5,3 +5,7 @@ erc.tar
 *.kate-swp
 .RData
 .Rhistory
+.project
+.pydevproject
+.settings
+__pycache__

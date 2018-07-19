@@ -62,17 +62,19 @@ Deux paramètres au minimum :
 | pluPriority          | False     | True       | bool   | True              | Utilisation du PLU pour peupler les ZAU en priorité                                                                   |
 | buildNonRes          | False     | True       | bool   | True              | Pour simuler la construction au sol de bâtiments non résidentiels (en utilisant un taux de résidentiel par IRIS)      |
 | densifyGround        | False     | True       | bool   | False             | Pour autoriser à densifier au sol des cellules déjà construite (si la capacité au sol le permet - voir maxBuiltRatio) |
-| maxBuiltRatio        | 50        | 100        | %      | 80                | Taux maximal de la surface bâtie au sol d’une cellule                                                                 |
+| maxBuiltRatio        | 50.0      | 100.0      | %      | 80                | Taux maximal de la surface bâtie au sol d’une cellule                                                                 |
 | densifyOld           | False     | True       | bool   | False             | Pour autoriser à augmenter la surface plancher dans des cellules urbanisées avant le début de la simulation           |
 | maximumDensifty      | False     | True       | bool   | False             | Pour utiliser le maximum de la surface autorisée dans chaque cellule - au sol ou en plancher                          |
 | winSize              | 3         | 9          | pixel  | 3                 | Taille en pixels du côté de la fenêtre glissante pour calcul de la somme ou de la moyenne des valeurs voisines        |
 | minContig            | 0         | 3          | pixel  | 1                 | Nombre minimal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
 | maxContig            | 0         | 8          | pixel  | 5                 | Nombre maximal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
+| writeTifs            | False     | True       | bool   | true              | Indique si les tiffs sont sauvés en sortie                                                                            |
 | local_data/poids.csv | 1         | +          | int    |                   | Poids de chaque raster d’aménités pour la création du raster final interet                                            |
 
 Usage :
 ```shell
-    ./simulate.py ./workspace/mtp/simulation_50m/ ./results/ 0.5 'scenario=tendanciel buildNonRes=True'
+    In this version designed for OpenMole, the boolean are floats that are set to true if value > 0.5
+    ./simulate.py  /prepared_34/ /tmp/tmp/  0.5 tendanciel 1 0  1  50.0 0 0  3 0.3 0.5 0
 ```
 
 Dépendances pour python3 :  
