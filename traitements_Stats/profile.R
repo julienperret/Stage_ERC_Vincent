@@ -1,8 +1,10 @@
 library(ggplot2)
 
-setwd("~/encadrement/Stage_ERC_Vincent/traitements_Stats/")
+setwd("~/encadrement/repoJulienERC/erc/traitements_Stats/")
 
 df <-  read.csv("population7609.csv")
+
+df <-  read.csv("population862.csv")
 
 
 names(df)
