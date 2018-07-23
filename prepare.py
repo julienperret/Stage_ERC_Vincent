@@ -1692,10 +1692,10 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         copyfile(str(workspace/'data'/pixResStr/'evo_surface_sol.csv'), str(project/'evo_surface_sol.csv'))
         # Rasterisations
         argList = [
-            (workspace/'data'/pixResStr/'stat_grid.shp', project/'demographie_2014.tif', 'UInt16', 'pop'),
+            (workspace/'data'/pixResStr/'stat_grid.shp', project/'demographie.tif', 'UInt16', 'pop'),
             (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_pla.tif', 'UInt32', 'srf_pla'),
             (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_sol_res.tif', 'UInt16', 'ssol_res'),
-            (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_sol_2014.tif', 'UInt16', 'ssol_14'),
+            (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_sol.tif', 'UInt16', 'ssol_14'),
             (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_ssr_med.tif', 'UInt16', 'ssr_med'),
             (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_tx_ssr.tif', 'Float32', 'tx_ssr'),
             (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_m2_hab.tif', 'UInt16', 'm2_hab'),

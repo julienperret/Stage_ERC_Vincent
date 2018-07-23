@@ -272,7 +272,7 @@ def urbanize(pop, srfMax=0, zau=False):
     return (pop - count, srfMax - artif)
 
 # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-ds = gdal.Open(str(dataDir/'demographie_2014.tif'))
+ds = gdal.Open(str(dataDir/'demographie.tif'))
 demographieDep = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
 cols, rows = demographieDep.shape[1], demographieDep.shape[0] # x, y
 proj = ds.GetProjection()
@@ -356,8 +356,8 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             pluPriority = False
 
         # Déclaration des matrices
-        demographie14 = to_array(dataDir/'demographie_2014.tif', np.uint16)
-        srfSol14 = to_array(dataDir/'srf_sol_2014.tif', np.uint16)
+        demographie14 = to_array(dataDir/'demographie.tif', np.uint16)
+        srfSol14 = to_array(dataDir/'srf_sol.tif', np.uint16)
         srfSolRes14 = to_array(dataDir/'srf_sol_res.tif', np.uint16)
         ssrMed = to_array(dataDir/'iris_ssr_med.tif', np.uint16)
         m2PlaHab = to_array(dataDir/'iris_m2_hab.tif', np.uint16)
@@ -420,11 +420,11 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
 
         # Instantanés de la situation à t0
         if writingTifs == 1:
-            to_tif(urb14, 'byte', proj, geot, project/'urbanisation_2014.tif')
-            to_tif(capaSol, 'uint16', proj, geot, project/'capacite_sol_2014.tif')
-            to_tif(txArtif, 'float32', proj, geot, project/'taux_artif_2014.tif')
-            to_tif(interet, 'float32', proj, geot, project/'interet_2014.tif')
-            to_tif(ratioPlaSol14, 'float32', proj, geot, project/'ratio_plancher_sol_2014.tif')
+            to_tif(urb14, 'byte', proj, geot, project/'urbanisation.tif')
+            to_tif(capaSol, 'uint16', proj, geot, project/'capacite_sol.tif')
+            to_tif(txArtif, 'float32', proj, geot, project/'taux_artif.tif')
+            to_tif(interet, 'float32', proj, geot, project/'interet.tif')
+            to_tif(ratioPlaSol14, 'float32', proj, geot, project/'ratio_plancher_sol.tif')
 
         start_time = time()
         ##### Boucle principale #####
@@ -491,7 +491,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             to_tif(srfPla, 'uint32', proj, geot, project/('output/surface_plancher_' + str(finalYear) + '.tif'))
             to_tif(demographie, 'uint16', proj, geot, project/('output/demographie_' + str(finalYear) + '.tif'))
             to_tif(ratioPlaSol, 'float32', proj, geot, project/('output/ratio_plancher_sol_' + str(finalYear) + '.tif'))
-            to_tif(txArtifNouv, 'float32', proj, geot, project/'output/taux_artificialisation.tif')
+            to_tif(txArtifNouv, 'float32', proj, geot, project/'output/taux_artifi_' + str(finalYear) + '.tif')
             to_tif(expansion, 'byte', proj, geot, project/'output/expansion.tif')
             to_tif(srfSolNouv, 'uint16', proj, geot, project/'output/surface_sol_construite.tif')
             to_tif(srfPlaNouv, 'uint32', proj, geot, project/'output/surface_plancher_construite.tif')
