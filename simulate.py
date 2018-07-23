@@ -491,7 +491,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             to_tif(srfPla, 'uint32', proj, geot, project/('output/surface_plancher_' + str(finalYear) + '.tif'))
             to_tif(demographie, 'uint16', proj, geot, project/('output/demographie_' + str(finalYear) + '.tif'))
             to_tif(ratioPlaSol, 'float32', proj, geot, project/('output/ratio_plancher_sol_' + str(finalYear) + '.tif'))
-            to_tif(txArtifNouv, 'float32', proj, geot, project/'output/taux_artifi_' + str(finalYear) + '.tif')
+            to_tif(txArtifNouv, 'float32', proj, geot, project/('output/taux_artif_' + str(finalYear) + '.tif'))
             to_tif(expansion, 'byte', proj, geot, project/'output/expansion.tif')
             to_tif(srfSolNouv, 'uint16', proj, geot, project/'output/surface_sol_construite.tif')
             to_tif(srfPlaNouv, 'uint32', proj, geot, project/'output/surface_plancher_construite.tif')
