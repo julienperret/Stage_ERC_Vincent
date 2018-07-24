@@ -1712,7 +1712,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 rasterize(*a)
 
         # Création des variables GDAL indispensables pour la fonction to_tif()
-        ds = gdal.Open(str(project/'demographie_2014.tif'))
+        ds = gdal.Open(str(project/'demographie.tif'))
         proj = ds.GetProjection()
         geot = ds.GetGeoTransform()
         ds = None
