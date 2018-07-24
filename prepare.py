@@ -996,7 +996,6 @@ def pluFixer(plu, overlay, outdir, encoding='utf-8'):
         expr = """
                 CASE
                     WHEN "classe" = 'AU' THEN 1
-                    WHEN "classe" = 'U' THEN 1
                     ELSE 0
                 END
             """
