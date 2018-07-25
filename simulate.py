@@ -47,6 +47,8 @@ if len(sys.argv) == 5:
             minContig = literal_eval(arg.split('=')[1])
         elif 'maxContig' in arg:
             maxContig = literal_eval(arg.split('=')[1])
+        elif 'seed' in arg:
+            maxContig = int(arg.split('=')[1])        
 
 # *** Paramètres pour openMole
 elif len(sys.argv) > 5:
@@ -69,6 +71,8 @@ elif len(sys.argv) > 5:
     minContig = float(sys.argv[12])
     maxContig = float(sys.argv[13])
     writingTifs = eval(sys.argv[14])
+    seed = int(sys.argv[15])
+
     #print("lancement avec " + str(sys.argv))
     
 ### Valeurs de paramètres par défaut ###
@@ -104,6 +108,8 @@ if 'maxContig' not in globals():
     maxContig = 0.8
 if 'writingTifs' not in globals():
     writingTifs = 1.0
+if 'seed' not in globals():
+    seed = 42
 
 # Contrôle des paramètres
 if growth > 3:
@@ -115,6 +121,10 @@ if maxContig > 1 or minContig > 1:
 if minContig > maxContig:
     print("Error : maxContig should be higher than minContig !")
     sys.exit()
+
+#intialisation de la seed du RNG
+np.random.seed(seed)
+
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
 def choose(weight, size=1):
