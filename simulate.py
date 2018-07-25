@@ -73,7 +73,7 @@ elif len(sys.argv) > 5:
     writingTifs = eval(sys.argv[14])
     seed = int(sys.argv[15])
 
-    #print("lancement avec " + str(sys.argv))
+    print("lancement avec " + str(sys.argv))
     
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
