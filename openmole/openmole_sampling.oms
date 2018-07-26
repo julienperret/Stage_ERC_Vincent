@@ -66,7 +66,7 @@ val extract = ScalaTask("""
     outputs += impact
     )
    
-val copy = CopyFileHook(output, workDirectory / "results" / "sim_${taux}_${scenario}_${pluPriority}_${buildNonRes}_${densifyGround}_${maxBuiltRatio}_${densifyOld}_${maximumDensity}_${winSize}_${minContig}_${maxContig}_${seed}_${sirene}_${transport}_${routes}_${ecologie}_${ocsol}.csv")
+val copy = CopyFileHook(output, workDirectory / "results" / "sim_${taux}_${scenario}_${pluPriority}_${buildNonRes}_${densifyGround}_${maxBuiltRatio}_${densifyOld}_${maximumDensity}_${winSize}_${minContig}_${maxContig}_${seed}_${sirene}_${transport}_${routes}_${ecologie}_${ocsol}")
 
 val stringHook = DisplayHook("The impact value is ${impact}.")
 
@@ -78,12 +78,12 @@ val env = LocalEnvironment(4)
 
 
 val sampling =DirectSampling ( sampling= (
-                        (taux in (1.0 to 3.0 by 0.25)) x
-                        (scenario in(0.0 to 2.0 by  1.0 ) )x
-                        (pluPriority  in  List(0.0, 1.0))  x
+                        (taux in (0.1 to 1.6 by 0.1)) x
+                        (scenario in  List(0.0, 1.0, 2.0) )x
+                        (pluPriority  in  List(0.0, 1.0)  )x
                         (buildNonRes   in  List(0.0, 1.0)  )  x
                         (densifyGround  in  List(0.0, 1.0)  ) x
-                        ( maxBuiltRatio in  (50.0 to 100.0 by 5.0))  x
+                        (maxBuiltRatio in  (50.0 to 100.0 by 5.0))  x
                         (densifyOld   in  List(0.0, 1.0)  ) x
                         (maximumDensity  in  List(0.0, 1.0)  ) x
                          (winSize in (3.0 to 9.0 by 1.0))x
