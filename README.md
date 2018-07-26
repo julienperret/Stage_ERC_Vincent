@@ -68,13 +68,14 @@ Deux paramètres au minimum :
 | winSize              | 3         | 9          | pixel  | 3                 | Taille en pixels du côté de la fenêtre glissante pour calcul de la somme ou de la moyenne des valeurs voisines        |
 | minContig            | 0         | 0.3        | float  | 0.1               | Nombre minimal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
 | maxContig            | 0.6       | 1          | float  | 0.8               | Nombre maximal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
-| writeTifs            | False     | True       | bool   | true              | Indique si les tiffs sont sauvés en sortie                                                                            |
+| writeTifs            | False     | True       | bool   | true              | Indique si les tiffs sont sauvés en sortie       
+| seed            | 0     | MaxInt       | Int   | 42              | Graine du générateur de nombres aléatoires                                                                           |
 | local_data/poids.csv | 1         | +          | int    |                   | Poids de chaque raster d’aménités pour la création du raster final interet                                            |
 
 Usage :
 ```shell
     In this version designed for OpenMole, the boolean are floats that are set to true if value > 0.5
-    ./simulate.py  /prepared_34/ /tmp/tmp/  0.5 tendanciel 1 0  1  50.0 0 0  3 0.3 0.5 0
+    ./simulate.py '/prepared_34'   /tmp/tmp/  0.5 1 1 0  1  50.0 0 0  3 0.3 0.5 0 42
 ```
 
 Dépendances pour python3 :
