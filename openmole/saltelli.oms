@@ -1,0 +1,119 @@
+// departement
+val dept = Val[Int]
+//options passées en string
+val optionsPrep = Val[String]
+
+
+// tout est passé en double car la methode morris ne prend que ça pour le moment
+val taux = Val[Double]
+val scenario = Val[Double]
+val pluPriority = Val[Double]
+val buildNonRes= Val[Double]
+val densifyGround= Val[Double]
+val maxBuiltRatio = Val[Double]
+val densifyOld = Val[Double]
+val maximumDensity = Val[Double]
+val winSize = Val[Double]
+val minContig = Val[Double] 
+val maxContig  = Val[Double]
+val writingTifs = Val[String]
+val seed = Val [Int]
+val sirene= Val[Double]
+val transport= Val[Double]
+val routes= Val[Double]
+val ecologie= Val[Double]
+val ocsol= Val[Double]
+val res = Val[Int]
+
+
+//=========================
+val inputDirectory = Val[File]
+val output = Val[File]
+
+val impact = Val[Double]
+
+
+// python task
+val pythonTask =
+  UDockerTask(workDirectory / "erc14.tar",
+  //UDockerTask(DockerImage("juperret/erc"),
+"""xvfb-run -a python3 simulate.py /tmp/prepared_data /tmp/results ${taux} ${scenario} ${pluPriority} ${buildNonRes} ${densifyGround} ${maxBuiltRatio} ${densifyOld}  ${maximumDensity} ${winSize} ${minContig} ${maxContig} ${writingTifs} ${seed} ${sirene} ${transport} ${routes} ${ecologie} ${ocsol} "${optionsPrep}"""")set (
+    inputDirectory := workDirectory / "prepared_34",
+    inputs += (taux, scenario, pluPriority, buildNonRes, densifyGround, maxBuiltRatio, densifyOld, maximumDensity, winSize, minContig, maxContig, seed, sirene , transport, routes, ecologie, ocsol),
+    inputs += optionsPrep,
+    outputs += (taux, scenario, pluPriority, buildNonRes, densifyGround, maxBuiltRatio, densifyOld, maximumDensity, winSize, minContig, maxContig, seed, sirene , transport, routes, ecologie, ocsol),
+    inputFiles += (inputDirectory, "/tmp/prepared_data"),
+    outputFiles += ("/tmp/results", output),
+    optionsPrep:="",
+    //winSize := 3,
+    //minContig := 1,
+    //maxContig :=5,
+    //scenario := 0.0,
+    seed:=42,
+    writingTifs := "False"
+   
+   
+  )
+  
+
+val extract = ScalaTask("""
+|    import scala.io.Source
+|    val measures = output.listFiles().filter(_.isDirectory).flatMap(_.listFiles().filter(_.isDirectory)).flatMap(_.listFiles().filter(_.getName.equalsIgnoreCase("mesures.csv"))).head
+|    val src = Source.fromFile(measures)
+|    val lineArray = src.getLines().drop(7).next().split(",")
+|    val impact = lineArray(1).trim.toDouble
+    """.stripMargin) set (
+    inputs += output,
+    outputs += impact
+    )
+   
+val copy = CopyFileHook(output, workDirectory / "results" / "sim_${taux}_${scenario}_${pluPriority}_${buildNonRes}_${densifyGround}_${maxBuiltRatio}_${densifyOld}_${maximumDensity}_${winSize}_${minContig}_${maxContig}_${seed}_${sirene}_${transport}_${routes}_${ecologie}_${ocsol}")
+
+val stringHook = DisplayHook("The impact value is ${impact}.")
+
+//val env = EGIEnvironment("vo.complex-systems.eu",openMOLEMemory = 2500 megabytes)
+val env = LocalEnvironment(10)
+
+
+//val runModel = MoleTask( (pythonTask hook copy)   -- (extract hook stringHook) )
+
+def bounds(d: Double) = {
+  val diff = math.abs(d * 0.1)
+  (d - diff, d + diff)
+}
+
+
+
+val runId =Val[Int]
+
+
+
+val salt =SaltelliSampling(
+                1000, 
+                taux in (0.1 , 1.6 ),
+                scenario in  (0.0, 2.0),
+                pluPriority  in  (0.0, 1.0),
+                buildNonRes   in  (0.0, 1.0),
+                densifyGround  in  (0.0, 1.0),  
+                maxBuiltRatio in  (50.0 , 100.0 ),
+                densifyOld   in  (0.0, 1.0),
+                maximumDensity  in  (0.0, 1.0),
+                winSize in (3.0, 7.0),
+                minContig in (0.0 , 0.3 ),
+                maxContig in (0.6, 1.0 ),
+                        //(seed in (UniformDistribution[Int](max=2147483646) take 10)) x
+                sirene in (0.0,5.0),
+                transport in (0.0,5.0),
+                routes in (0.0,5.0),
+                ecologie in (0.0,5.0), 
+                ocsol in (0.0,5.0)
+                
+                
+       )                
+  
+  //evaluation = (pythonTask on env  hook copy)   -- (extract hook stringHook)
+  
+
+
+ExplorationTask(salt) -< ((pythonTask on env  hook copy)   -- (extract hook stringHook))
+

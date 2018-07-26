@@ -73,12 +73,12 @@ elif len(sys.argv) > 5:
     minContig = float(sys.argv[12])
     maxContig = float(sys.argv[13])
     writingTifs = eval(sys.argv[14])
-    seed = int(sys.argv[15])
-    sirene =  int(sys.argv[16])
-    transport =  int(sys.argv[17])
-    routes =  int(sys.argv[18])
-    ecologie =  int(sys.argv[19])
-    ocsol =  int(sys.argv[20])
+    seed = int(float(sys.argv[15]))
+    sirene =  int(float(sys.argv[16]))
+    transport =  int(float(sys.argv[17]))
+    routes =  int(float(sys.argv[18]))
+    ecologie =  int(float(sys.argv[19]))
+    ocsol =  int(float(sys.argv[20]))
     
 
 
@@ -585,7 +585,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
             mesures.write("Ground-densified cells count, " + str(densifSol.sum()) + "\n")
         else:
-            mesures.write("Ground-densified cells count, na\n")
+            mesures.write("Ground-densified cells count, NA\n")
 
         if densifyOld > 0.5:
             densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
@@ -593,7 +593,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 to_tif(densifPla, 'byte', proj, geot, project/'output/densification_plancher.tif')
             mesures.write("Floor-densified cells count, " + str(densifPla.sum()) + "\n")
         else:
-            mesures.write("Floor-densified cells count, na\n")
+            mesures.write("Floor-densified cells count, NA\n")
 
     except:
         print("\n*** Error :")

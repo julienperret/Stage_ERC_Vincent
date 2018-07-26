@@ -4,7 +4,6 @@ setwd("~/encadrement/repoJulienERC/erc/traitements_Stats/")
 
 
 
-
 ## pour aggréger les fichiers de simus individuelles
 files <-  list.files("./results/", pattern = "mesures.csv", recursive = T, include.dirs = T, full.names = T)
 length(files)
@@ -37,7 +36,6 @@ namesbckup <-  names(dd)
 
 
 
-
 for (fifi in files){
   #on lit le fichier mesures.csv
   cat(fifi, "\n")
@@ -66,20 +64,19 @@ for (fifi in files){
   
   #valeurs des parametres obtenues en parsant le nom du repertoire qui contient mesures.csv
   paramsfifi <-  strsplit(fifi,"_")
-  paramsbruts <-  paramsfifi[[1]][2:11]
+  paramsbruts <-  paramsfifi[[1]][2:12]
   
   taux <- as.numeric(as.character(paramsbruts[1]))
   scenario <- paramsbruts[2]
-  pluPriority <-  as.logical(paramsbruts[3])
-  buildNonRes <-  as.logical(paramsbruts[4])
-  densifyGround <-  as.logical(paramsbruts[5])
+  pluPriority <-  as.logical(as.numeric(paramsbruts[3]))
+  buildNonRes <-  as.logical(as.numeric(paramsbruts[4]))
+  densifyGround <-  as.logical(as.numeric(paramsbruts[5]))
   maxBuiltRatio <-  as.numeric(paramsbruts[6])
-  densifyOld <-  as.logical(paramsbruts[7])
-  maximumDensity <-  as.logical(paramsbruts[8])
+  densifyOld <-  as.logical(as.numeric(paramsbruts[7]))
+  maximumDensity <-  as.logical(as.numeric(paramsbruts[8]))
   winSize <-   as.numeric(paramsbruts[9])
   minContig <-  as.numeric(paramsbruts[10])
-  #pour ce paramètre qui n'est pas dans lme nom de fichiers , la valeurs est 5 
-  maxContig <-  5
+  maxContig <-  as.numeric(strsplit(paramsbruts[11], ".csv")[[1]][1])
   
   
   
@@ -94,4 +91,12 @@ for (fifi in files){
 }
 
 
+
 names(dd) <-  namesbckup
+
+dd
+
+
+
+write.csv(dd, "profilelong.csv")
+
