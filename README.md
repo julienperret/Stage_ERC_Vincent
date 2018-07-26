@@ -70,12 +70,18 @@ Deux paramètres au minimum :
 | maxContig            | 0.6       | 1          | float  | 0.8               | Nombre maximal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
 | writeTifs            | False     | True       | bool   | true              | Indique si les tiffs sont sauvés en sortie       
 | seed            | 0     | MaxInt       | Int   | 42              | Graine du générateur de nombres aléatoires                                                                           |
-| local_data/poids.csv | 1         | +          | int    |                   | Poids de chaque raster d’aménités pour la création du raster final interet                                            |
+| sirene            | 0     | MaxInt       | Int   | 3              | Poids en lien avec la présence d'aménités                                                                           |
+| transport            | 0     | MaxInt       | Int   | 2              | Poids en lien avec la présence de transports en commun                                                                           |
+| routes            | 0     | MaxInt       | Int   | 3              | Poids en lien avec la présence de routes                                                                           |
+| ecologie            | 0     | MaxInt       | Int   | 2              | Poids diminuant l'intérêt d'une celule en fonction de l'intéret écologique                                                                           |
+| ocsol            | 0     | MaxInt       | Int   | 1              | Poids influant l'intérêt d'une cellule relativement à l'occupation du sol                                                                          |
+
 
 Usage :
 ```shell
     In this version designed for OpenMole, the boolean are floats that are set to true if value > 0.5
-    ./simulate.py '/prepared_34'   /tmp/tmp/  0.5 1 1 0  1  50.0 0 0  3 0.3 0.5 0 42
+    ./simulate.py '/prepared_34'   /tmp/tmp/ 0.5 1 1 0  1  50.0 0 0  3 0.3 0.5 0 42 3 2 3 2 1
+
 ```
 
 Dépendances pour python3 :

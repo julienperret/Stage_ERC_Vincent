@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import os
-import sys
+from ast import literal_eval
 import csv
 import gdal
-import traceback
-import numpy as np
-from time import time
+import os
 from pathlib import Path
 from shutil import rmtree
-from ast import literal_eval
+import sys
+from time import time
+import traceback
+
+import numpy as np
 from toolbox import to_tif, printer, to_array
+
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
@@ -72,6 +74,13 @@ elif len(sys.argv) > 5:
     maxContig = float(sys.argv[13])
     writingTifs = eval(sys.argv[14])
     seed = int(sys.argv[15])
+    sirene =  int(sys.argv[16])
+    transport =  int(sys.argv[17])
+    routes =  int(sys.argv[18])
+    ecologie =  int(sys.argv[19])
+    ocsol =  int(sys.argv[20])
+    
+
 
     print("lancement avec " + str(sys.argv))
     
@@ -110,6 +119,19 @@ if 'writingTifs' not in globals():
     writingTifs = 1.0
 if 'seed' not in globals():
     seed = 42
+if 'sirene' not in globals():
+    sirene = 3
+if 'transport' not in globals():
+    transport = 2
+if 'routes' not in globals():
+    routes = 3
+if 'ecologie' not in globals():
+    ecologie = 2
+if 'ocsol' not in globals():
+    ocsol = 1
+
+
+
 
 # Contrôle des paramètres
 if growth > 3:
@@ -348,17 +370,32 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         # Nombre total de personnes à loger - permet de vérifier si le raster capacité permet d'accueillir tout le monde
         sumPopALoger = sum(popDic.values())
         log.write("Population to put up until " + str(finalYear) + " : " + str(sumPopALoger) + "\n")
+        poids = {}
+        poids["sirene"] = sirene
+        poids["transport"] = transport
+        poids["routes"] = routes
+        poids["ecologie"] = ecologie
+        poids["ocsol"] = ocsol                
 
+
+        
+        """
         # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
         with (dataDir/'interet/poids.csv').open('r') as r:
             reader = csv.reader(r)
             next(reader, None)
             poids = {rows[0]:int(rows[1]) for rows in reader}
-
+        """
+        
+        sommePoids =  sum(poids.values())
+                          
+        if sommePoids==0:
+            sommePoids = 1
+        
         coef = {}
         with (project/'coefficients_interet.csv').open('w') as w:
             for key in poids:
-                coef[key] = poids[key] / sum(poids.values())
+                coef[key] = poids[key] / sommePoids
                 w.write(key + ', ' + str(coef[key]) + '\n')
 
         # Préparation des restrictions et gestion du PLU
@@ -390,7 +427,11 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         sir = to_array(dataDir/'interet/densite_sirene.tif', np.float32)
         # Création du raster final d'intérêt avec pondération
         interet = np.where((restriction != 1), (eco * coef['ecologie']) + (rou * coef['routes']) + (tra * coef['transport']) + (sir * poids['sirene']), 0)
-        interet = (interet / np.amax(interet)).astype(np.float32)
+        maxInterest =  np.amax(interet)
+        
+        if maxInterest == 0 :
+            maxInterest = 1
+        interet = (interet /maxInterest).astype(np.float32)
 
         # Création des rasters de capacité en surfaces sol et plancher
         capaSol = np.zeros([rows, cols], np.uint32) + int(srfCell * (maxBuiltRatio / 100))
