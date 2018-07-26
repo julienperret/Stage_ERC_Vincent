@@ -75,7 +75,7 @@ if len(sys.argv) > 5:
     argList = sys.argv[5].split()
     # Interprétation de la chaîne de paramètres
     for arg in argList :
-        # Taille de la grille / résolution des rasters
+        # Résolution de la grille / des rasters
         if 'pixRes' in arg:
             pixRes = int(arg.split("=")[1])
             pixResStr = str(pixRes) + 'm'
@@ -126,10 +126,6 @@ if 'silent' not in globals():
 if 'pixRes' not in globals():
     pixRes = 50
     pixResStr= str(pixRes) + 'm'
-elif not 200 >= pixRes >= 20:
-    if not silent:
-        print('Grid size should be between 20m and 200m')
-    sys.exit()
 if 'bufferDistance' not in globals():
     bufferDistance = 1000
 if 'minSurf' not in globals():
@@ -155,6 +151,11 @@ if 'speed' not in globals():
 if 'truth' not in globals():
     truth = False
 
+if not 200 >= pixRes >= 20:
+    if not silent:
+        print('Pixel size should be between 20m and 200m')
+    sys.exit()
+
 if force and outputDir.exists():
     rmtree(str(outputDir))
 
@@ -176,27 +177,20 @@ if not workspace.exists():
 
 # Pour un vrai feedback redirigé dans un fichier log
 class QgsLoggingFeedback(QgsProcessingFeedback):
-
     def __init__(self):
         super().__init__()
         self.handler = logging.FileHandler(str(project/(strftime('%Y%m%d%H%M') + '_qgsLog.txt')))
         logging.getLogger().addHandler(self.handler)
-
     def reportError(self, msg, fatalError=False):
         logging.log(logging.ERROR, msg)
-
     def setProgressText(self, text):
         logging.log(logging.INFO, msg)
-
     def pushInfo(self, info):
         super().pushInfo(info)
-
     def pushCommandInfo(self, info):
         super().pushCommandInfo(info)
-
     def pushDebugInfo(self, info):
         super().pushDebugInfo(info)
-
     def pushConsoleInfo(self, info):
         super().pushConsoleInfo(info)
 
@@ -301,7 +295,7 @@ def rasterize(vector, output, dtype, field=None, burn=None, inverse=False, touch
     gdal.Rasterize(str(output), str(vector), options=opt)
 
 # Nettoye une couche de bâtiments et génère les champs utiles à l'estimation de population
-def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut, removedOut):
+def buildingCleaner(buildings, sMin, sMax, lvlHeight, polygons, points, cleanedOut, removedOut):
     # Selection des bâtiments situés dans polygones
     for layer in polygons:
         params = {
@@ -324,7 +318,7 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
     expr = """ CASE
         WHEN "HAUTEUR" = 0 THEN 1
         WHEN "HAUTEUR" < 5 THEN 1
-        ELSE floor("HAUTEUR"/""" + str(hEtage) + """) END
+        ELSE floor("HAUTEUR"/""" + str(lvlHeight) + """) END
     """
     buildings.addExpressionField(expr, QgsField('NB_NIV', QVariant.Int, len=2))
     # Nettoyage des bâtiments supposés trop grand ou trop petit pour être habités
@@ -1032,13 +1026,18 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
     try:
         # Découpe et reprojection de la donnée en l'absence du dossier ./data
         if not (workspace/'data').exists():
-            os.mkdir(str(workspace/'data'))
-            os.mkdir(str(workspace/'data/2009_bati'))
-            os.mkdir(str(workspace/'data/2014_bati'))
-            os.mkdir(str(workspace/'data/pai'))
-            os.mkdir(str(workspace/'data/transport'))
-            os.mkdir(str(workspace/'data/geosirene'))
-            os.mkdir(str(workspace/'data/restriction'))
+            mkdirList = [
+                workspace/'data',
+                workspace/'data/2009_bati',
+                workspace/'data/2014_bati',
+                workspace/'data/pai',
+                workspace/'data/transport',
+                workspace/'data/geosirene',
+                workspace/'data/restriction',
+                workspace/'data/zonages'
+            ]
+            for path in mkdirList:
+                os.mkdir(str(path))
 
             etape = 1
             description = 'extracting and reprojecting data '
@@ -1208,10 +1207,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 del fields
                 argList.append((clip(ecologie, zone), workspace/'data/'))
 
-            # Autrement déterminer l'intérêt écologique grâce à l'ocsol ?
-            else:
-                pass
-
             # Traitement d'une couche facultative du PPRI
             if (localData/'ppri.shp').exists():
                 ppri = ppriExtractor(str(localData/'ppri.shp'))
@@ -1258,7 +1253,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
             # Traitement des couches de zonage de protection
             zonagesEnv = []
-            os.mkdir(str(workspace/'data/zonages'))
             for file in os.listdir(str(globalData/'env/')):
                 if os.path.splitext(file)[1] == '.shp':
                     zonagesEnv.append(str(globalData/('env/' + file)))
@@ -1429,9 +1423,14 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             log.write(getTime(start_time) + '\n')
 
         if not (workspace/'data'/pixResStr).exists():
-            os.mkdir(str(workspace/'data'/pixResStr))
-            os.mkdir(str(workspace/'data'/pixResStr/'tif'))
-            os.mkdir(str(workspace/'data'/pixResStr/'csv'))
+            mkdirList = [
+                workspace/'data'/pixResStr,
+                workspace/'data'/pixResStr/'csv',
+                workspace/'data'/pixResStr/'tif',
+                workspace/'data'/pixResStr/'tif/tmp'
+            ]
+            for path in mkdirList:
+                os.mkdir(str(path))
 
             start_time = time()
             etape = 3
@@ -1622,7 +1621,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             processing.run('gdal:proximity', params, feedback=feedback)
 
             # Calcul des rasters de densité
-            os.mkdir(str(workspace/'data'/pixResStr/'tif/tmp'))
             projwin = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax)
             with (globalData/'sirene/distances.csv').open('r') as csvFile:
                 reader = csv.reader(csvFile)
@@ -1687,8 +1685,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
         os.mkdir(str(project/'interet'))
-        copyfile(str(localData/'poids.csv'), str(project/'interet/poids.csv'))
-        copyfile(str(workspace/'data'/pixResStr/'evo_surface_sol.csv'), str(project/'evo_surface_sol.csv'))
         # Rasterisations
         argList = [
             (workspace/'data'/pixResStr/'stat_grid.shp', project/'demographie.tif', 'UInt16', 'pop'),
@@ -1781,6 +1777,9 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         to_tif(sirene, 'float32', proj, geot, project/'interet/densite_sirene.tif')
         to_tif(routes, 'float32', proj, geot, project/'interet/proximite_routes.tif')
         to_tif(transport, 'float32', proj, geot, project/'interet/proximite_transport.tif')
+
+        copyfile(str(localData/'poids.csv'), str(project/'interet/poids.csv'))
+        copyfile(str(workspace/'data'/pixResStr/'evo_surface_sol.csv'), str(project/'evo_surface_sol.csv'))
 
         if not silent:
             print('\nFinished at ' + strftime('%H:%M:%S'))
