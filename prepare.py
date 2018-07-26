@@ -1034,7 +1034,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 workspace/'data/transport',
                 workspace/'data/geosirene',
                 workspace/'data/restriction',
-                workspace/'data/zonages'
+                workspace/'data/zonage'
             ]
             for path in mkdirList:
                 os.mkdir(str(path))
@@ -1229,8 +1229,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 parcelles = res['OUTPUT']
                 argList.append((clip(parcelles, zone), workspace/'data/restriction/'))
 
-            elif (globalData/'majic'/dpt).exists():
-                parcelles = QgsVectorLayer(str(globalData/'majic'/dpt/'exclusion_parcelles.shp'), 'exclusion_parcelles')
+            elif (globalData/'majic').exists():
+                parcelles = QgsVectorLayer(str(globalData/('majic/exclusion_parcelles_' + dpt + '.shp')), 'exclusion_parcelles')
                 argList.append((clip(parcelles, zone), workspace/'data/restriction/'))
 
             # + Traitement d'une couche facultative pour exclusion de zones bâties lors du calcul et inclusion dans les restrictions
@@ -1253,15 +1253,15 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
             # Traitement des couches de zonage de protection
             zonagesEnv = []
-            for file in os.listdir(str(globalData/'env/')):
+            for file in os.listdir(str(globalData/'zonage/')):
                 if os.path.splitext(file)[1] == '.shp':
-                    zonagesEnv.append(str(globalData/('env/' + file)))
-            envRestrict(zonagesEnv, zone, workspace/'data/zonages/')
+                    zonagesEnv.append(str(globalData/('zonage/' + file)))
+            envRestrict(zonagesEnv, zone, workspace/'data/zonage/')
 
             zonagesEnv = []
-            for file in os.listdir(str(workspace/'data/zonages/')):
+            for file in os.listdir(str(workspace/'data/zonage/')):
                 if os.path.splitext(file)[1] == '.shp':
-                    zonagesEnv.append(str(workspace/('data/zonages/' + file)))
+                    zonagesEnv.append(str(workspace/('data/zonage/' + file)))
             params = {
                 'LAYERS': zonagesEnv,
                 'CRS': 'EPSG:3035',
