@@ -1,15 +1,17 @@
 library(ggplot2)
+library(dplyr)
 
 setwd("~/encadrement/repoJulienERC/erc/traitements_Stats/")
 
 df2 <-  read.csv("ProfilMBRsurtauxTendanciel.csv")
-
 
 df <-  read.csv("population862.csv")
 
 
 names(df)
 
+
+## si les booleens sont encore des doubles, on peut éxécuter les lignes ci dessous pour 
 df$pluPriority <-  df$pluPriority > 0.5
 df$buildNonRes <-  df$buildNonRes > 0.5
 df$densifyGround <-  df$densifyGround > 0.5
@@ -17,28 +19,11 @@ df$densifyOld <-  df$densifyOld > 0.5
 df$maximumDensity <-  df$maximumDensity > 0.5
 
 
-df2$pluPriority <-  df2$pluPriority > 0.5
-df2$buildNonRes <-  df2$buildNonRes > 0.5
-df2$densifyGround <-  df2$densifyGround > 0.5
-df2$densifyOld <-  df2$densifyOld > 0.5
-df2$maximumDensity <-  df2$maximumDensity > 0.5
 
-
-
-
-library(dplyr)
-df <-  df %>%  filter(impact < max(impact))
-
-
-names(df)
-
-
-plot(df)
 
 pp <-  ggplot(df, aes(maxBuiltRatio, impact))+
- # geom_point(aes(color=buildNonRes, shape=densifyOld))+
-  geom_point(data=df2,aes(color=buildNonRes, shape=densifyOld), size= 2 ) 
-
+  geom_point(aes(color=buildNonRes, shape=densifyOld))
+  
 pp
 
 

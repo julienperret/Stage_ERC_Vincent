@@ -1,6 +1,9 @@
 library(ggplot2)
 
 
+cov
+
+
 
 
 #################################
@@ -15,7 +18,6 @@ pniv <-  ggplot(dd, aes(impact))+
 pniv
 
 
-dd$densifyGround
 
 # dynamiques cohérentes avec maxBuilt Ratio et densifyGround
 
@@ -92,13 +94,67 @@ ppMBR75
     
 #autres mesures de sorties : comment se répartit l'impact
 
+# on prend les impacts positifs
+impPos <-  dd %>%  filter(impact >0 )
 
-names(dd)
-ppp <-  ggplot(dd, aes(PopNotPutUp, UnbuiltArea,AvgCellPop,AreaExpansion,,BuiltFloorArea,CellesOpenTiUrb,AvgArtifRate,impact,GrndDensifiedCells))+
-  geom_point()
-ppp
+#AvgCellpop par Area Expansion coloré en impact
+names(impPos)
+impCellPop <-  ggplot(impPos, aes(AvgCellPop,AreaExpansion))+
+    geom_point(aes(color= impact), size=0.6)+
+  facet_grid(rows=vars(scenario))
 
-mes <-  dd[,7:15]
+impCellPop
 
-plot(mes)
+#impact par AreaExpansion coloré par AvgCellPop
+names(impPos)
+impAreaExp <-  ggplot(impPos, aes(impact,AreaExpansion))+
+  geom_point(aes(color= AvgCellPop), size=0.6)+
+  facet_grid(rows=vars(scenario))
+
+impAreaExp
+
+
+
+#ACP sur les résultats
+
+library(ade4)
+library(factoextra)
+
+
+summary(dd)
+
+# on retire les colonnes non numériques 
+ddACP <-  dd[, -c(1:6)]
+
+ddACP <-  na.omit(ddACP)
+
+# ACP de base
+mypca <- prcomp(ddACP, scale. = T)
+#ACP avec le package ADE4
+mypca2 <-  dudi.pca(ddACP, center=F, scannf = F, nf= 5 )
+
+#dessin
+# variance expliquée par les composantes
+fviz_eig(mypca)
+# graphe des variables dans l'espace des deux premières composantes
+#la couleur indique comment la colonne  est bien décrite par CP1 et CP2
+fviz_pca_var(mypca,
+             col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE    
+)
+
+
+#inidividus projetés dans le plan CP1,CP2
+#colorés suivant l'impact
+fviz_pca_ind(
+  mypca,
+  geom="point",
+  geom.size= 0.02,
+  col.ind = ddACP$impact,
+  gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07")
+)
+
+#version plotly avec affichage des valeurs au survol
+
 
