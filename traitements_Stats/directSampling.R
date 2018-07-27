@@ -123,7 +123,7 @@ library(factoextra)
 
 summary(dd)
 
-# on retire les colonnes non numériques 
+# on retire les colonnes qui ne sont pas des sorties
 ddACP <-  dd[, -c(1:6)]
 
 ddACP <-  na.omit(ddACP)
