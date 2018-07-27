@@ -151,6 +151,14 @@ if 'speed' not in globals():
 if 'truth' not in globals():
     truth = False
 
+if dpt in ['11','30','34','48','66']:
+    reg = 'R91'
+elif dpt in ['09','12','31','32','46','65','81','82']:
+    reg = 'R73'
+else:
+    print('Le département renseigné ne fait pas partie de la région Occitanie !')
+    sys.exit()
+
 if not 200 >= pixRes >= 20:
     if not silent:
         print('Pixel size should be between 20m and 200m')
@@ -1237,6 +1245,11 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             if (localData/'exclusion_manuelle.shp').exists():
                 argList.append((clip(localData/'exclusion_manuelle.shp', zone), workspace/'data/restriction/'))
 
+            # Traitement de la couche des mesures comensatoires
+            if reg == 'R91':
+                compensation = QgsVectorLayer(str(globalData/'comp/MesuresCompensatoires_R91.shp'), 'compensation')
+                argList.append((clip(compensation, zone), workspace/'data/restriction/'))
+
             if speed:
                 getDone(reproj, argList)
             else:
@@ -1250,6 +1263,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 del ppri
             if 'azi' in globals():
                 del azi
+            if 'compensation' in globals():
+                del compensation
 
             # Traitement des couches de zonage de protection
             zonagesEnv = []
@@ -1269,6 +1284,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             }
             processing.run('native:mergevectorlayers', params, feedback=feedback)
             del zonagesEnv
+
+
 
             # Traitement des autoroutes : bande de 100m de part et d'autre
             params = {
@@ -1589,6 +1606,9 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             if (workspace/'data/restriction/ppri.shp').exists():
                 argList.append((workspace/'data/restriction/ppri.shp', workspace/'data'/pixResStr/'tif/ppri.tif', 'Byte', None, 1))
 
+            if (workspace/'data/restriction/compensation.shp').exists():
+                argList.append((workspace/'data/restriction/compensation.shp', workspace/'data'/pixResStr/'tif/compensation.tif', 'Byte', None, 1))
+
             elif (workspace/'data/plu.shp').exists():
                 layer = QgsVectorLayer(str(workspace/'data/plu.shp'), 'plu')
                 fields = list(f.name() for f in layer.fields())
@@ -1762,8 +1782,12 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             restriction = np.where(aziMask == 1, 1, restriction)
 
         if (workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif').exists():
-            exclusionManuelle = to_array(workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif',  np.byte)
+            exclusionManuelle = to_array(workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif', np.byte)
             restriction = np.where(exclusionManuelle == 1, 1, restriction)
+
+        if (workspace/'data'/pixResStr/'tif/compensation.tif').exists():
+            compMask = to_array(workspace/'data'/pixResStr/'tif/compensation.tif', np.byte)
+            restriction = np.where(compMask == 1, 1, restriction)
 
         # Traitement de l'intérêt écologique
         if (workspace/'data'/pixResStr/'tif/ecologie.tif').exists():
@@ -1793,8 +1817,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         exc = sys.exc_info()
         if not silent:
             print("\n*** Error :")
-            traceback.print_exception(*exc, limit=3, file=sys.stdout)
-        traceback.print_exception(*exc, limit=3, file=log)
+            traceback.print_exception(*exc, limit=5, file=sys.stdout)
+        traceback.print_exception(*exc, limit=5, file=log)
         sys.exit()
 
 qgs.exitQgis()
