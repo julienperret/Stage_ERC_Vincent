@@ -5,7 +5,7 @@ setwd("~/encadrement/repoJulienERC/erc/traitements_Stats/")
 
 df2 <-  read.csv("ProfilMBRsurtauxTendanciel.csv")
 
-df <-  read.csv("population862.csv")
+df <-  read.csv("profile_24HEGI.csv")
 
 
 names(df)
@@ -22,7 +22,8 @@ df$maximumDensity <-  df$maximumDensity > 0.5
 
 
 pp <-  ggplot(df, aes(maxBuiltRatio, impact))+
-  geom_point(aes(color=buildNonRes, shape=densifyOld))
+  geom_point(aes(color=buildNonRes, shape=densifyOld))+
+geom_line(color="lightgray")
   
 pp
 

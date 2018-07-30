@@ -1,8 +1,6 @@
 library(ggplot2)
 
 
-cov
-
 
 
 
@@ -11,6 +9,8 @@ cov
 ###################################
 
 dd <-  read.csv("directSamplingfulldataframe.csv")
+
+summary(dd)
 
 #distribution des impacts 
 pniv <-  ggplot(dd, aes(impact))+
