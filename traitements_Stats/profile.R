@@ -3,20 +3,18 @@ library(dplyr)
 
 setwd("~/encadrement/repoJulienERC/erc/traitements_Stats/")
 
-df2 <-  read.csv("ProfilMBRsurtauxTendanciel.csv")
 
+# fichier de resultats de profil à considérer
 df <-  read.csv("profile_24HEGI.csv")
 
-
-names(df)
-
+df
 
 ## si les booleens sont encore des doubles, on peut éxécuter les lignes ci dessous pour 
-df$pluPriority <-  df$pluPriority > 0.5
-df$buildNonRes <-  df$buildNonRes > 0.5
-df$densifyGround <-  df$densifyGround > 0.5
-df$densifyOld <-  df$densifyOld > 0.5
-df$maximumDensity <-  df$maximumDensity > 0.5
+if (is.numeric(df$pluPriority)) df$pluPriority <-  df$pluPriority > 0.5
+if (is.numeric(df$buildNonRes))df$buildNonRes <-  df$buildNonRes > 0.5
+if (is.numeric(df$densifyGround))df$densifyGround <-  df$densifyGround > 0.5
+if (is.numeric(df$densifyOld))df$densifyOld <-  df$densifyOld > 0.5
+if (is.numeric(df$maximumDensity))df$maximumDensity <-  df$maximumDensity > 0.5
 
 
 
@@ -28,13 +26,13 @@ geom_line(color="lightgray")
 pp
 
 
+
+## autre profil sur winsize 
+
 df3 <- read.csv("ProfilWinSizesurTauxTendanciel.csv")
 
 
-pp <-  ggplot(df3, aes(round(winSize), impact))+
-  geom_point(aes(color=buildNonRes, shape=densifyOld))+
-  geom_point(data=df2,aes(color=buildNonRes, shape=densifyOld), size= 4 ) 
-  geom_line(color="lightgray")+
-  stat_smooth()
-pp
+ppp <-  ggplot(df3, aes(round(winSize), impact))+
+  geom_point(aes(color=buildNonRes, shape=densifyOld))
+ppp
 

@@ -190,81 +190,138 @@ qplot(dd$NB_NIV)
 
 library(actuar)
 
-#"binom", "nbinom", "geom", "hyper" or "pois"
-
-
-fitter <-  function(dd){
-
-#celles qui marchent sans paramètres supplementaires 
-
-poiss <-  fitdist(dd$NB_NIV, discrete = T , "pois" )
-negbin <- fitdist(dd$NB_NIV, discrete = T , "nbinom" ,
-                  control=list(trace=1, REPORT=1))
-
-geo <-  fitdist(dd$NB_NIV, discrete = T , "geom" )
 
 
 
 
 
-#celles qui marchent avec des params 
-ztpoiss <-  fitdist(data = dd$NB_NIV, discrete = T ,
-                    start=list(lambda=1),
-                    distr = "ztpois",
-                    control=list(trace=1, REPORT=1))
-
-
-ztgeom <-  fitdist(data = dd$NB_NIV, discrete = T ,
-                   start=list(prob= 0.5 ),
-                   distr = "ztgeom",
-                   control=list(trace=1, REPORT=1))
-
-
-
+# fonction à part pour la distrib logarithmique 
 
 logfitter <-  function(dd) {
   AICmin <-  Inf
+  pvalmin <- Inf
   bestfit <-  NULL
   pbestfit <- NULL
-    
+  
   for (p in seq(from = 0.01, to = 0.99 , by = 0.01)) {
     tryCatch({
       
-          cat("p=", p, "-----------\n")
-    lolog <- fitdist(
-      data = dd$NB_NIV,
-      discrete = T ,
-      start = list(prob =p ),
-      distr = "logarithmic"
-    )
-    
-    xx <- gofstat(lolog)
-    
-    if (xx$aic < AICmin) {
-      AICmin <-  xx$aic
-      bestfit  <-  lolog
-      pbestfit <- p
-    }
+      #cat("p=", p, "-----------\n")
+      lolog <- fitdist(
+        data = dd$NB_NIV,
+        discrete = T ,
+        start = list(prob =p ),
+        distr = "logarithmic"
+      )
+      
+      xx <- gofstat(lolog)
+      
+      if (xx$aic < AICmin & xx$chisqpvalue< pvalmin) {
+        AICmin <-  xx$aic
+        pvalmin <- xx$chisqpvalue
+        bestfit  <-  lolog
+        pbestfit <- p
+      }
     }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
     
   }
-  cat ("AIC meilleur avec p = " , pbestfit , "\n")
-    
+  cat ("logarithmic : AIC meilleur avec p = " , pbestfit , "\n")
+  
   return(bestfit)
 }
 
-lolog <- logfitter(dd)
-candidats <-  list(poiss, negbin, geo, ztpoiss, ztgeom, lolog)
-tryCatch({
-gof <-  gofstat(candidats)
-}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
-return(candidats[which(gof$aic == min(gof$aic))])
 
 
+
+fitter <- function(dd, criterion ) {
+  #  "binom", "nbinom", "geom", "hyper" or "pois"
+
+  # celles qui marchent sans paramètres supplementaires
+
+  poiss <- fitdist(dd$NB_NIV, discrete = T, "pois")
+  negbin <- fitdist(dd$NB_NIV,
+    discrete = T,
+    "nbinom",
+    control = list(trace = 1, REPORT = 1)
+  )
+
+  geo <- fitdist(dd$NB_NIV, discrete = T, "geom")
+
+
+  # celles qui marchent avec des params
+  ztpoiss <- fitdist(
+    data = dd$NB_NIV,
+    discrete = T,
+    start = list(lambda = 1),
+    distr = "ztpois",
+    control = list(trace = 1, REPORT = 1)
+  )
+
+
+  ztgeom <- fitdist(
+    data = dd$NB_NIV,
+    discrete = T,
+    start = list(prob = 0.5),
+    distr = "ztgeom",
+    control = list(trace = 1, REPORT = 1)
+  )
+
+
+
+
+  lolog <- logfitter(dd)
+  candidats <- list(poiss, negbin, geo, ztpoiss, ztgeom, lolog)
+  gofs <- list()
+  minKipval <- Inf
+  minAic <- Inf
+  bestCandidateKipval <- NULL
+  besCandidateAic <- NULL
+  for (c in candidats) {
+    cat("candidat :", c$distname, "\n")
+    gof <- NULL
+    tryCatch({
+      gof <- gofstat(c)
+    }, error = function(e) {
+      cat("ERROR :", conditionMessage(e), "\n")
+    })
+
+    if (!is.null(gof)) {
+      if (gof$chisqpvalue < 0.05 & gof$chisqpvalue < minKipval) {
+        minKipval <- gof$chisqpvalue
+        bestCandidateKipval <- c
+        cat("======> meilleur candidat v/v chi pval" , bestCandidateKipval$distname, "\n")
+      }
+      if (gof$aic < minAic & gof$chisqpvalue < 0.05) {
+        minAic <- gof$aic
+        bestCandidateAic <- c
+        cat("======> meilleur candidat v/v  AIC" , bestCandidateAic$distname, "\n")
+      }
+      
+    }
+  }
+
+
+  if (criterion=="AIC") {
+    return(besCandidateAic)
+  }
+  if(criterion=="chi2pval"){
+    return(bestCandidateKipval)
+  }
 }
 
 
-meilleureDist <- fitter(dd)[[1]]
+
+
+
+
+
+meilleureDistAIC <- fitter(dd,"AIC")
+meilleureDistchipval <- fitter(dd,"chi2pval")
+
+
+meilleureDistAIC
+meilleureDistchipval
+
 
 #dessin comparant la distrib fittée et la distrib observée
 cdfcomp(meilleureDist)
@@ -321,7 +378,8 @@ fittedDistGenerator <-  function(dd, meilleureDist) {
 for (c in unique(dfniv$CODE_IRIS)){
   cat("###########IRIS ", c , "###################\n")
   distribObservee <-  dfniv %>% filter(CODE_IRIS==c) 
-  distModel <-  fitter(distribObservee)
+
+    distModel <-  fitter(distribObservee)
   distSimulee <-  fittedDistGenerator( distribObservee, distModel)
   
 }
@@ -329,6 +387,10 @@ for (c in unique(dfniv$CODE_IRIS)){
 
 
 
+dd <- distribObservee
+
+
+dfniv$CODE_IRIS[1]
 
 
 
@@ -410,5 +472,9 @@ for (m in optimMethods) {
   },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
   
 }
+
+
+
+
 
 
