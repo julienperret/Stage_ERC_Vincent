@@ -15,9 +15,21 @@ from time import strftime, time
 from shutil import rmtree, copyfile
 from toolbox import printer, getDone, getTime, to_array, to_tif
 
-# Chercher les chemins de QGIS sur Windows
-if sys.platform == 'win32':
-    qgsRoot = None
+# Chercher les chemins de QGIS
+qgsRoot = None
+if sys.platform == 'linux':
+    if os.path.exists('/usr/share/qgis'):
+        qgsRoot = Path('/usr')
+    elif os.path.exists('/usr/local/share/qgis'):
+        qgsRoot = Path('/usr/local')
+    elif os.path.exists('/opt/qgis'):
+        qgsRoot = Path('/opt/qgis')
+    if qgsRoot:
+        sys.path.append(str(qgsRoot/'share/qgis/python'))
+    else:
+        print('Impossible de localiser QGIS 3...')
+        sys.exit()
+elif sys.platform == 'win32':
     for d in Path('C:/Program Files').iterdir():
         if 'QGIS 3' in str(d) or 'OSGeo4W64' in str(d):
             qgsRoot = d
@@ -48,8 +60,8 @@ from qgis.PyQt.QtCore import QVariant
 
 qgs = QgsApplication([], GUIenabled=False)
 if sys.platform == 'linux':
-    qgs.setPrefixPath('/usr', True)
-    sys.path.append('/usr/share/qgis/python/plugins')
+    qgs.setPrefixPath(str(qgsRoot), True)
+    sys.path.append(str(qgsRoot/'share/qgis/python/plugins'))
 elif sys.platform == 'win32':
     qgs.setPrefixPath(str(qgsRoot/'apps/qgis'))
     sys.path.append(str(qgsRoot/'apps/qgis/python/plugins'))
