@@ -98,5 +98,5 @@ dd
 
 
 
-write.csv(dd, "profilelong.csv")
+write.csv(dd, "simudataframe.csv")
 

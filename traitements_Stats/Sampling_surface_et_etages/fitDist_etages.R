@@ -211,7 +211,8 @@ logfitter <-  function(dd) {
         data = dd$NB_NIV,
         discrete = T ,
         start = list(prob =p ),
-        distr = "logarithmic"
+        distr = "logarithmic",
+        control = list(trace = 0, REPORT = 1)
       )
       
       xx <- gofstat(lolog)
@@ -225,7 +226,7 @@ logfitter <-  function(dd) {
     }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
     
   }
-  cat ("logarithmic : AIC meilleur avec p = " , pbestfit , "\n")
+  #cat ("logarithmic : AIC meilleur avec p = " , pbestfit , "\n")
   
   return(bestfit)
 }
@@ -242,7 +243,7 @@ fitter <- function(dd, criterion ) {
   negbin <- fitdist(dd$NB_NIV,
     discrete = T,
     "nbinom",
-    control = list(trace = 1, REPORT = 1)
+    control = list(trace = 0, REPORT = 1)
   )
 
   geo <- fitdist(dd$NB_NIV, discrete = T, "geom")
@@ -254,7 +255,7 @@ fitter <- function(dd, criterion ) {
     discrete = T,
     start = list(lambda = 1),
     distr = "ztpois",
-    control = list(trace = 1, REPORT = 1)
+    control = list(trace = 0, REPORT = 1)
   )
 
 
@@ -263,7 +264,7 @@ fitter <- function(dd, criterion ) {
     discrete = T,
     start = list(prob = 0.5),
     distr = "ztgeom",
-    control = list(trace = 1, REPORT = 1)
+    control = list(trace = 0, REPORT = 1)
   )
 
 
@@ -275,9 +276,9 @@ fitter <- function(dd, criterion ) {
   minKipval <- Inf
   minAic <- Inf
   bestCandidateKipval <- NULL
-  besCandidateAic <- NULL
+  bestCandidateAic <- NULL
   for (c in candidats) {
-    cat("candidat :", c$distname, "\n")
+    #cat("candidat :", c$distname, "\n")
     gof <- NULL
     tryCatch({
       gof <- gofstat(c)
@@ -289,12 +290,12 @@ fitter <- function(dd, criterion ) {
       if (gof$chisqpvalue < 0.05 & gof$chisqpvalue < minKipval) {
         minKipval <- gof$chisqpvalue
         bestCandidateKipval <- c
-        cat("======> meilleur candidat v/v chi pval" , bestCandidateKipval$distname, "\n")
+       # cat("======> meilleur candidat v/v chi pval" , bestCandidateKipval$distname, "\n")
       }
       if (gof$aic < minAic & gof$chisqpvalue < 0.05) {
         minAic <- gof$aic
         bestCandidateAic <- c
-        cat("======> meilleur candidat v/v  AIC" , bestCandidateAic$distname, "\n")
+      #  cat("======> meilleur candidat v/v  AIC" , bestCandidateAic$distname, "\n")
       }
       
     }
@@ -302,12 +303,128 @@ fitter <- function(dd, criterion ) {
 
 
   if (criterion=="AIC") {
-    return(besCandidateAic)
+    return(bestCandidateAic)
   }
   if(criterion=="chi2pval"){
     return(bestCandidateKipval)
   }
 }
+
+
+
+fittedDistGenerator <-  function(nEtagesMax, meilleureDist) {
+  distrib <- NULL
+  
+  if (meilleureDist$distname == "pois") {
+    #cat(" distribution de Poisson\n")
+    
+    lambda <-  meilleureDist$estimate
+    distrib <-  dpois(1:max(nEtagesMax), lambda = lambda)
+    
+  }
+  if (meilleureDist$distname == "ztpois") {
+    #cat("distribution zero truncated Poisson\n")
+    lambda <-  meilleureDist$estimate
+    distrib <-  dztpois(1:max(nEtagesMax), lambda = lambda)
+    
+  }
+  if (meilleureDist$distname == "geom") {
+    #cat("distribution géométrique \n")
+    prob <-  meilleureDist$estimate
+    distrib <-  dgeom(1:max(nEtagesMax), prob = prob)
+  }
+  if (meilleureDist$distname == "ztgeom") {
+    #cat("distribution zero truncated geometrique\n")
+    prob <- meilleureDist$estimate
+    distrib <- dztgeom(1:max(nEtagesMax), prob = prob)
+  }
+  if (meilleureDist$distname == "nbinom") {
+    #cat("distribution negative binomiale\n")
+    mu <-  meilleureDist$estimate[2]
+    size <-  meilleureDist$estimate[1]
+    distrib <- dnbinom(1:max(nEtagesMax), size = size, prob = 0.5)
+  }
+  if (meilleureDist$distname == "logarithmic") {
+    #cat("distribution logarihtmique\n")
+    probn <-  meilleureDist$estimate
+    distrib <-  dlogarithmic(1:max(nEtagesMax), prob =probn)
+  }
+  return(distrib)
+  
+}
+
+
+
+
+distribsResults <-  data.frame(
+    CODE_IRIS = factor(),
+    NB_NIV  = integer(),
+    n = integer(),
+    poidsFitAIC = numeric(),
+    poidsFitCHI2 = numeric()
+)
+bckupNames <-  names(distribsResults)
+
+i <- 0
+for (c in unique(dfniv$CODE_IRIS)){
+ # cat("###########IRIS ", c , "###################\n")
+  distribObservee <-  dfniv %>% filter(CODE_IRIS==c) 
+  netagesmax <-  max(distribObservee$NB_NIV)
+    distModelAIC <-  fitter(distribObservee, "AIC")
+    distModelchi2pval <-  fitter(distribObservee, "chi2pval")
+  if(!is.null(distModelAIC)){  
+  distSimuleeAIC <-  fittedDistGenerator( netagesmax, distModelAIC)
+  }
+  if(!is.null(distModelchi2pval)){
+  distSimuleechi2pval <-  fittedDistGenerator( netagesmax, distModelchi2pval)
+  }
+  if(is.null(distModelchi2pval) & is.null(distModelAIC)){
+    cat("=#=#=#=#=# pas de fitting pour IRIS ", c, "=#=#=#=#=#\n")
+  }  
+  
+    i <-  i +1 
+    cat(i,"/",length(unique(dfniv$CODE_IRIS)),"\n")
+  if(!is.null(distModelAIC) & !is.null(distModelchi2pval)){
+
+  currentIrisResult <-  table(distribObservee  %>% group_by(CODE_IRIS) %>%  count(NB_NIV))
+  currentIrisResult <-  cbind(rep(c,netagesmax), table(distribObservee$NB_NIV))
+  currentIrisResult <-  cbind(currentIrisResult, distSimuleeAIC, distSimuleechi2pval)
+  names(currentIrisResult) <-  bckupNames
+  distribsResults <-  rbind (distribsResults, currentIrisResult)
+  
+  
+  
+  
+  
+  intersect(etages, distribObservee$NB_NIV)
+  
+  distribObservee  %>% group_by(CODE_IRIS) %>%  count(NB_NIV %in% 1:netagesmax) 
+  match(distribObservee$NB_NIV, etages) %>% group_by(etages)
+  
+   distribObservee$NB_NIV %in% 1:netagesmax
+  1:netagesmax %in% distribObservee$NB_NIV
+   
+   
+  intersect(distribObservee$NB_NIV, etages)
+  
+  
+  }
+}
+
+
+
+
+
+
+
+
+# dataframe avec les poids de chaque hauteur, normalisés par rapport à l'existant, pour chaque IRIS 
+distribByIris  <- dfniv  %>% group_by(CODE_IRIS) %>%  count(NB_NIV)  %>% mutate(distribAIC = fittedDistGenerator(max(n),meilleureDist = fitter(dfniv %>% filter(CODE_IRIS==c) ,criterion = "AIC")) )
+
+names(dPoidsNormExist) <-  c("CODE_IRIS", "NB_NIV", "effectif", "poidsNormalise_a_l_IRIS" )
+
+# ecriture du fichier de poids
+write_csv(dPoidsNormExist,path = "poidsNormalises_parIRIS.csv")
 
 
 
@@ -324,73 +441,21 @@ meilleureDistchipval
 
 
 #dessin comparant la distrib fittée et la distrib observée
-cdfcomp(meilleureDist)
+cdfcomp(list(meilleureDistAIC, meilleureDistchipval))
 
 meilleureDist$distname
 #générer les valeurs à partir de la meileure fonction candidate
 
 
 
-fittedDistGenerator <-  function(dd, meilleureDist) {
-  distrib <- NULL
-  
-  if (meilleureDist$distname == "pois") {
-    cat(" distribution de Poisson\n")
-    
-    lambda <-  meilleureDist$estimate
-    distrib <-  dpois(1:max(dd$NB_NIV), lambda = lambda)
-    
-  }
-  if (meilleureDist$distname == "ztpois") {
-    cat("distribution zero truncated Poisson\n")
-    lambda <-  meilleureDist$estimate
-    distrib <-  dztpois(1:max(dd$NB_NIV), lambda = lambda)
-    
-  }
-  if (meilleureDist$distname == "geom") {
-    cat("distribution géométrique \n")
-    prob <-  meilleureDist$estimate
-    distrib <-  dgeom(1:max(dd$NB_NIV), prob = prob)
-  }
-  if (meilleureDist$distname == "ztgeom") {
-    cat("distribution zero truncated geometrique\n")
-    prob <- meilleureDist$estimate
-    distrib <- dztgeom(1:max(dd$NB_NIV), prob = prob)
-  }
-  if (meilleureDist$distname == "nbinom") {
-    cat("distribution negative binomiale\n")
-    mu <-  meilleureDist$estimate[2]
-    size <-  meilleureDist$estimate[1]
-    distrib <- dnbinom(1:max(dd$NB_NIV), size = size, prob = 0.5)
-  }
-  if (meilleureDist$distname == "logarithmic") {
-    cat("distribution logarihtmique\n")
-    probn <-  meilleureDist$estimate
-    dsitrib <-  dlogarithmic(1:max(dd$NB_NIV), prob =)
-  }
-  return(distrib)
-  
-}
 
 
-
-
-for (c in unique(dfniv$CODE_IRIS)){
-  cat("###########IRIS ", c , "###################\n")
-  distribObservee <-  dfniv %>% filter(CODE_IRIS==c) 
-
-    distModel <-  fitter(distribObservee)
-  distSimulee <-  fittedDistGenerator( distribObservee, distModel)
-  
-}
-
-
-
-
-dd <- distribObservee
-
-
-dfniv$CODE_IRIS[1]
+#### RIRS recalcitrant : impossible de fitter automatiquement 
+unique(dfniv$CODE_IRIS)
+ddd <- dfniv %>% filter(CODE_IRIS==343270104) 
+qplot(ddd$NB_NIV)
+fitter(ddd, "chi2pval")
+warnings()
 
 
 
@@ -400,7 +465,9 @@ dfniv$CODE_IRIS[1]
 
 
 
-#celles qui marchent pas toutes seules
+
+
+#celles qui marchent pas toutes seules ------------------------------------------------------------------------------------
 bin <-  fitdist(dd$NB_NIV, discrete = T , 
                 method = "mle",
                 start=list( size=100, prob= 0.75),
@@ -472,7 +539,6 @@ for (m in optimMethods) {
   },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
   
 }
-
 
 
 
