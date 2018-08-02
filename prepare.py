@@ -169,7 +169,7 @@ if dpt in ['11','30','34','48','66']:
 elif dpt in ['09','12','31','32','46','65','81','82']:
     reg = 'R73'
 else:
-    print('Le département renseigné ne fait pas partie de la région Occitanie !')
+    print("Department " + dpt + " isn't part of the current study area !")
     sys.exit()
 
 if not 200 >= pixRes >= 20:
