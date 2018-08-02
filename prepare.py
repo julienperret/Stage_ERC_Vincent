@@ -15,20 +15,13 @@ from time import strftime, time
 from shutil import rmtree, copyfile
 from toolbox import printer, getDone, getTime, to_array, to_tif
 
-# Chercher les chemins de QGIS
+# Chercher les chemins de QGIS sur Linux, Windows ou MacOS
 qgsRoot = None
 if sys.platform == 'linux':
-    if os.path.exists('/usr/share/qgis'):
-        qgsRoot = Path('/usr')
-    elif os.path.exists('/usr/local/share/qgis'):
-        qgsRoot = Path('/usr/local')
-    elif os.path.exists('/opt/qgis'):
-        qgsRoot = Path('/opt/qgis')
-    if qgsRoot:
-        sys.path.append(str(qgsRoot/'share/qgis/python'))
-    else:
-        print('Impossible de localiser QGIS 3...')
-        sys.exit()
+    for d in ['/usr', '/usr/local', '/opt/qgis']:
+        if Path(d + '/lib/qgis').exists():
+            qgsRoot = Path(d)
+            sys.path.append(str(qgsRoot/'share/qgis/python'))
 elif sys.platform == 'win32':
     for d in Path('C:/Program Files').iterdir():
         if 'QGIS 3' in str(d) or 'OSGeo4W64' in str(d):
@@ -39,9 +32,14 @@ elif sys.platform == 'win32':
                 qgsRoot = d
     if qgsRoot:
         sys.path.append(str(qgsRoot/'apps/qgis/python'))
-    else:
-        print('Impossible de localiser QGIS 3...')
-        sys.exit()
+elif sys.platform == 'darwin':
+    if Path('Applications/QGIS.app').exists():
+        qgsRoot = Path('/Applications/QGIS.app')
+        sys.path.append(str(qgsRoot/'Contents/Resources/python/'))
+
+if not qgsRoot:
+    print('Unable to locate QGIS 3. Exiting now...')
+    sys.exit()
 
 from qgis.core import (
     QgsApplication,
@@ -65,6 +63,9 @@ if sys.platform == 'linux':
 elif sys.platform == 'win32':
     qgs.setPrefixPath(str(qgsRoot/'apps/qgis'))
     sys.path.append(str(qgsRoot/'apps/qgis/python/plugins'))
+elif sys.platform == 'darwin':
+    qgs.setPrefixPath(str(qgsRoot/'Contents/MacOS'))
+    sys.path.append(str(qgsRoot/'Resources/python/plugins'))
 qgs.initQgis()
 
 import processing
@@ -195,11 +196,12 @@ else:
 if not workspace.exists():
     os.makedirs(str(workspace))
 
-# Pour un vrai feedback redirigé dans un fichier log
 class QgsLoggingFeedback(QgsProcessingFeedback):
     def __init__(self):
         super().__init__()
+        # self.handler = logging.StreamHandler(sys.stdout)
         self.handler = logging.FileHandler(str(project/(strftime('%Y%m%d%H%M') + '_qgsLog.txt')))
+        self.handler.setLevel(logging.DEBUG)
         logging.getLogger().addHandler(self.handler)
     def reportError(self, msg, fatalError=False):
         logging.log(logging.ERROR, msg)
