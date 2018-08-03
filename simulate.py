@@ -62,7 +62,7 @@ elif len(sys.argv) > 5:
     maxBuiltRatio = float(sys.argv[8])
     densifyOld = to_bool(float(sys.argv[9]))
     maximumDensity = to_bool(float(sys.argv[10]))
-    winSize = int(sys.argv[11])
+    winSize = round(float(sys.argv[11]))
     minContig = float(sys.argv[12])
     maxContig = float(sys.argv[13])
     writingTifs = to_bool(float(sys.argv[14]))
