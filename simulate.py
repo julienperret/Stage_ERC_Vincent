@@ -134,7 +134,7 @@ def choose(weight, size=1):
         return None
 
 # Fenêtre glissante pour statistique dans le voisinage d'un pixel
-def slidingWin(array, row, col, size=3):
+def winMean(array, row, col, size=3):
     if (row > size - 1 and row + size-1 < rows) and (col > size - 1 and col + size-1 < cols):
         s = 0
         pos = [i + 1 for i in range(- size//2, size//2)]
@@ -152,7 +152,7 @@ def expand(row, col):
     maxSrf = capaSol[row][col]
     ss = 0
     if maxSrf > minSrf:
-        contig = slidingWin(urb, row, col, winSize)
+        contig = winMean(urb, row, col, winSize)
         if contig:
             if minContig < contig <= maxContig:
                 if maximumDensity:
