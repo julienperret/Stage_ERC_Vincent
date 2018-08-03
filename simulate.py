@@ -81,7 +81,6 @@ elif len(sys.argv) > 5:
     transport =  round(float(sys.argv[17]))
     routes =  round(float(sys.argv[18]))
     ecologie =  round(float(sys.argv[19]))
-    ocsol =  round(float(sys.argv[20]))
 
     print("lancement avec " + str(sys.argv))
 
