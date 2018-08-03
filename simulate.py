@@ -49,9 +49,9 @@ if len(sys.argv) == 5:
         elif 'winSize' in arg:
             winSize = int(arg.split('=')[1])
         elif 'minContig' in arg:
-            minContig = literal_eval(arg.split('=')[1])
+            minContig = float(arg.split('=')[1])
         elif 'maxContig' in arg:
-            maxContig = literal_eval(arg.split('=')[1])
+            maxContig = float(arg.split('=')[1])
 
 # *** Paramètres pour openMole
 elif len(sys.argv) > 5:
@@ -277,13 +277,14 @@ def urbanize(pop, srfMax=0, zau=False):
 
 # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
 ds = gdal.Open(str(dataDir/'demographie.tif'))
-demographieDep = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
-cols, rows = demographieDep.shape[1], demographieDep.shape[0] # x, y
+anyRaster = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
+cols, rows = anyRaster.shape[1], anyRaster.shape[0] # x, y
 proj = ds.GetProjection()
 geot = ds.GetGeoTransform()
 pixSize = int(geot[1])
 srfCell = pixSize * pixSize
 ds = None
+del anyRaster
 
 projectStr = str(pixSize) + 'm' + '_tx' + str(growth) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
 if pluPriority:
