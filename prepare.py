@@ -15,9 +15,14 @@ from time import strftime, time
 from shutil import rmtree, copyfile
 from toolbox import printer, getDone, getTime, to_array, to_tif
 
-# Chercher les chemins de QGIS sur Windows
-if sys.platform == 'win32':
-    qgsRoot = None
+# Chercher les chemins de QGIS sur Linux, Windows ou MacOS
+qgsRoot = None
+if sys.platform == 'linux':
+    for d in ['/usr', '/usr/local', '/opt/qgis']:
+        if Path(d + '/lib/qgis').exists():
+            qgsRoot = Path(d)
+            sys.path.append(str(qgsRoot/'share/qgis/python'))
+elif sys.platform == 'win32':
     for d in Path('C:/Program Files').iterdir():
         if 'QGIS 3' in str(d) or 'OSGeo4W64' in str(d):
             qgsRoot = d
@@ -27,9 +32,14 @@ if sys.platform == 'win32':
                 qgsRoot = d
     if qgsRoot:
         sys.path.append(str(qgsRoot/'apps/qgis/python'))
-    else:
-        print('Impossible de localiser QGIS 3...')
-        sys.exit()
+elif sys.platform == 'darwin':
+    if Path('/Applications/QGIS.app').exists():
+        qgsRoot = Path('/Applications/QGIS.app')
+        sys.path.append(str(qgsRoot/'Contents/Resources/python/'))
+
+if not qgsRoot:
+    print('Unable to locate QGIS 3. Exiting now...')
+    sys.exit()
 
 from qgis.core import (
     QgsApplication,
@@ -48,11 +58,14 @@ from qgis.PyQt.QtCore import QVariant
 
 qgs = QgsApplication([], GUIenabled=False)
 if sys.platform == 'linux':
-    qgs.setPrefixPath('/usr', True)
-    sys.path.append('/usr/share/qgis/python/plugins')
+    qgs.setPrefixPath(str(qgsRoot), True)
+    sys.path.append(str(qgsRoot/'share/qgis/python/plugins'))
 elif sys.platform == 'win32':
     qgs.setPrefixPath(str(qgsRoot/'apps/qgis'))
     sys.path.append(str(qgsRoot/'apps/qgis/python/plugins'))
+elif sys.platform == 'darwin':
+    qgs.setPrefixPath(str(qgsRoot/'Contents/MacOS'))
+    sys.path.append(str(qgsRoot/'Resources/python/plugins'))
 qgs.initQgis()
 
 import processing
@@ -64,7 +77,7 @@ qgs.processingRegistry().addProvider(QgsNativeAlgorithms())
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
 # Utilisation d'un arrondi au supérieur avec les objet Decimal()
-decimal.getcontext().rounding='ROUND_UP'
+# decimal.getcontext().rounding='ROUND_HALF_UP'
 
 # Import des paramètres d'entrée
 globalData = Path(sys.argv[1])
@@ -75,7 +88,7 @@ if len(sys.argv) > 5:
     argList = sys.argv[5].split()
     # Interprétation de la chaîne de paramètres
     for arg in argList :
-        # Taille de la grille / résolution des rasters
+        # Résolution de la grille / des rasters
         if 'pixRes' in arg:
             pixRes = int(arg.split("=")[1])
             pixResStr = str(pixRes) + 'm'
@@ -126,10 +139,6 @@ if 'silent' not in globals():
 if 'pixRes' not in globals():
     pixRes = 50
     pixResStr= str(pixRes) + 'm'
-elif not 200 >= pixRes >= 20:
-    if not silent:
-        print('Grid size should be between 20m and 200m')
-    sys.exit()
 if 'bufferDistance' not in globals():
     bufferDistance = 1000
 if 'minSurf' not in globals():
@@ -155,6 +164,19 @@ if 'speed' not in globals():
 if 'truth' not in globals():
     truth = False
 
+if dpt in ['11','30','34','48','66']:
+    reg = 'R91'
+elif dpt in ['09','12','31','32','46','65','81','82']:
+    reg = 'R73'
+else:
+    print("Department " + dpt + " isn't part of the current study area !")
+    sys.exit()
+
+if not 200 >= pixRes >= 20:
+    if not silent:
+        print('Pixel size should be between 20m and 200m')
+    sys.exit()
+
 if force and outputDir.exists():
     rmtree(str(outputDir))
 
@@ -174,29 +196,23 @@ else:
 if not workspace.exists():
     os.makedirs(str(workspace))
 
-# Pour un vrai feedback redirigé dans un fichier log
 class QgsLoggingFeedback(QgsProcessingFeedback):
-
     def __init__(self):
         super().__init__()
+        # self.handler = logging.StreamHandler(sys.stdout)
         self.handler = logging.FileHandler(str(project/(strftime('%Y%m%d%H%M') + '_qgsLog.txt')))
+        self.handler.setLevel(logging.DEBUG)
         logging.getLogger().addHandler(self.handler)
-
     def reportError(self, msg, fatalError=False):
         logging.log(logging.ERROR, msg)
-
     def setProgressText(self, text):
         logging.log(logging.INFO, msg)
-
     def pushInfo(self, info):
         super().pushInfo(info)
-
     def pushCommandInfo(self, info):
         super().pushCommandInfo(info)
-
     def pushDebugInfo(self, info):
         super().pushDebugInfo(info)
-
     def pushConsoleInfo(self, info):
         super().pushConsoleInfo(info)
 
@@ -301,7 +317,7 @@ def rasterize(vector, output, dtype, field=None, burn=None, inverse=False, touch
     gdal.Rasterize(str(output), str(vector), options=opt)
 
 # Nettoye une couche de bâtiments et génère les champs utiles à l'estimation de population
-def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut, removedOut):
+def buildingCleaner(buildings, sMin, sMax, lvlHeight, polygons, points, cleanedOut, removedOut):
     # Selection des bâtiments situés dans polygones
     for layer in polygons:
         params = {
@@ -324,7 +340,7 @@ def buildingCleaner(buildings, sMin, sMax, hEtage, polygons, points, cleanedOut,
     expr = """ CASE
         WHEN "HAUTEUR" = 0 THEN 1
         WHEN "HAUTEUR" < 5 THEN 1
-        ELSE floor("HAUTEUR"/""" + str(hEtage) + """) END
+        ELSE floor("HAUTEUR"/""" + str(lvlHeight) + """) END
     """
     buildings.addExpressionField(expr, QgsField('NB_NIV', QVariant.Int, len=2))
     # Nettoyage des bâtiments supposés trop grand ou trop petit pour être habités
@@ -996,7 +1012,6 @@ def pluFixer(plu, overlay, outdir, encoding='utf-8'):
         expr = """
                 CASE
                     WHEN "classe" = 'AU' THEN 1
-                    WHEN "classe" = 'U' THEN 1
                     ELSE 0
                 END
             """
@@ -1033,13 +1048,18 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
     try:
         # Découpe et reprojection de la donnée en l'absence du dossier ./data
         if not (workspace/'data').exists():
-            os.mkdir(str(workspace/'data'))
-            os.mkdir(str(workspace/'data/2009_bati'))
-            os.mkdir(str(workspace/'data/2014_bati'))
-            os.mkdir(str(workspace/'data/pai'))
-            os.mkdir(str(workspace/'data/transport'))
-            os.mkdir(str(workspace/'data/geosirene'))
-            os.mkdir(str(workspace/'data/restriction'))
+            mkdirList = [
+                workspace/'data',
+                workspace/'data/2009_bati',
+                workspace/'data/2014_bati',
+                workspace/'data/pai',
+                workspace/'data/transport',
+                workspace/'data/geosirene',
+                workspace/'data/restriction',
+                workspace/'data/zonage'
+            ]
+            for path in mkdirList:
+                os.mkdir(str(path))
 
             etape = 1
             description = 'extracting and reprojecting data '
@@ -1209,10 +1229,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 del fields
                 argList.append((clip(ecologie, zone), workspace/'data/'))
 
-            # Autrement déterminer l'intérêt écologique grâce à l'ocsol ?
-            else:
-                pass
-
             # Traitement d'une couche facultative du PPRI
             if (localData/'ppri.shp').exists():
                 ppri = ppriExtractor(str(localData/'ppri.shp'))
@@ -1235,13 +1251,18 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 parcelles = res['OUTPUT']
                 argList.append((clip(parcelles, zone), workspace/'data/restriction/'))
 
-            elif (globalData/'majic'/dpt).exists():
-                parcelles = QgsVectorLayer(str(globalData/'majic'/dpt/'exclusion_parcelles.shp'), 'exclusion_parcelles')
+            elif (globalData/'majic').exists():
+                parcelles = QgsVectorLayer(str(globalData/('majic/exclusion_parcelles_' + dpt + '.shp')), 'exclusion_parcelles')
                 argList.append((clip(parcelles, zone), workspace/'data/restriction/'))
 
             # + Traitement d'une couche facultative pour exclusion de zones bâties lors du calcul et inclusion dans les restrictions
             if (localData/'exclusion_manuelle.shp').exists():
                 argList.append((clip(localData/'exclusion_manuelle.shp', zone), workspace/'data/restriction/'))
+
+            # Traitement de la couche des mesures comensatoires
+            if reg == 'R91':
+                compensation = QgsVectorLayer(str(globalData/'comp/MesuresCompensatoires_R91.shp'), 'compensation')
+                argList.append((clip(compensation, zone), workspace/'data/restriction/'))
 
             if speed:
                 getDone(reproj, argList)
@@ -1256,6 +1277,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 del ppri
             if 'azi' in globals():
                 del azi
+            if 'compensation' in globals():
+                del compensation
 
             # Traitement des couches de zonage de protection
             zonagesEnv = []
@@ -1430,9 +1453,14 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             log.write(getTime(start_time) + '\n')
 
         if not (workspace/'data'/pixResStr).exists():
-            os.mkdir(str(workspace/'data'/pixResStr))
-            os.mkdir(str(workspace/'data'/pixResStr/'tif'))
-            os.mkdir(str(workspace/'data'/pixResStr/'csv'))
+            mkdirList = [
+                workspace/'data'/pixResStr,
+                workspace/'data'/pixResStr/'csv',
+                workspace/'data'/pixResStr/'tif',
+                workspace/'data'/pixResStr/'tif/tmp'
+            ]
+            for path in mkdirList:
+                os.mkdir(str(path))
 
             start_time = time()
             etape = 3
@@ -1591,6 +1619,9 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             if (workspace/'data/restriction/ppri.shp').exists():
                 argList.append((workspace/'data/restriction/ppri.shp', workspace/'data'/pixResStr/'tif/ppri.tif', 'Byte', None, 1))
 
+            if (workspace/'data/restriction/compensation.shp').exists():
+                argList.append((workspace/'data/restriction/compensation.shp', workspace/'data'/pixResStr/'tif/compensation.tif', 'Byte', None, 1))
+
             elif (workspace/'data/plu.shp').exists():
                 layer = QgsVectorLayer(str(workspace/'data/plu.shp'), 'plu')
                 fields = list(f.name() for f in layer.fields())
@@ -1623,7 +1654,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             processing.run('gdal:proximity', params, feedback=feedback)
 
             # Calcul des rasters de densité
-            os.mkdir(str(workspace/'data'/pixResStr/'tif/tmp'))
             projwin = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax)
             with (globalData/'sirene/distances.csv').open('r') as csvFile:
                 reader = csv.reader(csvFile)
@@ -1688,8 +1718,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         extentStr = str(xMin) + ',' + str(xMax) + ',' + str(yMin) + ',' + str(yMax) + ' [EPSG:3035]'
 
         os.mkdir(str(project/'interet'))
-        copyfile(str(localData/'poids.csv'), str(project/'interet/poids.csv'))
-        copyfile(str(workspace/'data'/pixResStr/'evo_surface_sol.csv'), str(project/'evo_surface_sol.csv'))
         # Rasterisations
         argList = [
             (workspace/'data'/pixResStr/'stat_grid.shp', project/'demographie_2014.tif', 'UInt16', 'pop'),
@@ -1767,8 +1795,12 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             restriction = np.where(aziMask == 1, 1, restriction)
 
         if (workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif').exists():
-            exclusionManuelle = to_array(workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif',  np.byte)
+            exclusionManuelle = to_array(workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif', np.byte)
             restriction = np.where(exclusionManuelle == 1, 1, restriction)
+
+        if (workspace/'data'/pixResStr/'tif/compensation.tif').exists():
+            compMask = to_array(workspace/'data'/pixResStr/'tif/compensation.tif', np.byte)
+            restriction = np.where(compMask == 1, 1, restriction)
 
         # Traitement de l'intérêt écologique
         if (workspace/'data'/pixResStr/'tif/ecologie.tif').exists():
@@ -1783,6 +1815,9 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         to_tif(routes, 'float32', proj, geot, project/'interet/proximite_routes.tif')
         to_tif(transport, 'float32', proj, geot, project/'interet/proximite_transport.tif')
 
+        copyfile(str(localData/'poids.csv'), str(project/'interet/poids.csv'))
+        copyfile(str(workspace/'data'/pixResStr/'evo_surface_sol.csv'), str(project/'evo_surface_sol.csv'))
+
         if not silent:
             print('\nFinished at ' + strftime('%H:%M:%S'))
         log.write(getTime(start_time) + '\n')
@@ -1795,8 +1830,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         exc = sys.exc_info()
         if not silent:
             print("\n*** Error :")
-            traceback.print_exception(*exc, limit=3, file=sys.stdout)
-        traceback.print_exception(*exc, limit=3, file=log)
+            traceback.print_exception(*exc, limit=5, file=sys.stdout)
+        traceback.print_exception(*exc, limit=5, file=log)
         sys.exit()
 
 qgs.exitQgis()

@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from ast import literal_eval
+import os
+import sys
 import csv
 import gdal
-import os
+import traceback
+import numpy as np
+from time import time
 from pathlib import Path
 from shutil import rmtree
-import sys
-from time import time
-import traceback
-
-import numpy as np
+from ast import literal_eval
 from toolbox import to_tif, printer, to_array
-
 
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
+
+# Convertit les réels en booléen
+def to_bool(r):
+    b = True if r > 0.5 else False
+    return b
 
 # Stockage et contrôle de la validité des paramètres utilisateur
 dataDir = Path(sys.argv[1])
@@ -40,50 +43,48 @@ if len(sys.argv) == 5:
         elif 'densifyOld' in arg:
             densifyOld = literal_eval(arg.split('=')[1])
         elif 'maximumDensity' in arg:
-            maximumDensity = literal_eval(arg.split('=')[1])
+            maximumDensity = int(arg.split('=')[1])
         elif 'maxBuiltRatio' in arg:
             maxBuiltRatio = int(arg.split('=')[1])
         elif 'winSize' in arg:
             winSize = int(arg.split('=')[1])
         elif 'minContig' in arg:
-            minContig = literal_eval(arg.split('=')[1])
+            minContig = float(arg.split('=')[1])
         elif 'maxContig' in arg:
-            maxContig = literal_eval(arg.split('=')[1])
+            maxContig = float(arg.split('=')[1])
         elif 'seed' in arg:
-            maxContig = int(arg.split('=')[1])        
+            seed = int(arg.split('=')[1])
 
 # *** Paramètres pour openMole
 elif len(sys.argv) > 5:
     scenario = float(sys.argv[4])
-    
-    if (scenario >=0) & (scenario < 1) : 
+
+    if (scenario >=0) & (scenario < 1) :
         tmpscenario = "tendanciel"
-    if (scenario >=1) & (scenario < 2) : 
+    if (scenario >= 1) & (scenario < 2) :
         tmpscenario = "stable"
-    if (scenario >=2) & (scenario <= 3) : 
+    if (scenario >= 2) & (scenario <= 3) :
         tmpscenario = "reduction"
-    scenario = tmpscenario    
-    pluPriority = float(sys.argv[5])
-    buildNonRes = float(sys.argv[6])
-    densifyGround = float(sys.argv[7])
+    scenario = tmpscenario
+    pluPriority = to_bool(float(sys.argv[5]))
+    buildNonRes = to_bool(float(sys.argv[6]))
+    densifyGround = to_bool(float(sys.argv[7]))
     maxBuiltRatio = float(sys.argv[8])
-    densifyOld = float(sys.argv[9])
-    maximumDensity = float(sys.argv[10])
-    winSize = int(float(sys.argv[11]))
+    densifyOld = to_bool(float(sys.argv[9]))
+    maximumDensity = to_bool(float(sys.argv[10]))
+    winSize = round(float(sys.argv[11]))
     minContig = float(sys.argv[12])
     maxContig = float(sys.argv[13])
-    writingTifs = eval(sys.argv[14])
-    seed = int(float(sys.argv[15]))
-    sirene =  int(float(sys.argv[16]))
-    transport =  int(float(sys.argv[17]))
-    routes =  int(float(sys.argv[18]))
-    ecologie =  int(float(sys.argv[19]))
-    ocsol =  int(float(sys.argv[20]))
-    
-
+    writingTifs = to_bool(float(sys.argv[14]))
+    seed = round(float(sys.argv[15]))
+    sirene =  round(float(sys.argv[16]))
+    transport =  round(float(sys.argv[17]))
+    routes =  round(float(sys.argv[18]))
+    ecologie =  round(float(sys.argv[19]))
+    ocsol =  round(float(sys.argv[20]))
 
     print("lancement avec " + str(sys.argv))
-    
+
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
     finalYear = 2040
@@ -116,22 +117,17 @@ if 'minContig' not in globals():
 if 'maxContig' not in globals():
     maxContig = 0.8
 if 'writingTifs' not in globals():
-    writingTifs = 1.0
+    writingTifs = True
 if 'seed' not in globals():
     seed = 42
 if 'sirene' not in globals():
-    sirene = 3
+    sirene = 1
 if 'transport' not in globals():
-    transport = 2
+    transport = 1
 if 'routes' not in globals():
-    routes = 3
+    routes = 1
 if 'ecologie' not in globals():
-    ecologie = 2
-if 'ocsol' not in globals():
-    ocsol = 1
-
-
-
+    ecologie = 1
 
 # Contrôle des paramètres
 if growth > 3:
@@ -144,9 +140,8 @@ if minContig > maxContig:
     print("Error : maxContig should be higher than minContig !")
     sys.exit()
 
-#intialisation de la seed du RNG
+# Intialisation de la seed du RNG
 np.random.seed(seed)
-
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
 def choose(weight, size=1):
@@ -169,7 +164,7 @@ def choose(weight, size=1):
         return None
 
 # Fenêtre glissante pour statistique dans le voisinage d'un pixel
-def slidingWin(array, row, col, size=3):
+def winMean(array, row, col, size=3):
     if (row > size - 1 and row + size-1 < rows) and (col > size - 1 and col + size-1 < cols):
         s = 0
         pos = [i + 1 for i in range(- size//2, size//2)]
@@ -183,15 +178,14 @@ def slidingWin(array, row, col, size=3):
 # Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def expand(row, col):
     global capaSol, urb
-    contig = None
     minSrf = ssrMed[row][col]
     maxSrf = capaSol[row][col]
     ss = 0
     if maxSrf > minSrf:
-        contig = slidingWin(urb, row, col, winSize)
+        contig = winMean(urb, row, col, winSize)
         if contig:
             if minContig < contig <= maxContig:
-                if maximumDensity > 0.5:
+                if maximumDensity:
                     ss = maxSrf
                 else:
                     ss = np.random.randint(minSrf, maxSrf + 1)
@@ -216,7 +210,7 @@ def densify(mode, row, col):
         minSrf = ssrMed[row][col]
         maxSrf = capaSol[row][col]
         if maxSrf > minSrf:
-            if maximumDensity > 0.5:
+            if maximumDensity:
                 ss = maxSrf
             else:
                 ss = np.random.randint(minSrf, maxSrf + 1)
@@ -268,7 +262,7 @@ def urbanize(pop, srfMax=0, zau=False):
                 tmpInteret[row][col] = 0
 
         # On densifie l'existant si les cellules vides sont déjà saturées
-        if artif < srfMax and count < pop and densifyGround > 0.5:
+        if artif < srfMax and count < pop and densifyGround:
             tmpInteret = np.where((capaSol >= ssrMed) & (urb == 1), interet, 0)
             if zau:
                 tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
@@ -290,7 +284,7 @@ def urbanize(pop, srfMax=0, zau=False):
                     tmpInteret[row][col] = 0
 
     # Densification du bâti existant si on n'a pas pu loger tout le monde
-    elif count < pop and densifyOld > 0.5:
+    elif count < pop and densifyOld:
         tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
         while count < pop and tmpInteret.sum() > 0:
             sp = 0
@@ -303,7 +297,7 @@ def urbanize(pop, srfMax=0, zau=False):
                 tmpInteret[row][col] = 0
 
     srfSol += tmpSrfSol
-    if buildNonRes > 0.5:
+    if buildNonRes:
         tmpSrfSol = (tmpSrfSol * txSsr).round().astype(np.uint16)
     srfSolRes += tmpSrfSol
     srfPla += tmpSrfPla
@@ -322,15 +316,15 @@ srfCell = pixSize * pixSize
 ds = None
 
 projectStr = str(pixSize) + 'm' + '_tx' + str(growth) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
-if pluPriority > 0.5:
+if pluPriority:
     projectStr += '_pluPrio'
-if buildNonRes > 0.5:
+if buildNonRes:
     projectStr += '_buildNonRes'
-if densifyGround > 0.5:
+if densifyGround:
     projectStr += '_densifyGround'
-if densifyOld > 0.5:
+if densifyOld:
     projectStr += '_densifyOld'
-if maximumDensity > 0.5:
+if maximumDensity:
     projectStr += '_maximumDensity'
 if finalYear != 2040:
     projectStr += '_' + str(finalYear)
@@ -375,23 +369,18 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         poids["transport"] = transport
         poids["routes"] = routes
         poids["ecologie"] = ecologie
-        poids["ocsol"] = ocsol                
 
+        # # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
+        # with (dataDir/'interet/poids.csv').open('r') as r:
+        #     reader = csv.reader(r)
+        #     next(reader, None)
+        #     poids = {rows[0]:int(rows[1]) for rows in reader}
 
-        
-        """
-        # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
-        with (dataDir/'interet/poids.csv').open('r') as r:
-            reader = csv.reader(r)
-            next(reader, None)
-            poids = {rows[0]:int(rows[1]) for rows in reader}
-        """
-        
-        sommePoids =  sum(poids.values())
-                          
-        if sommePoids==0:
+        sommePoids = sum(poids.values())
+
+        if sommePoids == 0:
             sommePoids = 1
-        
+
         coef = {}
         with (project/'coefficients_interet.csv').open('w') as w:
             for key in poids:
@@ -418,7 +407,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         m2PlaHab = to_array(dataDir/'iris_m2_hab.tif', np.uint16)
         srfPla14 = to_array(dataDir/'srf_pla.tif', np.uint32)
         nbNivMax = to_array(dataDir/'iris_nbniv_max.tif')
-        if buildNonRes > 0.5:
+        if buildNonRes:
             txSsr = to_array(dataDir/'iris_tx_ssr.tif', np.float32)
         # Amenités
         eco = to_array(dataDir/'interet/non-importance_ecologique.tif', np.float32)
@@ -428,7 +417,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         # Création du raster final d'intérêt avec pondération
         interet = np.where((restriction != 1), (eco * coef['ecologie']) + (rou * coef['routes']) + (tra * coef['transport']) + (sir * poids['sirene']), 0)
         maxInterest =  np.amax(interet)
-        
+
         if maxInterest == 0 :
             maxInterest = 1
         interet = (interet /maxInterest).astype(np.float32)
@@ -478,12 +467,12 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m2\n')
 
         # Instantanés de la situation à t0
-        if writingTifs == 1:
             to_tif(urb14, 'byte', proj, geot, project/'urbanisation_2014.tif')
             to_tif(capaSol, 'uint16', proj, geot, project/'capacite_sol_2014.tif')
             to_tif(txArtif, 'float32', proj, geot, project/'taux_artif_2014.tif')
             to_tif(interet, 'float32', proj, geot, project/'interet_2014.tif')
             to_tif(ratioPlaSol14, 'float32', proj, geot, project/'ratio_plancher_sol_2014.tif')
+        if writingTifs:
 
         start_time = time()
         ##### Boucle principale #####
@@ -502,7 +491,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             # printer(progres)
             srfMax = dicSrf[year]
             popALoger = popDic[year]
-            if pluPriority > 0.5 and not skipZau:
+            if pluPriority and not skipZau:
                 restePop, resteSrf = urbanize(popALoger - preLogee, srfMax - preBuilt,  True)
                 if restePop > 0 and resteSrf > 0:
                     skipZau = True
@@ -517,7 +506,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             preLogee = -restePop
 
             # Snapshots
-            if writingTifs == 1:
+            if writingTifs:
                 to_tif(demographie, 'uint16', proj, geot, project/('snapshots/demographie/demo_' + str(year) + '.tif'))
                 to_tif(urb, 'byte', proj, geot, project/('snapshots/urbanisation/urb_' + str(year) + '.tif'))
                 to_tif(srfSol, 'uint16', proj, geot, project/('snapshots/surface_sol/sol_' + str(year) + '.tif'))
@@ -544,7 +533,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
         expansionSum = expansion.sum()
         impactEnv = round((srfSolNouv * (1 - eco)).sum())
-        if writingTifs > 0.5 :
+        if writingTifs :
             to_tif(urb, 'uint16', proj, geot, project/('output/urbanisation_' + str(finalYear) + '.tif'))
             to_tif(srfSol, 'uint16', proj, geot, project/('output/surface_sol_' + str(finalYear) + '.tif'))
             to_tif(srfPla, 'uint32', proj, geot, project/('output/surface_plancher_' + str(finalYear) + '.tif'))
@@ -579,17 +568,17 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write("Total number of randomly chosen cells: " + str(countChoices) + '\n')
         log.write("Execution time: " + str(execTime) + '\n')
 
-        if densifyGround > 0.5:
+        if densifyGround:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
-            if writingTifs == 1:
+            if writingTifs:
                 to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
             mesures.write("Ground-densified cells count, " + str(densifSol.sum()) + "\n")
         else:
             mesures.write("Ground-densified cells count, NA\n")
 
-        if densifyOld > 0.5:
+        if densifyOld:
             densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
-            if writingTifs == 1:
+            if writingTifs:
                 to_tif(densifPla, 'byte', proj, geot, project/'output/densification_plancher.tif')
             mesures.write("Floor-densified cells count, " + str(densifPla.sum()) + "\n")
         else:
@@ -598,6 +587,6 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
     except:
         print("\n*** Error :")
         exc = sys.exc_info()
-        traceback.print_exception(*exc, limit=3, file=sys.stdout)
-        traceback.print_exception(*exc, limit=3, file=log)
+        traceback.print_exception(*exc, limit=5, file=sys.stdout)
+        traceback.print_exception(*exc, limit=5, file=log)
         sys.exit()
