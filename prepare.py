@@ -33,7 +33,7 @@ elif sys.platform == 'win32':
     if qgsRoot:
         sys.path.append(str(qgsRoot/'apps/qgis/python'))
 elif sys.platform == 'darwin':
-    if Path('Applications/QGIS.app').exists():
+    if Path('/Applications/QGIS.app').exists():
         qgsRoot = Path('/Applications/QGIS.app')
         sys.path.append(str(qgsRoot/'Contents/Resources/python/'))
 
