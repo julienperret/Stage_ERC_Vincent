@@ -77,7 +77,7 @@ qgs.processingRegistry().addProvider(QgsNativeAlgorithms())
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
 # Utilisation d'un arrondi au supérieur avec les objet Decimal()
-decimal.getcontext().rounding='ROUND_UP'
+# decimal.getcontext().rounding='ROUND_HALF_UP'
 
 # Import des paramètres d'entrée
 globalData = Path(sys.argv[1])
