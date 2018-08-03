@@ -479,7 +479,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         print('\nDuration of the simulation: ' + str(execTime) + ' seconds')
 
         # Calcul et export des résultats
-        popNouv = demographie - demographieDep
+        popNouv = demographie - demographie14
         popNouvCount = popNouv.sum()
         peuplementMoyen = round(np.nanmean(np.where(popNouv == 0, np.nan, popNouv)), 3)
         srfSolNouv = srfSol - srfSol14
