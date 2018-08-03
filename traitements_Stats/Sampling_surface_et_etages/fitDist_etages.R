@@ -178,6 +178,7 @@ write_csv(dPoidsNormExist,path = "poidsNormalises_parIRIS.csv")
 #########################################################
 
 library(fitdistrplus)
+library(actuar)
 
 
 dd <- dfniv %>% filter(CODE_IRIS==IRISvarious) 
@@ -188,7 +189,6 @@ qplot(dd$NB_NIV)
 
 
 
-library(actuar)
 
 
 
@@ -356,80 +356,98 @@ fittedDistGenerator <-  function(nEtagesMax, meilleureDist) {
 
 
 
+
 distribsResults <-  data.frame(
-    CODE_IRIS = factor(),
-    NB_NIV  = integer(),
-    n = integer(),
-    poidsFitAIC = numeric(),
-    poidsFitCHI2 = numeric()
+  CODE_IRIS = factor(),
+  NB_NIV  = integer(),
+  n = integer(),
+  poidsFitAIC = numeric(),
+  poidsFitCHI2 = numeric()
 )
 bckupNames <-  names(distribsResults)
 
 i <- 0
-for (c in unique(dfniv$CODE_IRIS)){
- # cat("###########IRIS ", c , "###################\n")
-  distribObservee <-  dfniv %>% filter(CODE_IRIS==c) 
+for (c in unique(dfniv$CODE_IRIS)) {
+  # cat("###########IRIS ", c , "###################\n")
+  distribObservee <-  dfniv %>% filter(CODE_IRIS == c)
   netagesmax <-  max(distribObservee$NB_NIV)
-    distModelAIC <-  fitter(distribObservee, "AIC")
-    distModelchi2pval <-  fitter(distribObservee, "chi2pval")
-  if(!is.null(distModelAIC)){  
-  distSimuleeAIC <-  fittedDistGenerator( netagesmax, distModelAIC)
+  distModelAIC <-  fitter(distribObservee, "AIC")
+  distModelchi2pval <-  fitter(distribObservee, "chi2pval")
+  if (!is.null(distModelAIC)) {
+    distSimuleeAIC <-  fittedDistGenerator(netagesmax, distModelAIC)
   }
-  if(!is.null(distModelchi2pval)){
-  distSimuleechi2pval <-  fittedDistGenerator( netagesmax, distModelchi2pval)
+  if (!is.null(distModelchi2pval)) {
+    distSimuleechi2pval <-fittedDistGenerator(netagesmax, distModelchi2pval)
   }
-  if(is.null(distModelchi2pval) & is.null(distModelAIC)){
+  
+  i <-  i + 1
+  cat(i, "/", length(unique(dfniv$CODE_IRIS)), "\n")
+  if (!is.null(distModelAIC) & !is.null(distModelchi2pval)) {
+    effectifComplets <- c()
+    # boucle très crade
+    for (etage in 1:netagesmax) {
+      effectifComplets <-
+        append(effectifComplets, sum(distribObservee$NB_NIV == etage))
+    }
+    currentIrisResult <- as.data.frame(
+      cbind(rep(c, netagesmax),
+            seq(from = 1, to = netagesmax, by = 1),
+            effectifComplets))
+    currentIrisResult <-cbind(currentIrisResult, distSimuleeAIC, distSimuleechi2pval)
+    
+    names(distribsResults) <-  bckupNames
+    
+        names(currentIrisResult) <-  bckupNames
+    # on empile dans les resultats
+    distribsResults <-  rbind (distribsResults, currentIrisResult)
+    
+    
+    
+  }
+  
+  ## sans candidats, opn remplace par la distrib observée :-()
+  if (is.null(distModelchi2pval) & is.null(distModelAIC)) {
     cat("=#=#=#=#=# pas de fitting pour IRIS ", c, "=#=#=#=#=#\n")
-  }  
-  
-    i <-  i +1 
-    cat(i,"/",length(unique(dfniv$CODE_IRIS)),"\n")
-  if(!is.null(distModelAIC) & !is.null(distModelchi2pval)){
-
-  currentIrisResult <-  table(distribObservee  %>% group_by(CODE_IRIS) %>%  count(NB_NIV))
-  currentIrisResult <-  cbind(rep(c,netagesmax), table(distribObservee$NB_NIV))
-  currentIrisResult <-  cbind(currentIrisResult, distSimuleeAIC, distSimuleechi2pval)
-  names(currentIrisResult) <-  bckupNames
-  distribsResults <-  rbind (distribsResults, currentIrisResult)
-  
-  
-  
-  
-  
-  intersect(etages, distribObservee$NB_NIV)
-  
-  distribObservee  %>% group_by(CODE_IRIS) %>%  count(NB_NIV %in% 1:netagesmax) 
-  match(distribObservee$NB_NIV, etages) %>% group_by(etages)
-  
-   distribObservee$NB_NIV %in% 1:netagesmax
-  1:netagesmax %in% distribObservee$NB_NIV
-   
-   
-  intersect(distribObservee$NB_NIV, etages)
-  
-  
+    effectifComplets <- c()
+    # boucle très crade
+    for (etage in 1:netagesmax) {
+      effectifComplets <-
+        append(effectifComplets, sum(distribObservee$NB_NIV == etage))
+    }
+    
+    currentIrisResult <-as.data.frame(cbind(rep(c, netagesmax),
+                              seq(from = 1, to = netagesmax, by = 1),
+                              effectifComplets))
+    
+    currentIrisResult$poidsFitAIC <- currentIrisResult$effectifComplets / sum(currentIrisResult$effectifComplets)
+    currentIrisResult$poidsFitCHI2 <- currentIrisResult$effectifComplets / sum(currentIrisResult$effectifComplets)
+    
+    names(currentIrisResult) <-  bckupNames
+    names(distribsResults) <-  bckupNames
+    
+    # on empile dans les resultats
+    distribsResults <-  rbind (distribsResults, currentIrisResult)
+    
   }
+  
 }
 
+names(distribsResults) <-  bckupNames
+
+
+#sauvegarde en fichier 
+
+write.csv(distribsResults, "distributionsEtagesFitted.csv")
 
 
 
 
 
 
-
-# dataframe avec les poids de chaque hauteur, normalisés par rapport à l'existant, pour chaque IRIS 
-distribByIris  <- dfniv  %>% group_by(CODE_IRIS) %>%  count(NB_NIV)  %>% mutate(distribAIC = fittedDistGenerator(max(n),meilleureDist = fitter(dfniv %>% filter(CODE_IRIS==c) ,criterion = "AIC")) )
-
-names(dPoidsNormExist) <-  c("CODE_IRIS", "NB_NIV", "effectif", "poidsNormalise_a_l_IRIS" )
-
-# ecriture du fichier de poids
-write_csv(dPoidsNormExist,path = "poidsNormalises_parIRIS.csv")
+#Exemple pourun IRIS dont on connait le code 
 
 
-
-
-
+dd <-  dfniv %>% filter(CODE_IRIS == 343270104)
 
 
 meilleureDistAIC <- fitter(dd,"AIC")
@@ -440,17 +458,13 @@ meilleureDistAIC
 meilleureDistchipval
 
 
-#dessin comparant la distrib fittée et la distrib observée
+#dessin comparant les distribs fittées et la distrib observée
 cdfcomp(list(meilleureDistAIC, meilleureDistchipval))
 
-meilleureDist$distname
-#générer les valeurs à partir de la meileure fonction candidate
 
 
 
-
-
-#### RIRS recalcitrant : impossible de fitter automatiquement 
+#### IRIS recalcitrant : impossible de fitter automatiquement 
 unique(dfniv$CODE_IRIS)
 ddd <- dfniv %>% filter(CODE_IRIS==343270104) 
 qplot(ddd$NB_NIV)
