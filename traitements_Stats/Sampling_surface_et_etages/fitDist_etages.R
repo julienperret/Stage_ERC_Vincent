@@ -3,7 +3,8 @@ library(dplyr)
 library(readr)
 
 
-setwd("/home/paulchapron/encadrement/Stage_ERC_Vincent/traitements_Stats/")
+setwd("/home/paulchapron/encadrement/repoJulienERC/erc/traitements_Stats/Sampling_surface_et_etages/")
+
 
 dfniv <- read_csv("nb_niv.csv")
 
@@ -436,7 +437,7 @@ names(distribsResults) <-  bckupNames
 
 
 #sauvegarde en fichier 
-
+setwd()
 write.csv(distribsResults, "distributionsEtagesFitted.csv")
 
 
