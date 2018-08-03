@@ -1260,7 +1260,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 argList.append((clip(localData/'exclusion_manuelle.shp', zone), workspace/'data/restriction/'))
 
             # Traitement de la couche des mesures comensatoires
-            if reg == 'R91':
+            if reg == 'R91' and (globalData/'comp').exists():
                 compensation = QgsVectorLayer(str(globalData/'comp/MesuresCompensatoires_R91.shp'), 'compensation')
                 argList.append((clip(compensation, zone), workspace/'data/restriction/'))
 
@@ -1298,8 +1298,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             }
             processing.run('native:mergevectorlayers', params, feedback=feedback)
             del zonagesEnv
-
-
 
             # Traitement des autoroutes : bande de 100m de part et d'autre
             params = {
