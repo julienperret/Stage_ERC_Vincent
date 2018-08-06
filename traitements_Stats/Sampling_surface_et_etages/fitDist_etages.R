@@ -1,6 +1,9 @@
 library(ggplot2)
 library(dplyr)
 library(readr)
+library(fitdistrplus)
+library(actuar)
+
 
 
 setwd("/home/paulchapron/encadrement/repoJulienERC/erc/traitements_Stats/Sampling_surface_et_etages/")
@@ -178,8 +181,6 @@ write_csv(dPoidsNormExist,path = "poidsNormalises_parIRIS.csv")
 
 #########################################################
 
-library(fitdistrplus)
-library(actuar)
 
 
 dd <- dfniv %>% filter(CODE_IRIS==IRISvarious) 
@@ -236,9 +237,10 @@ logfitter <-  function(dd) {
 
 
 fitter <- function(dd, criterion ) {
-  #  "binom", "nbinom", "geom", "hyper" or "pois"
+  
+  
+  # distribution qui marchent sans paramètres supplementaires :#  "binom", "nbinom", "geom", "hyper" or "pois"
 
-  # celles qui marchent sans paramètres supplementaires
 
   poiss <- fitdist(dd$NB_NIV, discrete = T, "pois")
   negbin <- fitdist(dd$NB_NIV,
@@ -357,7 +359,7 @@ fittedDistGenerator <-  function(nEtagesMax, meilleureDist) {
 
 
 
-
+#dataframe vide pour stocker les resultats
 distribsResults <-  data.frame(
   CODE_IRIS = factor(),
   NB_NIV  = integer(),
@@ -442,13 +444,25 @@ write.csv(distribsResults, "distributionsEtagesFitted.csv")
 
 
 
+# on vérifie que la distribution somme à 1 ou presque  :
 
+ddd <-  read.csv("distributionsEtagesFitted.csv")
+#somme des poids par IRIS
+xx <- ddd %>% group_by(CODE_IRIS) %>% summarise(totProbAIC = sum(poidsFitAIC), totProbCHI2 = sum(poidsFitCHI2))
+## => le poifsFitAIC semble plus adapté puisque la la somme tend vers 1 (faudrait vérifier avec un statisticien )
+
+
+
+#########----------------------------------------------------------------
+#Pour un fit plus précis des distributions d'un IRIS, il faut regarder si les distributions fittées automatiquement s'approchent suffisament bien de la distribution observée , et le cas échéant , regarder pour quels valeurs d'étages la distribution fittée est insuffisante
+ ################################"
 
 
 #Exemple pourun IRIS dont on connait le code 
 
 
-dd <-  dfniv %>% filter(CODE_IRIS == 343270104)
+
+dd <-  dfniv %>% filter(CODE_IRIS == 340220101)
 
 
 meilleureDistAIC <- fitter(dd,"AIC")
@@ -465,9 +479,12 @@ cdfcomp(list(meilleureDistAIC, meilleureDistchipval))
 
 
 
+
+
+
 #### IRIS recalcitrant : impossible de fitter automatiquement 
 unique(dfniv$CODE_IRIS)
-ddd <- dfniv %>% filter(CODE_IRIS==343270104) 
+ddd <- dfniv %>% filter(CODE_IRIS==340220101) 
 qplot(ddd$NB_NIV)
 fitter(ddd, "chi2pval")
 warnings()
@@ -482,7 +499,7 @@ warnings()
 
 
 
-#celles qui marchent pas toutes seules ------------------------------------------------------------------------------------
+#Distributions candidates  qui ne marchent pas toutes seules ------------------------------------------------------------------------------------
 bin <-  fitdist(dd$NB_NIV, discrete = T , 
                 method = "mle",
                 start=list( size=100, prob= 0.75),
