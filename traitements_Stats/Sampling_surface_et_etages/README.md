@@ -6,18 +6,18 @@ Pour la zone étudiée , on dispose des données suivantes : par IRIS , et à un
 1. les surfaces construites
 2. le nombre d'étages des bâtiments
 
-Pour la simulation des constructions futures, il est pertinent de choisir le nombre d'étages et les surfaces construites de telle façons qu'elles soient relativement similaires aux constructions présentes, par IRIS.
+Pour la simulation des constructions futures, il est pertinent de choisir le nombre d'étages et les surfaces construites de telle façon qu'ils soient relativement similaires aux constructions présentes, par IRIS.
 
 
 Une méthode pour y arriver est de trouver le modèle des distributions observées, en sélectionnant parmi des modèles de distributions candidats, ceux qui "collent" le mieux aux données.
 
 C'est ce que propose la lib `fitdistrplus ` , qui propose de "fitter" (en français on dit "ajuster") une distribution observée, empirique, à des modèles de distribution (e.g. binomiale, lognormale, exponentielle, etc). Ces modèles sont paramétriques (e.g. pourune gaussienne : moyenne et écart type)
-La librairie  procède par optimisation des paramètres des modèles de distributions candidats, suivant une fonction qui évalue la qualité du fitting, la plupart du temps la vraisemblance (cf. MLE : Maximum Likelyhood Estimation)
+La librairie  procède par optimisation des paramètres des modèles de distributions candidats, suivant une fonction qui évalue la qualité du fitting, la plupart du temps la vraisemblance (cf. MLE : Maximum Likelihood Estimation)
 
 
-La qualité de l' ajustement / le degré de confiance dans le fitting est évaluée par plusieurs indicateurs, ce qui nous permettra de sélectionner automatiquement le meilleur candidat. Comme il n'y a pas d'indicateur absolu de la qualité d'un fit, nous pourrons proposer plusieurs distributions candidates, et il faudra trancher.
+La qualité de l' ajustement / le degré de confiance dans le fitting est évaluée par plusieurs indicateurs, ce qui nous permettra de sélectionner automatiquement, pour chacun de ceux-ci  le meilleur candidat. Comme il n'y a pas d'indicateur absolu de la qualité d'un fit, nous pourrons proposer plusieurs distributions candidates, et il faudra trancher.
 
-**N.B.** Avoir le meilleur score dans les indicateurs de fitting ne signifie pas forcément que le modèle de distribution est le plus adapté. Au cas par cas il faudrait observer l'allure des distributions observées et modélisées pour valider qualitativement le modèle (notamment en cas de distributions multi-modales, souvent observées dans les distributions d'étages,  que l'on modélise par une distribution unimodale ,  et donc forcément imprécise, faute d'avoir trouvé une façon simple et automatique de fitter une telle distribution par un modèle mixte de distribution du genre a * D1 + b* D2)
+**N.B.** Avoir le meilleur score dans les indicateurs de fitting ne signifie pas forcément que le modèle de distribution est le plus adapté. Au cas par cas il faudrait observer l'allure des distributions observées et modélisées pour valider qualitativement le modèle (notamment en cas de distributions multi-modales, souvent observées dans les distributions d'étages,  qu'ici l'on modélise par une distribution unimodale ,  et donc forcément imprécise, faute d'avoir trouvé une façon simple et automatique de fitter une telle distribution par un modèle mixte de distribution du genre a * D1 + b* D2)
 
 Pour un IRIS particulier dont le fitting poserait problème, on pourra utiliser les graphiques de comparaisons de distributions observée/simulée : PP plot , QQplot , et comparaisons des distributions cumulées. (cf. l'exemple dans le code R, utilisant la fonction `cdfcomp` )
 
@@ -59,14 +59,14 @@ On sacrifie donc la qualité à la quantité et à la vitesse. Le capitalisme se
 ## Pourquoi ajuster et pas simplement échantillonner dans la distribution observée ? 
 
 
-Les distributions observées comportent des "trous": toutes les valeurs possibles ne sont pas présente dans la distribution observées . 
+Les distributions observées comportent des "trous": toutes les valeurs possibles ne sont pas présente dans la distribution observée. 
 Par exemple pour les étages d'un IRIS, on peut trouver des bâtiments de 1,2,3,4 étages puis de 8,9 ou 10 étages. 
 
 
 Si on échantillonne les futures bâtiments dans la distribution observée, il sera impossible de tirer un nombre d'étages de 5,6,7 ou 8, car les probabilités associées à ces scores dans la distribution observée sont nulles. 
 
 
-Trouver un modèle de distribution, c'est s'assurer d'obtenir une distribution définie en tout point (pour toutes les valeurs de nombre d'étages), ou chaque valeur pourra avoir une chance d'être tirée lors de l'échantillonNage.
+Trouver un modèle de distribution, c'est s'assurer d'obtenir une distribution définie en tout point (pour toutes les valeurs de nombre d'étages), ou chaque valeur pourra avoir une chance d'être tirée lors de l'échantillonnage.
 
 
 ## Étages : fitting d'une distribution discrète
@@ -85,7 +85,7 @@ Il y a moins de modèles candidats, et le fait qu'on observe beaucoup de distrib
 
 *Output* : 
 * les dessins ggplot 
-* le fichier `poidsNormalises_parIRIS.csv` qui contient la distribution observée du nombre d'étages et les probas associées (obsolète puisque qu'on ajuste les distributions) 
+* le fichier `poidsNormalises_parIRIS.csv` qui contient la distribution observée du nombre d'étages et les probas associées (obsolète puisque qu'on fitte désormais les distributions d'étages observées) 
 * le fichier `distributionsEtagesFitted.csv`, qui contient , pour chaque IRIS, les distributions de probabilités des distributions qu'on a fittées de chaque valeurs de nombre d'étages: 
 
 Format du fichier `distributionsEtagesFitted.csv`: 
@@ -126,13 +126,13 @@ Lors de l'éxécution du code, il y a beaucoup de messages d'erreurs lorsque l'o
 
 
 L'ajustement des modèles de distributions continues est plus aisé (il y aussi plus de candidats possibles ), mais plus long en temps de calcul (approx 2h mono coeur pour les 160 IRIS)
-Avec un peu de bidouille fonctionnelle et de parallélisation on peut faire beaucoup mieux, j'ai pas pris le temps de le faire.
+Avec un peu de bidouille fonctionnelle et de parallélisation on peut faire beaucoup mieux, mais je n 'ai pas pris le temps de le faire.
 
 
 ### Code et Fichiers
 
 
-`fitDistSurface.R` affiche quelques distributions des surfaces et réalise l'ajustement des modèles de distribution selon 3 méthodes d'optimisation (MQE demande des apramètres que je ne peux pas fournir automatiquement pour le moment) :
+`fitDistSurface.R` affiche quelques distributions des surfaces et réalise l'ajustement des modèles de distribution selon 3 méthodes d'optimisation (MQE demande des paramètres que je ne peux pas fournir automatiquement pour le moment) :
 
 
 
@@ -141,7 +141,7 @@ Avec un peu de bidouille fonctionnelle et de parallélisation on peut faire beau
  * méthode de minimisation d’une statistique d’ajustement (MGE )
 
 
-et 10 modèles candidats :
+et 9 modèles candidats :
 
  * distribution  gamma
  * distribution normale 
@@ -159,7 +159,7 @@ la qualité de l'ajustement (goodness of fit) est obtenu par la fonction `gofsta
 
 
 * Aikake Information Criterion (tient compte de la complexité du modèle et favorise les modèles parcimonieux)
-* Kolmogorov Smirnov : ghenre de distance entre distribution (basée sur l'entropie, avec un nom de vodka, donc forcément cool)
+* Kolmogorov Smirnov : genre de distance entre distribution (basée sur l'entropie, avec un nom de vodka, donc forcément cool)
 * CVM : Cramér-von Mises , aucune idée , mais les auteurs du packages disent que c'est bien 
 * AD :  Anderson-Darling , idem , inconnue
 
@@ -207,6 +207,11 @@ Exemple de contenu du fichier `poidsSurface_fittes_by_IRIS.csv`
 |24     |24 |    470| 1.000532e-04 |1.000532e-04 |8.992722e-05 |8.992722e-05 |340570104|
 
 
+* CODE_IRIS : code de l'IRIS 
+* dBestAIC : poids obtenus avec la meilleure distribution candidate selon le critère AD
+* dBestKS : idem avec Kolmogorov Smirnov
+* dBestCVM : Cramér-von Mises
+* dBestAD : Anderson-Darling 	
 
 # Perspectives
 
