@@ -66,7 +66,7 @@ Par exemple pour les étages d'un IRIS, on peut trouver des bâtiments de 1,2,3,
 Si on échantillonne les futures bâtiments dans la distribution observée, il sera impossible de tirer un nombre d'étages de 5,6,7 ou 8, car les probabilités associées à ces scores dans la distribution observée sont nulles. 
 
 
-Trouver un modèle de distribution, c'est s'assurer d'obtenir une distribution continue, ou chaque valeur pourra avoir une chance d'être tirée lors de l'échantillonNage.
+Trouver un modèle de distribution, c'est s'assurer d'obtenir une distribution définie en tout point (pour toutes les valeurs de nombre d'étages), ou chaque valeur pourra avoir une chance d'être tirée lors de l'échantillonNage.
 
 
 ## Étages : fitting d'une distribution discrète
