@@ -4,8 +4,7 @@ library(readr)
 library(fitdistrplus)
 library(actuar)
 
-setwd("/home/paulchapron/encadrement/Stage_ERC_Vincent/traitements_Stats/")
-
+setwd("/home/paulchapron/encadrement/repoJulienERC/erc//traitements_Stats/Sampling_surface_et_etages/")
 
 df <-  read_csv("surface_sol.csv")
 
@@ -348,9 +347,35 @@ for (c in unique(df$CODE_IRIS)) {
 
 getwd()
 write.csv(distribsResults, "poidsSurface_fittes_by_IRIS.csv")
+dd <-  read.csv("poidsSurface_fittes_by_IRIS.csv")
+
+
+
+
+
+
+## on vérfie si ça somme à 1 
+
+xx <- dd %>% group_by(CODE_IRIS) %>% summarise(totProbAIC = sum(dBestAIC), totProbAD = sum(dBestAD), totProbCVM= sum(dBestCVM), totProbKS=sum(dBestKS))
 
 
 names(distribsResults) <-  bckupNames
+
+
+
+###### pour un IRIS particulier 
+
+
+
+riri <-  df %>% filter(CODE_IRIS == 340220101)
+
+
+mod  <- fitter(,"AIC")
+meilleureDistchipval <- fitter(dd,"chi2pval")
+
+
+meilleureDistAIC
+meilleureDistchipval
 
 
 
