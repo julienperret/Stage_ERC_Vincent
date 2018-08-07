@@ -170,6 +170,12 @@ la fonction `fitter` retourne les meilleurs candidats, la fonction `fittedDistge
 
 
 
+**input** : le fichier des surfaces observées par IRIS 
+
+**output** : le fichier `poidsSurface_fittes_by_IRIS.csv` qui donne les poids par surfaces, tous les 20m²
+
+
+
 Exemple de contenu du fichier `poidsSurface_fittes_by_IRIS.csv`
 
 
