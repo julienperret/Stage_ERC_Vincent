@@ -1,7 +1,7 @@
-#Fitting des distributions d'étages et de surfaces
+# Fitting des distributions d'étages et de surfaces
 
 
-Pour al zone étudiée , on dispose des données suivantes : par IRIS , et à une certaine date (2012 ? ) on connaît : 
+Pour la zone étudiée , on dispose des données suivantes : par IRIS , et à une certaine date (2012 ? ) on connaît : 
 
 1. les surfaces construites
 2. le nombre d'étages des bâtiments
@@ -17,7 +17,7 @@ La librairie  procède par optimisation des paramètres des modèles de distribu
 
 La qualité de l' ajustement / le degré de confiance dans le fitting est évaluée par plusieurs indicateurs, ce qui nous permettra de sélectionner automatiquement le meilleur candidat. Comme il n'y a pas d'indicateur absolu de la qualité d'un fit, nous pourrons proposer plusieurs distributions candidates, et il faudra trancher.
 
-*N.B.* Avoir le meilleur score dans les indicateurs de fitting ne signifie pas forcément que le modèle de distribution est le plus adapté. Au cas par cas il faudrait observer l'allure des distributions observées et modélisées pour valider qualitativement le modèle (notamment en cas de distributions multi-modales, souvent observées dans les distributions d'étages,  que l'on modélise par une distribution unimodale ,  et donc forcément imprécise, faute d'avoir trouvé une façon simple et automatique de fitter une telle distribution par un modèle mixte de distribution du genre a * D1 + b* D2)
+**N.B.** Avoir le meilleur score dans les indicateurs de fitting ne signifie pas forcément que le modèle de distribution est le plus adapté. Au cas par cas il faudrait observer l'allure des distributions observées et modélisées pour valider qualitativement le modèle (notamment en cas de distributions multi-modales, souvent observées dans les distributions d'étages,  que l'on modélise par une distribution unimodale ,  et donc forcément imprécise, faute d'avoir trouvé une façon simple et automatique de fitter une telle distribution par un modèle mixte de distribution du genre a * D1 + b* D2)
 
 Pour un IRIS particulier dont le fitting poserait problème, on pourra utiliser les graphiques de comparaisons de distributions observée/simulée : PP plot , QQplot , et comparaisons des distributions cumulées. (cf. l'exemple dans le code R, utilisant la fonction `cdfcomp` )
 
@@ -115,7 +115,7 @@ Les modèles de distributions candidats sont : logarithmique, géométrique, Poi
 
 Lors de l'éxécution du code, il y a beaucoup de messages d'erreurs lorsque l'optimisation échoue à produire un candidat non nul, il faut pas s'en inquiéter , on vérifie à la fin de l'algo qu'il y a bien un modèle pour chaque IRIS.
 
-*N.B.* un IRIS est particulièrement récalcitrant car aucun modèle de distribution ne fitte dessus. Dans ce cas particulier , on met la distribution observée , celles des effectifs à la place.
+**N.B.** un IRIS est particulièrement récalcitrant car aucun modèle de distribution ne fitte dessus. Dans ce cas particulier , on met la distribution observée , celles des effectifs à la place.
 
 
 
@@ -129,7 +129,7 @@ L'ajustement des modèles de distributions continues est plus aisé (plus de can
 Avec un peu de bidouille fonctionnelle et de parallélisation on peut faire beaucoup mieux, j'ai pas pris le temps de le faire.
 
 
-###Code et Fichiers
+### Code et Fichiers
 
 
 `fitDistSurface.R` affiche quelques distributions des surfaces et réalise l'ajustement des modèles de distribution selon 3 méthodes d'optimisation (MQE demande des apramètres que je ne peux pas fournir automatiquement pour le moment) :
@@ -166,7 +166,7 @@ la qualité de l'ajustement (goodness of fit) est obtenu par la fonction `gofsta
 
 Il y a deuxs fonctions et une boucle principale 
 
-la fonction `fitter` retourne les meilleurs candidats, la fonction `fittedDistgenerator` génère une distribution pour les surface de 10 m& à la surface maximale de l'IRIS, par tranches de 20m² . Le maximum et la taille de la tranche pour la distribution générée sont ajustables.
+la fonction `fitter` retourne les meilleurs candidats, la fonction `fittedDistgenerator` génère une distribution pour les surface de 10 m² à la surface maximale de l'IRIS, par tranches de 20m² . Le maximum et la taille de la tranche pour la distribution générée sont ajustables.
 
 
 
