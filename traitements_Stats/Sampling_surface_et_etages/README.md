@@ -74,7 +74,7 @@ Trouver un modèle de distribution, c'est s'assurer d'obtenir une distribution d
 
 
 Fitter une distribution discrète est plus compliquée que fitter une distribution continue. 
-Il y a moins de modèles candidats, et le fait qu'on observe beaucoup de distribution bi-modales (un groupe en 1 et 3-4 étages pour le résidentiel individuel, et un groupe de 7+ étages pour les barres et les résidences)
+Il y a moins de modèles candidats, et le fait qu'on observe beaucoup de distribution bi-modales (un groupe en 1 et 3-4 étages pour le résidentiel individuel, et un groupe de 7+ étages pour les barres et les résidences) complique la tâche 
 
 
 ### Code et fichiers
