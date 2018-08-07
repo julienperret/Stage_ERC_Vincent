@@ -100,22 +100,22 @@ Format du fichier `distributionsEtagesFitted.csv`:
 |6       |6 |340570104|      6 |  1 |4.198986e-04| 1.850896e-02|
 
 
-*X* :  numérode la ligne , inutile
-*CODE_IRIS* : le code de l'IRIS (si si) 
-*NB_NIV* : le nombre d'étages
-*n* : l'effectif dans l'IRIS de NB_NIV, le nombre de bâtiments de cette hauteur 
-*poidsFitAIC* : la distribution optimale selon le critère AIC 
-* poidsFitCHI2* : la distribution optimale suivant la statistique du Chi² 
+* *X* :  numérode la ligne , inutile
+* *CODE_IRIS* : le code de l'IRIS (si si) 
+* *NB_NIV* : le nombre d'étages
+* *n* : l'effectif dans l'IRIS de NB_NIV, le nombre de bâtiments de cette hauteur 
+* *poidsFitAIC* : la distribution optimale selon le critère AIC 
+* *poidsFitCHI2* : la distribution optimale suivant la statistique du Chi² 
 
 
 
 
-Les modèles de distributions candidats sont : logarithmique, géométrique, Poisson, zero-truncated Poisson , zero-truncated géométrique, négative binomialee
+Les modèles de distributions candidats sont : logarithmique, géométrique, Poisson, zero-truncated Poisson , zero-truncated géométrique, négative binomiale
 
 
-Lors de l'éxécution du code, il y a beaucoup de messages d'erreurs lorsque l'optimisation échoue à produire un candidat non nul, il faut pas s'en inquiéter , on vérifie à la fin de l'algo qu'il y a bien un modèle pour chaque IRIS.
+Lors de l'éxécution du code, il y a beaucoup de messages d'erreurs lorsque l'optimisation échoue à produire un candidat non nul, ou quand le paramétrage par défaut ne suffit pas, il faut pas s'en inquiéter , on vérifie à la fin de l'algo qu'il y a bien un modèle pour chaque IRIS.
 
-**N.B.** un IRIS est particulièrement récalcitrant car aucun modèle de distribution ne fitte dessus. Dans ce cas particulier , on met la distribution observée , celles des effectifs à la place.
+**N.B.** un IRIS est particulièrement récalcitrant car aucun modèle de distribution ne fitte dessus. Dans ce cas particulier , on met la distribution observée , celles des effectifs à la place. Il est detecté dans le code.
 
 
 
