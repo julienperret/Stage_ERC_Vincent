@@ -294,9 +294,6 @@ fittedDistSurfGenerator <-  function(surfmax, distribModels, surfaceBinwidth) {
 
 
 
-models <-  fitter(dd = dd)
-
-fittedDistr <-  fittedDistSurfGenerator(max(dd$SURFACE_SOL), distribModels = models, surfaceBinwidth = 20)
 
 
 
@@ -368,10 +365,12 @@ names(distribsResults) <-  bckupNames
 
 
 riri <-  df %>% filter(CODE_IRIS == 340220101)
+mods  <- fitter(dd = riri)
+#dessin comparant les distribs fittées et la distrib observée
+cdfcomp(mods)
 
 
-mod  <- fitter(,"AIC")
-meilleureDistchipval <- fitter(dd,"chi2pval")
+
 
 
 meilleureDistAIC

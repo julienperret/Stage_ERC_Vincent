@@ -155,7 +155,7 @@ et 10 modèles candidats :
 
 
 
-la qualité de l'ajustement (goodness of fit) est obtenu par la fonction `gofstat` et on retient 4 indicateur de la qualité de cet ajustement , dont on cherche le minimum :
+la qualité de l'ajustement (goodness of fit) est obtenu par la fonction `gofstat` et on retient 4 indicateurs de la qualité de cet ajustement , dont on cherche le minimum :
 
 
 * Aikake Information Criterion (tient compte de la complexité du modèle et favorise les modèles parcimonieux)
