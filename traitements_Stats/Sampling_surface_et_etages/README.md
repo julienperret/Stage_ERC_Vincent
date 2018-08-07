@@ -86,7 +86,7 @@ Il y a moins de modèles candidats, et le fait qu'on observe beaucoup de distrib
 *Output* : 
 * les dessins ggplot 
 * le fichier `poidsNormalises_parIRIS.csv` qui contient la distribution observée du nombre d'étages et les probas associées (obsolète puisque qu'on ajuste les distributions) 
-* le fichier `distributionsEtagesFitted.csv`, qui contient , pour chaque IRIS, les distributions de probabilités de chaque valeurs de nombre d'étages: 
+* le fichier `distributionsEtagesFitted.csv`, qui contient , pour chaque IRIS, les distributions de probabilités des distributions qu'on a fittées de chaque valeurs de nombre d'étages: 
 
 Format du fichier `distributionsEtagesFitted.csv`: 
 
