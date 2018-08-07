@@ -125,7 +125,7 @@ Lors de l'éxécution du code, il y a beaucoup de messages d'erreurs lorsque l'o
 
 
 
-L'ajustement des modèles de distributions continues est plus aisé (plus de candidats), mais plus long en temps de calcul (approx 2h mono coeur pour les 160 IRIS)
+L'ajustement des modèles de distributions continues est plus aisé (il y aussi plus de candidats possibles ), mais plus long en temps de calcul (approx 2h mono coeur pour les 160 IRIS)
 Avec un peu de bidouille fonctionnelle et de parallélisation on peut faire beaucoup mieux, j'ai pas pris le temps de le faire.
 
 
