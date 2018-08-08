@@ -163,7 +163,7 @@ def expand(row, col):
                 urb[row][col] = 1
     return ss
 
-# Pour urbaniser verticalement à partir d'une surface au sol donnée et d'un nombre de niveaux tirés aléatoirement entre 1 et le nbNiv max par IRIS
+# Pour urbaniser verticalement à partir d'une surface au sol donnée et d'un nombre de niveaux tiré aléatoirement entre 1 et le nbNiv max par IRIS
 def build(ss, row, col):
     sp = 0
     nivMin = 1
@@ -286,7 +286,7 @@ srfCell = pixSize * pixSize
 ds = None
 del anyRaster
 
-projectStr = str(pixSize) + 'm' + '_tx' + str(growth) + '_' + scenario + '_buildRatio' + str(maxBuiltRatio)
+projectStr = '%im_tx%s_%s_buildRatio%i_winSize%i_minContig%s_maxContig%s'%(pixSize, str(growth), scenario, maxBuiltRatio, winSize, str(minContig), str(maxContig))
 if pluPriority:
     projectStr += '_pluPrio'
 if buildNonRes:
@@ -303,12 +303,16 @@ project = outputDir/projectStr
 
 if project.exists():
     rmtree(str(project))
-os.makedirs(str(project/'output'))
-os.mkdir(str(project/'snapshots'))
-os.mkdir(str(project/'snapshots/demographie'))
-os.mkdir(str(project/'snapshots/urbanisation'))
-os.mkdir(str(project/'snapshots/surface_sol'))
-os.mkdir(str(project/'snapshots/surface_plancher'))
+mkdirList = [
+    'output',
+    'snapshots',
+    'snapshots/demographie',
+    'snapshots/urbanisation',
+    'snapshots/surface_sol',
+    'snapshots/surface_plancher'
+]
+for d in mkdirList:
+    os.makedirs(str(project/d))
 
 with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('w') as mesures:
     try:
