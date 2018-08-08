@@ -54,6 +54,8 @@ if len(sys.argv) == 5:
             maxContig = float(arg.split('=')[1])
         elif 'writingTifs' in arg:
             writingTifs = literal_eval(arg.split('=')[1])
+        elif 'writingSnapshots' in arg:
+            writingSnapshots = literal_eval(arg.split('=')[1])
 
 # *** Paramètres pour openMole
 elif len(sys.argv) > 5:
@@ -103,6 +105,8 @@ if 'maxContig' not in globals():
     maxContig = 0.8
 if 'writingTifs' not in globals():
     writingTifs = True
+if 'writingSnapshots' not in globals():
+    writingSnapshots = True
 
 # Contrôle des paramètres
 if growth > 3:
@@ -305,16 +309,18 @@ project = outputDir/projectStr
 
 if project.exists():
     rmtree(str(project))
-mkdirList = [
-    'output',
-    'snapshots',
-    'snapshots/demographie',
-    'snapshots/urbanisation',
-    'snapshots/surface_sol',
-    'snapshots/surface_plancher'
-]
-for d in mkdirList:
-    os.makedirs(str(project/d))
+os.makedirs(str(project/'output'))
+
+if writingTifs and writingSnapshots:
+    mkdirList = [
+        'snapshots',
+        'snapshots/demographie',
+        'snapshots/urbanisation',
+        'snapshots/surface_sol',
+        'snapshots/surface_plancher'
+    ]
+    for d in mkdirList:
+        os.mkdir(str(project/d))
 
 with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('w') as mesures:
     try:
@@ -469,7 +475,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             preLogee = -restePop
 
             # Snapshots
-            if writingTifs:
+            if writingTifs and writingSnapshots:
                 to_tif(demographie, 'uint16', proj, geot, project/('snapshots/demographie/demo_' + str(year) + '.tif'))
                 to_tif(urb, 'byte', proj, geot, project/('snapshots/urbanisation/urb_' + str(year) + '.tif'))
                 to_tif(srfSol, 'uint16', proj, geot, project/('snapshots/surface_sol/sol_' + str(year) + '.tif'))
