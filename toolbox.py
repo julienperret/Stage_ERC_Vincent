@@ -7,11 +7,11 @@ from multiprocessing import Process
 
 # Pour affichage dynamique de la progression
 def printer(string):
-	if sys.platform == 'linux':
-		sys.stdout.write("\r\x1b[K" + string)
-	elif sys.platform == 'win32':
-		sys.stdout.write("\r" + string)
-	sys.stdout.flush()
+    if sys.platform == 'win32':
+        sys.stdout.write("\r" + string)
+    else :
+        sys.stdout.write("\r\x1b[K" + string)
+    sys.stdout.flush()
 
 def getDone(function, argList):
 	nbCores = os.cpu_count()
