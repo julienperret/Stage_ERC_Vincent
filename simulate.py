@@ -52,6 +52,8 @@ if len(sys.argv) == 5:
             minContig = float(arg.split('=')[1])
         elif 'maxContig' in arg:
             maxContig = float(arg.split('=')[1])
+        elif 'writingTifs' in arg:
+            writingTifs = literal_eval(arg.split('=')[1])
 
 # *** Paramètres pour openMole
 elif len(sys.argv) > 5:
@@ -521,7 +523,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         mesures.write("Cells open to urbanisation, " + str(expansion.sum()) + "\n")
         mesures.write("Average artificialisation rate, " + str(txArtifMoyen) + "\n")
         mesures.write("Cumulated environnemental impact, " + str(int(impactEnv)) + "\n")
-        print("Cumulated environnemental impact = " + str(int(impactEnv)) + "\n")
+        #print("Cumulated environnemental impact = " + str(int(impactEnv)) + "\n")
         log.write("Unbuilt area: " + str(nonBuilt) + '\n')
         log.write("Population not put up: " + str(nonLogee) + '\n')
         log.write("Population put up: " + str(popNouvCount) + '\n')
