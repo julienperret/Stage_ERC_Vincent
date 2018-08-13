@@ -1,7 +1,7 @@
 library(parallel)
-
+library(readr)
 # Calculate the number of cores
-no_cores <- detectCores() - 4
+no_cores <- detectCores() - 2
 
 # Initiate cluster
 cl <- makeCluster(no_cores)
@@ -9,12 +9,14 @@ cl <- makeCluster(no_cores)
 
 
 
-setwd("~/encadrement/repoJulien/erc/traitements_Stats/Direct_Sampling_Analysis/")
+setwd("~/encadrement/repoJulienERC/erc/traitements_Stats/Direct_Sampling_Analysis/")
+# setwd("~/encadrement/repoJulien/erc/traitements_Stats/Direct_Sampling_Analysis/")
+
 #setwd("~/.openmole/zangdar/webui/projects/erc/results")
 
 
 ## pour aggréger les fichiers de simus individuelles
-files <-  list.files("./resExtrait/", pattern = "mesures.csv", recursive = T, include.dirs = T, full.names = T)
+files <-  list.files("./tempResSampling/", pattern = "mesures.csv", recursive = T, include.dirs = T, full.names = T)
 length(files)
 
 ## préparation du tableau final params + mesures
@@ -46,7 +48,7 @@ namesbckup <-  names(dd)
 
 
 extractLine <-  function(fifi){
-  dfbrut <-  read.csv(fifi, header = F)
+  dfbrut <-  read.csv(fifi, header=F)
 
   namesMesures <- dfbrut$V1
   
@@ -95,14 +97,25 @@ extractLine <-  function(fifi){
     
 }
 
-lili <-  head(files, 279600)
+lili1sur2 <-  head(files, 431500 / 2 )
+lili2sur2 <-  tail(files, 431500 / 2 )
+
+
+
 
 start_time <- Sys.time()
-ww <-  sapply(lili, FUN = extractLine)
-write.csv(t(ww), "simudataframe.csv")
+ww <-  sapply(lili1sur2, FUN = extractLine)
+write.csv(t(ww), "simudataframe1sur2.csv")
 end_time <- Sys.time()
-
 cat(end_time -start_time)
+
+
+start_time <- Sys.time()
+ww <-  sapply(lili2sur2, FUN = extractLine)
+write.csv(t(ww), "simudataframe2sur2.csv")
+end_time <- Sys.time()
+cat(end_time -start_time)
+
 
 
 stopCluster(cl)
