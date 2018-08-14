@@ -60,7 +60,7 @@ def writeHeaders(prefix, dep, tab):
         for field in modelSorted[tab]:
             i += 1
             lgr = model[tab][field][2]
-            h += '"' + field + '" varchar(' + str(lgr) + ')'
+            h += '"' + field.lower() + '" varchar(' + str(lgr) + ')'
             if i < len(modelSorted[tab]):
                 h += ','
             else:

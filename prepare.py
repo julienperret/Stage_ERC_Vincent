@@ -452,7 +452,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
         dicBuilds[feat.attribute('CODE_IRIS')][feat.attribute('ID')] = feat.attribute('planch') / dicSumBuilds[feat.attribute('CODE_IRIS')]
         dicWeightedPop[feat.attribute('CODE_IRIS')][feat.attribute('ID')] = 0
 
-    with (outdir/'pop_bati.csv').open('w') as w:
+    with (outdir/'csv/pop_bati_pkey.csv').open('w') as w:
         w.write('pkey_iris, pop\n')
         for quartier, builds in dicBuilds.items():
             keyList = list(builds.keys())
@@ -475,9 +475,9 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
             for idBati, value in dicWeightedPop[quartier].items():
                 w.write(quartier + idBati + ',' + str(value) + '\n')
 
-    popCsv = QgsVectorLayer(str(outdir/'pop_bati.csv'))
-    popCsv.addExpressionField('to_int("pop")', QgsField('pop_bati', QVariant.Int))
-    join(buildings, 'pkey_iris', popCsv, 'pkey_iris', ['pop'])
+    csvPop = QgsVectorLayer(str(outdir/'csv/pop_bati_pkey.csv'))
+    csvPop.addExpressionField('to_int("pop")', QgsField('pop_bati', QVariant.Int))
+    join(buildings, 'pkey_iris', csvPop, 'pkey_iris', ['pop'])
 
     dicPop = {}
     dicBuilds = {}
@@ -488,7 +488,7 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     params = {
         'INPUT': buildings,
         'OVERLAY': grid,
-        'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV', 'CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS',
+        'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV', 'CODE_IRIS', 'ID_IRIS', 'NOM_IRIS', 'TYP_IRIS',
                           'POP14', 'TXRP14', 'area_i', 'planch', 'pkey_iris', 'pop_bati'],
         'OVERLAY_FIELDS': ['id'],
         'OUTPUT': 'memory:bati_inter_grid'
@@ -529,15 +529,15 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
                 gid = keyList[i]
                 dicWeightedPop[build][gid] += 1
 
-    with (outdir/'pop_grid.csv').open('w') as w:
+    with (outdir/'csv/pop_grid_pkey.csv').open('w') as w:
         w.write('pkey_grid, pop\n')
         for build, parts in dicWeightedPop.items():
             for gid, pop in parts.items():
                 w.write(build + str(gid) + ', ' + str(pop) + '\n')
 
-    popCsv = QgsVectorLayer(str(outdir/'pop_grid.csv'))
-    popCsv.addExpressionField('to_int("pop")', QgsField('pop_g', QVariant.Int))
-    join(buildings, 'pkey_grid', popCsv, 'pkey_grid', ['pop'])
+    csvPop = QgsVectorLayer(str(outdir/'csv/pop_grid_pkey.csv'))
+    csvPop.addExpressionField('to_int("pop")', QgsField('pop_g', QVariant.Int))
+    join(buildings, 'pkey_grid', csvPop, 'pkey_grid', ['pop'])
     expr = ' "planch_g" / "pop_g" '
     buildings.addExpressionField(expr, QgsField('nb_m2_hab', QVariant.Double))
 
@@ -583,6 +583,28 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
         'OUTPUT': str(outdir/'csv/iris_nb_niv.csv')
     }
     processing.run('qgis:statisticsbycategories', params, feedback=feedback)
+
+    # Création des CSV de distribution des étages et surface au sol, utilisés pour le fitting avec R
+    dicFloors, dicAreas = {}, {}
+    for i in iris.getFeatures():
+        id = str(i.attribute('ID_IRIS'))
+        dicFloors[id] = []
+        dicAreas[id] = []
+
+    for feat in buildings.getFeatures():
+        id = str(feat.attribute('ID_IRIS'))
+        dicAreas[id].append(feat.attribute('area_g'))
+        dicFloors[id].append(feat.attribute('NB_NIV'))
+
+    with (outdir/'distrib_floors.csv').open('w') as csvFloors, (outdir/'distrib_areas.csv').open('w') as csvAreas:
+        csvAreas.write('ID_IRIS, AREA\n')
+        csvFloors.write('ID_IRIS, FLOOR\n')
+        for id, values in dicAreas.items():
+            for area in values:
+                csvAreas.write(id + ', ' + str(area) + '\n')
+        for id, values in dicFloors.items():
+            for niv in values:
+                csvFloors.write(id + ', ' + str(niv) + '\n')
 
     to_shp(buildings, outdir/'bati_inter_grid.shp')
     del buildings, res
@@ -672,7 +694,6 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
     iris.addExpressionField('round(' + expr + ')', QgsField('ssol_14', QVariant.Int))
 
     iris.addExpressionField('"ssr_sum" / "ssol_14"', QgsField('tx_ssr', QVariant.Double))
-    iris.addExpressionField('$id + 1', QgsField('ID', QVariant.Int, len=4))
 
     params = {
         'INPUT': grid,
@@ -1441,15 +1462,18 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             # Intersection du bâti résidentiel avec les quartiers IRIS
             bati_clean = QgsVectorLayer(str(workspace/'data/2014_bati/bati_clean.shp'))
             bati_clean.dataProvider().createSpatialIndex()
+            iris = QgsVectorLayer(str(workspace/'data/iris.shp'), 'iris')
+            iris.addExpressionField('$id + 1', QgsField('ID_IRIS', QVariant.Int, len=4))
             params = {
                 'INPUT': str(workspace/'data/2014_bati/bati_clean.shp'),
-                'OVERLAY': str(workspace/'data/iris.shp'),
+                'OVERLAY': iris,
                 'INPUT_FIELDS': ['ID', 'HAUTEUR', 'NB_NIV'],
-                'OVERLAY_FIELDS': ['CODE_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14', 'TXRP14'],
+                'OVERLAY_FIELDS': ['CODE_IRIS', 'ID_IRIS', 'NOM_IRIS', 'TYP_IRIS', 'POP14', 'TXRP14'],
                 'OUTPUT': str(workspace/'data/2014_bati/bati_inter_iris.shp')
             }
             processing.run('native:intersection', params, feedback=feedback)
             log.write(getTime(start_time) + '\n')
+            del iris
 
         if not (workspace/'data'/pixResStr).exists():
             mkdirList = [
@@ -1499,6 +1523,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             grid.dataProvider().createSpatialIndex()
             iris = QgsVectorLayer(str(workspace/'data/iris.shp'))
             iris.dataProvider().createSpatialIndex()
+            iris.addExpressionField('$id + 1', QgsField('ID_IRIS', QVariant.Int, len=4))
 
             buildStatDic = {
                 'indif': workspace/'data/2014_bati/bati_indifferencie.shp',
@@ -1719,14 +1744,16 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         os.mkdir(str(project/'interet'))
         # Rasterisations
         argList = [
-            (workspace/'data'/pixResStr/'stat_grid.shp', project/'demographie.tif', 'UInt16', 'pop'),
-            (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_pla.tif', 'UInt32', 'srf_pla'),
-            (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_sol_res.tif', 'UInt16', 'ssol_res'),
-            (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_sol.tif', 'UInt16', 'ssol_14'),
+            (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_id.tif', 'UInt8', 'ID_IRIS'),
             (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_ssr_med.tif', 'UInt16', 'ssr_med'),
             (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_tx_ssr.tif', 'Float32', 'tx_ssr'),
             (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_m2_hab.tif', 'UInt16', 'm2_hab'),
             (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_nbniv_max.tif', 'UInt16', 'nbniv_max'),
+            (workspace/'data'/pixResStr/'stat_grid.shp', project/'demographie.tif', 'UInt16', 'pop'),
+            (workspace/'data'/pixResStr/'stat_grid.shp', project/'demographie.tif', 'UInt16', 'pop'),
+            (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_pla.tif', 'UInt32', 'srf_pla'),
+            (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_sol_res.tif', 'UInt16', 'ssol_res'),
+            (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_sol.tif', 'UInt16', 'ssol_14'),
             (workspace/'data/ocsol.shp', project/'classes_ocsol.tif', 'UInt16', 'code_orig')
         ]
         if (workspace/'data/plu.shp').exists():
