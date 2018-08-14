@@ -1,0 +1,334 @@
+---
+title: "Analyse des resultats de simulations , sampling régulier"
+author: "TeamERCVincent"
+date: "14 août 2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+```
+
+## Données
+Les données visualisées ici proviennent d'un Echantillonage régulier de l'espace d'entrée du modèle de simulation, dont voici les domaines de variations:
+
+
+
+
+
+* `taux` varie de 0.5 à  1.5 par pas de  0.5
+* `scenario` est toujours égal à 0.0 (tendanciel)
+* `pluPriority` est toujours égal à TRUE
+* `densifyGround` est toujours égal à TRUE
+* `densifyOld` est toujours égal à TRUE
+* `maximumDensity` est toujours égal à TRUE
+* `maxBuiltRatio` varie de 50.0 à  90.0 par pas de 20.0))  x
+* `buildNonRes` vaux alternativement TRUE et FALSE 
+* `maxBuiltRation` varie de 50 à 90 (%) par pas de 20
+* `winSize` vaut alternativement 3.0 et 5.0
+* `minContig` varie de 0.0 à 0.3 par pas de 0.1
+* `maxContig` varie de 0.6 à 1.0 par pas de 0.1
+* `seed` varie énormément , mais on s'en fiche , il fait office d'identifiant pour les réplications
+* `sirene` vaut 0, 1 ou 3
+* `ocsol` vaut 0, 1 ou 3 
+* `transport` vaut 0, 1 ou 3 
+* `routes` vaut 0, 1 ou 3 
+* `ecologie` vaut 0, 1 ou 3 
+
+
+C'est unplan d'expérience relativement gros , qui tourne encore à l'heure actuelle (1.8 millions de simulations prévues). L'échantillon que j'analyse ici  fait 616 000 lignes (une ligne = une simulation), **Ce plan n'est donc pas complet**, il y a encore beaucoup de combinaisons de paramètres à tester , et le sous ensemble des données qu'on considère ici **n'est pas uniformément distribué dans l'espace des paramètres**, donc potentiellement pas représentatif de l'ensemble des données.
+
+Le texte de ce document est statique, il deviendra donc obsolète, mais le code garantit la reproductibilité des graphiques avec les futures données complètes, pourvu que le format n'en cahnge pas entre temps .
+
+
+
+
+## Chargement des données
+```{r load, cache=TRUE}
+setwd("~/encadrement/repoJulienERC/erc/traitements_Stats/Direct_Sampling_Analysis/")
+dd <-  read.csv("simudataframe_13Aout_616klines.csv")
+dd <-  dd[,-1] #la première colonne est inutile
+```
+
+
+
+
+
+## Effets de winSize/minContig/maxContig  sur les impacts 
+
+On commence par regarder l'effet de `winSize` sur les impacts , quand il vaut 3, puis 5
+
+```{r winsize , fig.width=10, cache=TRUE}
+ws3 <- dd %>%  filter(winSize==3)
+
+minContig_ws3_by_impact <-  ggplot(ws3, aes(minContig, impact))+
+  geom_jitter(aes( color=buildNonRes), width=0.02)+
+  ggtitle("Impact en fonction de minContig pour winsize = 3,, pour minContig variant de 0 à 0.3 par pas de 0.1", subtitle = "les points sont étirés horizontalement autour des valeurs  pour favoriser la visibilité")
+minContig_ws3_by_impact
+
+
+
+ws5 <- dd %>%  filter(winSize==5)
+
+minContig_ws5_by_impact <-  ggplot(ws5, aes(minContig, impact))+
+  geom_jitter(aes( color=buildNonRes), width=0.02)+
+  ggtitle("Impact en fonction de minContig pour winsize = 5, pour minContig variant de 0 à 0.3 par pas de 0.1", subtitle = "scenario tendanciel, pluPriority, densifyGround, densifyOld  valent TRUE\n les points sont étirés autour des valeurs  pour favoriser la visibilité")
+minContig_ws5_by_impact
+```
+
+
+
+
+Que ce soit pour winSize = 3 ou 5 , l'effet de minContig ne semble pas très marqué : les impacts s'échelonnent dans les mêmes gammes de valeurs.
+
+On pourrait vérifier la même chose avec maxContig, on va plutôt capturer l'effet croisé de minContig et maxContig en réalisant une carte de chaleur(heatmap) pour les deux valeurs de winSize.
+Pour ces graphiques on filtre les impacts pour ne garder que les valeurs non nulles.
+
+
+
+
+```{r heatmap , cache=TRUE , fig.width=10}
+ws3_impacts_positifs <-  ws3 %>%  filter(impact >0) %>% group_by(minContig, maxContig) %>% mutate(impactMoyen=mean(impact))
+
+
+heatmap_ws3 <-  ggplot(ws3_impacts_positifs, aes(minContig, maxContig))+
+  geom_tile(aes(fill=impactMoyen))+
+  ggtitle("Moyenne des impacts  positifs par valeurs de minContig et maxContig, pour winSize=3")
+heatmap_ws3
+
+
+
+ws5_impacts_positifs <-  ws5 %>%  filter(impact >0) %>% group_by(minContig, maxContig) %>% mutate(impactMoyen=mean(impact))
+
+
+heatmap_ws5 <-  ggplot(ws5_impacts_positifs, aes(minContig, maxContig))+
+  geom_tile(aes(fill=impactMoyen))+
+  ggtitle("Moyenne des impacts   par valeurs de minContig et maxContig, pour winSize=5")
+heatmap_ws5
+```
+
+
+Dans les deux cas , on observe un effet positif de maxContig : plus celui-ci est élevé , plus les impacts sont élevés en moyenne.
+
+
+
+
+
+Pour minContig, il faut distinguer suivant la valeur de winSize : son effet est faible pour winsize = 3 (l'impact moyen varie peu selon l'axe des X) , il est légèrement plus marqué lorsque wwinSize= 5  : les impacts moyens les plus faibles sont obtenus pour sa valeur maximale :  0.3.
+
+
+
+
+## Effets des poids des couches
+
+On s'intéresse maintenant à l'effet des poids choisis pour les 5 couches utilisées pour quantifier l'intérêt à urbaniser.
+
+Vu le peu de valeurs possibles (une exploration fine ferait exploser le nombre de simulations à effectuer), et le découpage grossier de leur domaine , on transforme ces poids en facteurs qu'on peut interpréter à la louche comme : nul (0), important (1), très important (3) .
+
+
+
+```{r poidsTrans, cache = TRUE, fig.width = 10 }
+dd <-  dd %>% filter(impact >0) %>%  mutate(sirene=factor(sirene), transport = factor(transport), ocsol = factor(ocsol), routes = factor(routes), ecologie = factor(ecologie))
+
+
+ ImpactdensityPlotbyX <-  function(x, name) {
+     pImpByX <-  ggplot(dd, aes(impact))+
+     geom_density(aes(fill=x, color= x),  alpha=0.1)+
+     labs(y="densité")+
+     scale_fill_discrete(guide="none")+
+     scale_color_discrete(paste0("Poids ", name))+
+     ggtitle(paste0("Distribution des impacts selon le poids de la couche ",name))
+
+     return(pImpByX)
+        
+ }
+   
+print(ImpactdensityPlotbyX(dd$transport, "transport"))
+```
+
+### Couche transport
+on constate que les distributions se superposent presque : le poids de la couche transport influence peu les impacts, en général (i.e. pour l'ensemble des simulations produites, c'est à dire un échantillonnage régulier de son espace de paramètres).
+
+D'autre part les distributions sont très "gaussiennes", très centrées autour de l'impact moyen , aux alentours de 2 millions.
+Je ne sais pas trop comment interpréter ce résultat, disons que le modèle semble peut contraignant sur la structure des impacts : lorsqu'on regarde l'image d'un échantillon uniforme, la répétition des processus aléatoires semblent faire tendre la distribution des impacts vers une Gaussienne, ce qui normalement devrait faire penser à la loi de grand nombre / théorème central limite. 
+
+
+
+**N.B**  L'axe des Y est difficile à interpréter dans un graphique de densité :  c'est la valeur de la fonction dont l'intégrale entre deux valeurs A et B , donne la probabilité, parmi les données, d'obtenir une valeur comprise entre ces deux valeurs A et B. 
+
+Pour nous qui faisons une densité d'impact, quand il y a une grosse bosse dans une zone  du graphique de densité, ça signifie que beaucoup de vaeurs d'impacts simulés valent des valeurs de cette zone.
+
+A la limite , ce qui nous intéresse ici , ce n'est pas la valeur atteinte par les pics de ce graphique, mais la comparaisons entre les graphique de densité suivant les poids de la couche. On se contentera donc de comparer les courbes
+
+
+
+On fait la même chose avec les autres couches.
+
+### Couche sirene
+
+
+```{r poidsSir, cache=TRUE, fig.width=10}
+print(ImpactdensityPlotbyX(dd$sirene, "sirene"))
+```
+
+
+De même ici, il y a peu de variations entre les trois valeurs de poids: seul le poids nul se distingue des autres pour les valeurs d'impacts faibles; on peut tenter l'interprétation suivante : ne pas prendre en compte la couche sirène à tendance à produire des impacts légèrement peu plus faibles que lorsqu'on le prend en compte, mais de façon très marginale. 
+
+```{r poidsroutes, cache=TRUE, fig.width=10}
+print(ImpactdensityPlotbyX(dd$routes, "routes"))
+```
+
+La tendance est un peu plus claire pour la couche routes on observe un décalage à droite du pic de la gaussienne  : le poids de la couche routes a tendance renforcer l'impact à mesure qu'il augmente. (Il faudrait bien sûr confirmer cette tendance acvec un découpage plus fin et une envergure plus large de son domaine de variation)
+
+
+
+```{r poidsEco, cache=TRUE, fig.width=10}
+print(ImpactdensityPlotbyX(dd$ecologie, "ecologie"))
+```
+
+
+ici encore , l'influence de la couche écologie est plus claire : l'impact est d'autant plus faible que le poids de l'écologie est élevé, comme le montre le décalage vers la droite des distributions lorsque le poids diminue.
+
+
+
+
+```{r poidsOcs, cache=TRUE, fig.width=10}
+print(ImpactdensityPlotbyX(dd$ocsol, "ocsol"))
+```
+ 
+ 
+ la couche d'ocsol n'a pas d'effet visible sur la distribution des impacts 
+ 
+ 
+ 
+ 
+ 
+
+
+
+## Effet des poids sur le nombre de cellules ouvertes
+ 
+ 
+ on fait la même chose que pour les distributions d'impacts, mais pour le nombre de cellules ouvertes
+ 
+ 
+```{r poidsCells, cache=TRUE, fig.width=10}  
+ 
+CellsOpenDensitybyX <-  function(x, name) {
+    pImpByX <-  ggplot(dd, aes(Cells.open.to.urbanisation))+
+      geom_density(aes(fill=x, color= x),  alpha=0.1)+
+      labs(y="densité")+
+      scale_fill_discrete(guide="none")+
+      scale_color_discrete(paste0("Poids ", name))+
+      ggtitle(paste0("Distribution du nombre de cellules ouvertes à l'urbanisation obtenues selon le poids de la couche ",name))
+    
+    return(pImpByX)
+    
+  }
+
+
+print(CellsOpenDensitybyX(dd$sirene, "sirene"))
+```
+
+Le poids de la couche sirène a un effet positif sur le nombre de cellules ouvertes à l'urbanisation, du moment qu'il n'est pas nul.
+
+En revanche il semble être le même pour le poids 1 et 3 , c'est un effet "discrèt" et pas continu , de type ON/OFF, le poids (sa valeur) ne joue pas .
+S'il est non nul, certaines cellules deviennent constructibles , et donc leur nombre potentiel à être ouvertes à l'urbanisation augmente, 
+
+
+```{r poidsCellsRoutes, cache=TRUE, fig.width=10}  
+print(CellsOpenDensitybyX(dd$routes, "routes"))
+```
+
+le poids 1 et 3 sont indiscernables, le poids nul produit des impacts légèrement plus faibles.
+
+
+```{r poidsCellsEco, cache=TRUE, fig.width=10}  
+print(CellsOpenDensitybyX(dd$ecologie, "ecologie"))
+```
+
+Ici également , les poidsz 1 et 3 sont indiscernables (même effet), la densité de poids nul est conforme à ce que l'on attend : parmi  les simulations , celles dont le nombre de cellules ouvertes est faible à plus de chances d'être issue d'une simulation où le poids de l'écologie est nul.
+Ça paraît contre-intuitif, il faut creuser : 
+En attendant voilà une instanciation de l'interpréatation de la mesure avec une valeur  : si moins de 70 cellules sont ouvertes à l'urbanisation dans une simulation , il y a plus de chances que cette simu ait été lancée avec un poids écologique nul (courbe rouge et aire supérieure), à l'inverse , si plus de 70 cellules  sont ouvertes , il y a moins de chances que le poids de la couche écologique soit nul (courbes bleue /vertes et aire supérieures)).
+
+
+C'est typiquement là qu'il faudrait étudier la chose par rapport "une simulation de référence"" et son paramétrage, en faisant varier uniquement les poids pour voir leur effet autour des impactset nombre de cellules de référence.
+
+
+```{r poidsCellsTransp, cache=TRUE, fig.width=10}  
+print(CellsOpenDensitybyX(dd$transport, "transport"))
+```
+
+Les courbes sont très proches:  il semble que ce poids ait peu d'influence.
+
+```{r poidsCellsOcs, cache=TRUE, fig.width=10}  
+print(CellsOpenDensitybyX(dd$ocsol, "ocsol"))
+```
+
+Les courbes sont indiscernables, ce poids n'a aucune influence .
+
+
+
+
+## Effet des poids sur la surface construite
+
+
+bis repetita placent
+
+
+```{r poidsSurf, cache=TRUE, fig.width=10}  
+ 
+SurfDensitybyX <-  function(x, name) {
+    pImpByX <-  ggplot(dd, aes(Built.floor.area))+
+      geom_density(aes(fill=x, color= x),  alpha=0.1)+
+      labs(y="densité")+
+      scale_fill_discrete(guide="none")+
+      scale_color_discrete(paste0("Poids ", name))+
+      ggtitle(paste0("Distribution de la surface construite au sol selon le poids de la couche ",name))
+    
+    return(pImpByX)
+    
+  }
+
+
+print(SurfDensitybyX(dd$sirene, "sirene"))
+```
+
+
+Similaire à la distribution du nombre de cellules ouvertes
+
+```{r poidsSurfRoutes, cache=TRUE, fig.width=10}  
+print(SurfDensitybyX(dd$routes, "routes"))
+```
+
+  idem
+
+
+```{r poidsSurfEco, cache=TRUE, fig.width=10}  
+print(SurfDensitybyX(dd$ecologie, "ecologie"))
+```
+
+idem effet "discret" , systématiquement moins de surface construite quand le poids est nul, indiscernable sinon
+
+
+```{r poidsSurfTransp, cache=TRUE, fig.width=10}  
+print(SurfDensitybyX(dd$transport, "transport"))
+```
+
+indiscernable 
+
+
+```{r poidsSurfOcs, cache=TRUE, fig.width=10}  
+print(SurfDensitybyX(dd$ocsol, "ocsol"))
+```
+
+indiscernable
+
+
+
+Ces 5 distributions ne nous aident pas beaucoup , l'échelle n'est peut être pas la bonne.
+

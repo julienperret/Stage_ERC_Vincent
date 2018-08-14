@@ -1,0 +1,21 @@
+
+//200m_tx1.5_tendanciel_buildRatio90.0_pluPrio_buildNonRes_densifyGround_densifyOld_maximumDensity/output
+
+val results = File("results.csv")
+
+
+for {
+  f <- File("results").list
+} {
+  val dir = f.toJava.listFiles.headOption
+
+  dir foreach { dir =>
+    val csv =  dir.toScala / "output" / "mesures.csv"
+    val stream = csv.newInputStream
+    val data = stream.lines.map(_.split(",").last).toList 
+    stream.close
+  
+    results << (s"${f.name}," + data.mkString(","))
+  }
+}  
+
