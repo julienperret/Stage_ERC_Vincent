@@ -108,7 +108,7 @@ dSurfNormExist  <- df  %>% group_by(ID_IRIS) %>%  count(round(AREA))  %>% mutate
 names(dSurfNormExist) <-  c("ID_IRIS", "SURFACE", "effectif", "Surface_normalisee_a_lIRIS" )
 
 # ecriture du fichier de poids
-write_csv(dSurfNormExist,path = "area_weights_norm.csv")
+write_csv(dSurfNormExist,path = "areas_weights_nofit.csv")
 
 
 #########################################################
@@ -316,8 +316,8 @@ for (c in unique(df$ID_IRIS))
 
 
 getwd()
-write.csv(distribsResults, "poidsSurface_fittes_by_IRIS.csv")
-dd <-  read.csv("poidsSurface_fittes_by_IRIS.csv")
+write.csv(distribsResults, "areas_weights.csv")
+dd <-  read.csv("areas_weights.csv")
 
 
 ## on vérfie si ça somme à 1

@@ -150,7 +150,7 @@ dPoidsNormExist  <- dfniv  %>% group_by(ID_IRIS) %>%  count(FLOOR)  %>% mutate(p
 names(dPoidsNormExist) <-  c("ID_IRIS", "FLOOR", "effectif", "poidsNormalise_a_l_IRIS" )
 
 # ecriture du fichier de poids
-write_csv(dPoidsNormExist,path = "floor_weights_norm.csv")
+write_csv(dPoidsNormExist,path = "floors_weights_nofit.csv")
 
 
 #########################################################
@@ -414,7 +414,7 @@ write.csv(distribsResults, "distributionsEtagesFitted.csv")
 
 # on vérifie que la distribution somme à 1 ou presque  :
 
-ddd <-  read.csv("distributionsEtagesFitted.csv")
+ddd <-  read.csv("floors_weights.csv")
 #somme des poids par IRIS
 xx <- ddd %>% group_by(ID_IRIS) %>% summarise(totProbAIC = sum(poidsFitAIC), totProbCHI2 = sum(poidsFitCHI2))
 ## => le poifsFitAIC semble plus adapté puisque la la somme tend vers 1 (faudrait vérifier avec un statisticien )
