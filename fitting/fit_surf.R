@@ -330,7 +330,7 @@ names(distribsResults) <-  bckupNames
 
 ###### pour un IRIS particulier
 
-riri <-  df %>% filter(ID_IRIS == 340220101)
+riri <-  df %>% filter(ID_IRIS == 16)
 mods  <- fitter(dd = riri)
 #dessin comparant les distribs fittées et la distrib observée
 cdfcomp(mods)
