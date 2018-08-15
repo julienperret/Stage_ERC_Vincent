@@ -5,8 +5,8 @@ library(fitdistrplus)
 library(actuar)
 
 
-#setwd("/home/delbarvi/Geomatique/simulation/prepared/34/mtp/data/20m")
-setwd("/home/vins/Geomatique/stage/simulation/prepared/34/mtp/data/20m")
+setwd("/home/delbarvi/Geomatique/simulation/prepared/34/mtp/data/20m")
+#setwd("/home/vins/Geomatique/stage/simulation/prepared/34/mtp/data/20m")
 
 
 dfniv <- read_csv("distrib_floors.csv")

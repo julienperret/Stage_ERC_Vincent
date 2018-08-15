@@ -1843,6 +1843,10 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
         copyfile(str(localData/'poids.csv'), str(project/'interet/poids.csv'))
         copyfile(str(workspace/'data'/pixResStr/'evo_surface_sol.csv'), str(project/'evo_surface_sol.csv'))
+        copyfile(str(workspace/'data'/pixResStr/'areas_weights.csv'), str(project/'poids_surfaces.csv'))
+        copyfile(str(workspace/'data'/pixResStr/'floors_weights.csv'), str(project/'poids_etages.csv'))
+        copyfile(str(workspace/'data'/pixResStr/'areas_weights_nofit.csv'), str(project/'poids_surfaces_nofit.csv'))
+        copyfile(str(workspace/'data'/pixResStr/'floors_weights_nofit.csv'), str(project/'poids_etages_nofit.csv'))
 
         if not silent:
             print('\nFinished at ' + strftime('%H:%M:%S'))

@@ -57,20 +57,10 @@ if len(sys.argv) == 5:
         elif 'writingSnapshots' in arg:
             writingSnapshots = literal_eval(arg.split('=')[1])
 
-# *** Paramètres pour openMole
+# *** Ici, ajouter les paramètres pour openMole
 elif len(sys.argv) > 5:
-    scenario = sys.argv[4]
-    pluPriority = to_bool(float(sys.argv[5]))
-    buildNonRes = to_bool(float(sys.argv[6]))
-    densifyGround = to_bool(float(sys.argv[7]))
-    maxBuiltRatio = float(sys.argv[8])
-    densifyOld = to_bool(float(sys.argv[9]))
-    maximumDensity = to_bool(float(sys.argv[10]))
-    winSize = round(float(sys.argv[11]))
-    minContig = float(sys.argv[12])
-    maxContig = float(sys.argv[13])
-    writingTifs = to_bool(float(sys.argv[14]))
-    print("lancement avec " + str(sys.argv))
+    print('Nombre de paramètres incorrect.')
+    sys.exit()
 
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
@@ -120,7 +110,7 @@ if minContig > maxContig:
     sys.exit()
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
-def choose(weight, size=1):
+def chooseCell(weight, size=1):
     global countChoices
     countChoices += size
     cells = []
@@ -139,6 +129,34 @@ def choose(weight, size=1):
     else:
         return None
 
+def chooseArea(id, row, col):
+    surf = np.array(list(poidsSurfaces[id].keys()))
+    pds = np.array(list(poidsSurfaces[id].values()))
+    if len(surf) > 0 or len(pds) > 0 :
+        ss = np.random.choice(surf, 1, p=pds/pds.sum())
+    else:
+        surf = np.array(list(poidsSurfacesNoFit[id].keys()))
+        pds = np.array(list(poidsSurfacesNoFit[id].values()))
+        if len(surf) > 0 or len(pds) > 0 :
+            ss = np.random.choice(surf, 1, p=pds/pds.sum())
+        else:
+            ss = 0
+    return ss
+
+def chooseFloors(id, row, col):
+    etages = np.array(list(poidsEtages[id].keys()))
+    pds = np.array(list(poidsEtages[id].values()))
+    if len(etages) > 0 or len(pds) > 0:
+        nbNiv = np.random.choice(etages, 1, p=pds/pds.sum())
+    else:
+        etages = np.array(list(poidsEtagesNoFit[id].keys()))
+        pds = np.array(list(poidsEtagesNoFit[id].values()))
+        if len(etages) > 0 or len(pds) > 0:
+            nbNiv = np.random.choice(etages, 1, p=pds/pds.sum())
+        else:
+            nbNiv = 0
+    return nbNiv
+
 # Fenêtre glissante pour statistique dans le voisinage d'un pixel
 def winMean(array, row, col, size=3):
     if (row > size - 1 and row + size-1 < rows) and (col > size - 1 and col + size-1 < cols):
@@ -153,57 +171,52 @@ def winMean(array, row, col, size=3):
 
 # Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def expand(row, col):
-    global capaSol, urb
-    minSrf = ssrMed[row][col]
-    maxSrf = capaSol[row][col]
     ss = 0
-    if maxSrf > minSrf:
-        contig = winMean(urb, row, col, winSize)
-        if contig:
-            if minContig < contig <= maxContig:
-                if maximumDensity:
-                    ss = maxSrf
-                else:
-                    ss = np.random.randint(minSrf, maxSrf + 1)
-                capaSol[row][col] -= ss
-                urb[row][col] = 1
+    global capaSol, urb
+    contig = winMean(urb, row, col, winSize)
+    if contig and minContig < contig <= maxContig:
+        id = irisId[row][col]
+        ss = chooseArea(id, row, col)
+        if ss > 0:
+            maxSrf = capaSol[row][col]
+            if ss > maxSrf :
+                ss = maxSrf
+            capaSol[row][col] -= ss
+            urb[row][col] = 1
     return ss
 
 # Pour urbaniser verticalement à partir d'une surface au sol donnée et d'un nombre de niveaux tiré aléatoirement entre 1 et le nbNiv max par IRIS
 def build(ss, row, col):
-    sp = 0
-    nivMin = 1
-    nivMax = nbNivMax[row][col]
-    nbNiv = np.random.randint(nivMin, nivMax + 1)
-    sp = ss * nbNiv
+    id = irisId[row][col]
+    nbNiv = chooseFloors(id, row, col)
+    if nbNiv > 0:
+        sp = ss * nbNiv
+    else:
+        sp = 0
     return sp
 
 # Densification d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def densify(mode, row, col):
     global capaSol
     if mode == 'ground':
-        ss = 0
-        minSrf = ssrMed[row][col]
+        id = irisId[row][col]
         maxSrf = capaSol[row][col]
-        if maxSrf > minSrf:
-            if maximumDensity:
+        ss = chooseArea(id, row, col)
+        if ss > 0:
+            if ss > maxSrf :
                 ss = maxSrf
-            else:
-                ss = np.random.randint(minSrf, maxSrf + 1)
             capaSol[row][col] -= ss
         return ss
     elif mode == 'height':
-        sp = 0
-        nivMin = int(srfPla[row][col] / srfSolRes[row][col]) + 1
-        nivMax = nbNivMax[row][col]
         ssol = srfSolRes[row][col]
-        if nivMin < nivMax:
-            nbNiv = np.random.randint(nivMin, nivMax + 1)
+        id = irisId[row][col]
+        nbNiv = chooseFloors(id, row, col)
+        if nbNiv > 0:
+            sp = ssol * nbNiv
+            sp -= srfPla[row][col]
+            if sp < m2PlaHab[row][col]:
+                sp = 0
         else:
-            nbNiv = nivMax
-        sp = ssol * nbNiv
-        sp -= srfPla[row][col]
-        if sp < m2PlaHab[row][col]:
             sp = 0
         return sp
 
@@ -216,13 +229,13 @@ def urbanize(pop, srfMax=0, zau=False):
     count = 0
     # Expansion par ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
     if srfMax > 0:
-        tmpInteret = np.where((capaSol >= ssrMed) & (urb == 0), interet, 0)
+        tmpInteret = np.where(urb == 0, interet, 0)
         if zau:
             tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
         while artif < srfMax and count < pop and tmpInteret.sum() > 0:
             ss = 0
             sp = 0
-            row, col = choose(tmpInteret)
+            row, col = chooseCell(tmpInteret)
             if urb[row][col] == 0:
                 ss = expand(row, col)
             if ss > 0 :
@@ -245,7 +258,7 @@ def urbanize(pop, srfMax=0, zau=False):
             while artif < srfMax and count < pop and tmpInteret.sum() > 0:
                 ss = 0
                 sp = 0
-                row, col = choose(tmpInteret)
+                row, col = chooseCell(tmpInteret)
                 ss = densify('ground', row, col)
                 if ss > 0 :
                     artif += ss
@@ -264,7 +277,7 @@ def urbanize(pop, srfMax=0, zau=False):
         tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
         while count < pop and tmpInteret.sum() > 0:
             sp = 0
-            row, col = choose(tmpInteret)
+            row, col = chooseCell(tmpInteret)
             sp = densify('height', row, col)
             if sp > 0:
                 tmpSrfPla[row][col] += sp
@@ -282,15 +295,14 @@ def urbanize(pop, srfMax=0, zau=False):
     return (pop - count, srfMax - artif)
 
 # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
-ds = gdal.Open(str(dataDir/'demographie.tif'))
-anyRaster = ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
-cols, rows = anyRaster.shape[1], anyRaster.shape[0] # x, y
+ds = gdal.Open(str(dataDir/'iris_id.tif'))
+irisId = ds.GetRasterBand(1).ReadAsArray().astype(np.uint8)
+cols, rows = irisId.shape[1], irisId.shape[0] # x, y
 proj = ds.GetProjection()
 geot = ds.GetGeoTransform()
 pixSize = int(geot[1])
 srfCell = pixSize * pixSize
 ds = None
-del anyRaster
 
 projectStr = '%im_tx%s_%s_buildRatio%i_winSize%i_minContig%s_maxContig%s'%(pixSize, str(growth), scenario, maxBuiltRatio, winSize, str(minContig), str(maxContig))
 if pluPriority:
@@ -352,13 +364,60 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         with (dataDir/'interet/poids.csv').open('r') as r:
             reader = csv.reader(r)
             next(reader, None)
-            poids = {rows[0]:int(rows[1]) for rows in reader}
+            poidsInteret = {rows[0]:int(rows[1]) for rows in reader}
 
         coef = {}
         with (project/'coefficients_interet.csv').open('w') as w:
-            for key in poids:
-                coef[key] = poids[key] / sum(poids.values())
+            for key in poidsInteret:
+                coef[key] = poidsInteret[key] / sum(poidsInteret.values())
                 w.write(key + ', ' + str(coef[key]) + '\n')
+
+        # Enregistrements des poids pour le tirage des étages et surface !!! temporairement adapté à Montpellier
+        poidsEtages = {}
+        for i in range(160):
+            poidsEtages[i+1] = {}
+        with (dataDir/'poids_etages.csv').open('r') as r:
+            r.readline()
+            for l in r.readlines():
+                values = l.split(',')
+                id = int(values[1].replace('"',''))
+                etages = int(values[2].replace('"',''))
+                # AIC=[4] ; Chi²=[5]
+                poidsEtages[id][etages] = float(values[4])
+
+        poidsSurfaces = {}
+        for i in range(160):
+            poidsSurfaces[i+1] = {}
+        with (dataDir/'poids_surfaces.csv').open('r') as r:
+            r.readline()
+            for l in r.readlines():
+                values = l.split(',')
+                id = int(values[6].replace('"','').replace('\n',''))
+                surf = int(values[1].replace('"',''))
+                # AD=[2] ; CVM=[3] ; KS=[4] ; AIC=[5] ;
+                poidsSurfaces[id][surf] = float(values[5])
+
+        poidsEtagesNoFit = {}
+        for i in range(160):
+            poidsEtagesNoFit[i+1] = {}
+        with (dataDir/'poids_etages_nofit.csv').open('r') as r:
+            r.readline()
+            for l in r.readlines():
+                values = l.split(',')
+                id = int(values[0])
+                etages = int(values[1])
+                poidsEtagesNoFit[id][etages] = float(values[3])
+
+        poidsSurfacesNoFit = {}
+        for i in range(160):
+            poidsSurfacesNoFit[i+1] = {}
+        with (dataDir/'poids_surfaces_nofit.csv').open('r') as r:
+            r.readline()
+            for l in r.readlines():
+                values = l.split(',')
+                id = int(values[0])
+                surf = int(values[1])
+                poidsSurfacesNoFit[id][surf] = float(values[3])
 
         # Préparation des restrictions et gestion du PLU
         restriction = to_array(dataDir/'interet/restriction_totale.tif')
@@ -388,7 +447,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         tra = to_array(dataDir/'interet/proximite_transport.tif', np.float32)
         sir = to_array(dataDir/'interet/densite_sirene.tif', np.float32)
         # Création du raster final d'intérêt avec pondération
-        interet = np.where((restriction != 1), (eco * coef['ecologie']) + (rou * coef['routes']) + (tra * coef['transport']) + (sir * poids['sirene']), 0)
+        interet = np.where((restriction != 1), (eco * coef['ecologie']) + (rou * coef['routes']) + (tra * coef['transport']) + (sir * coef['sirene']), 0)
         interet = (interet / np.amax(interet)).astype(np.float32)
 
         # Création des rasters de capacité en surfaces sol et plancher
