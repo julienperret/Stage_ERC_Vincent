@@ -16,9 +16,9 @@ from toolbox import to_tif, printer, to_array
 np.seterr(divide='ignore', invalid='ignore')
 
 # Convertit les réels en booléen
-def to_bool(r):
-    b = True if r > 0.5 else False
-    return b
+# def to_bool(r):
+#     b = True if r > 0.5 else False
+#     return b
 
 # Stockage et contrôle de la validité des paramètres utilisateur
 dataDir = Path(sys.argv[1])
@@ -44,8 +44,6 @@ if len(sys.argv) == 5:
             densifyOld = literal_eval(arg.split('=')[1])
         elif 'maximumDensity' in arg:
             maximumDensity = literal_eval(arg.split('=')[1])
-        elif 'maxBuiltRatio' in arg:
-            maxBuiltRatio = int(arg.split('=')[1])
         elif 'winSize' in arg:
             winSize = int(arg.split('=')[1])
         elif 'minContig' in arg:
@@ -83,9 +81,6 @@ if 'densifyOld' not in globals():
 # Pour toujours densifier la cellule au maximum de sa capacité plancher
 if 'maximumDensity' not in globals():
     maximumDensity = False
-# Taux d'artificialisation maximum d'une cellule
-if 'maxBuiltRatio' not in globals():
-    maxBuiltRatio = 80
 # Paramètres pour les règles de contiguïtés
 if 'winSize' not in globals():
     winSize = 3
@@ -96,7 +91,7 @@ if 'maxContig' not in globals():
 if 'writingTifs' not in globals():
     writingTifs = True
 if 'writingSnapshots' not in globals():
-    writingSnapshots = True
+    writingSnapshots = False
 
 # Contrôle des paramètres
 if growth > 3:
@@ -130,31 +125,33 @@ def chooseCell(weight, size=1):
         return None
 
 def chooseArea(id, row, col):
+    ss = 0
     surf = np.array(list(poidsSurfaces[id].keys()))
     pds = np.array(list(poidsSurfaces[id].values()))
     if len(surf) > 0 or len(pds) > 0 :
-        ss = np.random.choice(surf, 1, p=pds/pds.sum())
+        c = np.random.choice(surf, 1, p=pds/pds.sum())
+        ss = c[0]
     else:
         surf = np.array(list(poidsSurfacesNoFit[id].keys()))
         pds = np.array(list(poidsSurfacesNoFit[id].values()))
         if len(surf) > 0 or len(pds) > 0 :
-            ss = np.random.choice(surf, 1, p=pds/pds.sum())
-        else:
-            ss = 0
+            c = np.random.choice(surf, 1, p=pds/pds.sum())
+            ss = c[0]
     return ss
 
 def chooseFloors(id, row, col):
+    nbNiv = 0
     etages = np.array(list(poidsEtages[id].keys()))
     pds = np.array(list(poidsEtages[id].values()))
     if len(etages) > 0 or len(pds) > 0:
-        nbNiv = np.random.choice(etages, 1, p=pds/pds.sum())
+        c = np.random.choice(etages, 1, p=pds/pds.sum())
+        nbNiv = c[0]
     else:
         etages = np.array(list(poidsEtagesNoFit[id].keys()))
         pds = np.array(list(poidsEtagesNoFit[id].values()))
         if len(etages) > 0 or len(pds) > 0:
-            nbNiv = np.random.choice(etages, 1, p=pds/pds.sum())
-        else:
-            nbNiv = 0
+            c = np.random.choice(etages, 1, p=pds/pds.sum())
+            nbNiv = c[0]
     return nbNiv
 
 # Fenêtre glissante pour statistique dans le voisinage d'un pixel
@@ -304,7 +301,7 @@ pixSize = int(geot[1])
 srfCell = pixSize * pixSize
 ds = None
 
-projectStr = '%im_tx%s_%s_buildRatio%i_winSize%i_minContig%s_maxContig%s'%(pixSize, str(growth), scenario, maxBuiltRatio, winSize, str(minContig), str(maxContig))
+projectStr = '%im_tx%s_%s_winSize%i_minContig%s_maxContig%s'%(pixSize, str(growth), scenario, winSize, str(minContig), str(maxContig))
 if pluPriority:
     projectStr += '_pluPrio'
 if buildNonRes:
@@ -451,7 +448,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         interet = (interet / np.amax(interet)).astype(np.float32)
 
         # Création des rasters de capacité en surfaces sol et plancher
-        capaSol = np.zeros([rows, cols], np.uint32) + int(srfCell * (maxBuiltRatio / 100))
+        capaSol = np.zeros([rows, cols], np.uint32) + srfCell
         capaSol = np.where((restriction != 1) & (srfSol14 < capaSol), capaSol - srfSol14, 0).astype(np.uint16)
         # Statistiques sur l'évolution du bâti
         urb14 = np.where(srfSol14 > 0, 1, 0).astype(np.byte)
