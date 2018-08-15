@@ -7,7 +7,7 @@ library(actuar)
 #setwd("/home/delbarvi/Geomatique/simulation/prepared/34/mtp/data/20m")
 setwd("/home/vins/Geomatique/stage/simulation/prepared/34/mtp/data/20m")
 
-df <-  read_csv("distrib_areas.csv")
+df <-  read_csv("distrib_surf.csv")
 
 #les codes iris sont des facteurs
 df$ID_IRIS <- factor(df$ID_IRIS)
@@ -15,21 +15,21 @@ df$ID_IRIS <- factor(df$ID_IRIS)
 head(df)
 
 #plot global de la distribution des surfaces
-psurf <-  ggplot(df, aes(AREA))+
+psurf <-  ggplot(df, aes(SURF))+
   geom_histogram( fill="darkolivegreen2", colour="darkgrey", binwidth = 1 )+
   labs(x="surface", y="effectif")+
   ggtitle("Distribution des surfaces")
 psurf
 
 
-psurf2 <-  ggplot(df, aes(AREA))+
+psurf2 <-  ggplot(df, aes(SURF))+
   geom_density( fill="darkolivegreen2", colour="darkgrey")+
   labs(x="surface", y="effectif")+
   ggtitle("Distribution des surfaces")
 psurf2
 
 #group by IRIS + nombre de lignes
-dfSurfByIRIS <- df %>% group_by(ID_IRIS) %>% summarize(Surf_Tot=sum(AREA)) %>% arrange(desc(Surf_Tot))
+dfSurfByIRIS <- df %>% group_by(ID_IRIS) %>% summarize(Surf_Tot=sum(SURF)) %>% arrange(desc(Surf_Tot))
 
 # réordonne les niveaux de facteurs
 dfSurfByIRIS$ID_IRIS <- factor(dfSurfByIRIS$ID_IRIS, levels = dfSurfByIRIS$ID_IRIS[order(-dfSurfByIRIS$Surf_Tot)])
@@ -71,16 +71,16 @@ pp
 IRISmaousse <-  dfSurfByIRIS$ID_IRIS[1]
 dbig <-  df %>% filter(ID_IRIS== IRISmaousse)
 
-pmaousse <-  ggplot(dbig, aes(AREA))+
+pmaousse <-  ggplot(dbig, aes(SURF))+
   geom_histogram( fill="darkolivegreen2", colour="darkgrey", binwidth = 1)+
   labs(x="Surface ", y="effectif")+
-  scale_x_continuous(breaks = seq(0,max(dbig$AREA), by = 1000))+
+  scale_x_continuous(breaks = seq(0,max(dbig$SURF), by = 1000))+
   ggtitle(paste("Distribution de la surface de l'IRIS", IRISmaousse, "(le plus représenté dans le fichier)"))
 pmaousse
 
 
 # Variété de hauteurs distinctes par IRIS
-dfSurfDistinct <- df %>% group_by(ID_IRIS) %>% summarize(Surf_Tot= sum(AREA),distcount=n_distinct(AREA)) %>% arrange(desc(distcount))
+dfSurfDistinct <- df %>% group_by(ID_IRIS) %>% summarize(Surf_Tot= sum(SURF),distcount=n_distinct(SURF)) %>% arrange(desc(distcount))
 
 # réordonne les niveaux de facteurs   par nombre de hauteurs distinctes
 dfSurfDistinct$ID_IRIS <- factor(dfSurfDistinct$ID_IRIS, levels = dfSurfDistinct$ID_IRIS[order(-dfSurfDistinct$distcount)])
@@ -90,10 +90,10 @@ IRISvarious <- dfSurfDistinct$ID_IRIS[1]
 
 dvarious <- df %>% filter(ID_IRIS==IRISvarious)
 
-pvarious <-  ggplot(dvarious, aes(AREA))+
+pvarious <-  ggplot(dvarious, aes(SURF))+
   geom_histogram( fill="darkolivegreen2", colour="darkgrey", binwidth = 1)+
   labs(x="Surfaces", y="effectif")+
-  scale_x_continuous(breaks = seq(0,max(dvarious$AREA), by = 100))+
+  scale_x_continuous(breaks = seq(0,max(dvarious$SURF), by = 100))+
   ggtitle(paste("Distribution des surfaces de l'IRIS", IRISvarious, "(contient le plus de surfaces distinctes)"))
 pvarious
 
@@ -104,11 +104,11 @@ pvarious
 
 
 # dataframe avec les poids de chaque hauteur, normalisés par rapport à l'existant, pour chaque IRIS
-dSurfNormExist  <- df  %>% group_by(ID_IRIS) %>%  count(round(AREA))  %>% mutate(SurfNorm = n / sum(n) )
+dSurfNormExist  <- df  %>% group_by(ID_IRIS) %>%  count(round(SURF))  %>% mutate(SurfNorm = n / sum(n) )
 names(dSurfNormExist) <-  c("ID_IRIS", "SURFACE", "effectif", "Surface_normalisee_a_lIRIS" )
 
 # ecriture du fichier de poids
-write_csv(dSurfNormExist,path = "areas_weights_nofit.csv")
+write_csv(dSurfNormExist,path = "surf_weights_nofit.csv")
 
 
 #########################################################
@@ -136,7 +136,7 @@ fitter <-  function (dd)
       for (met in methods) {
        # cat("methode : " , met, "\n")
         tryCatch({
-          fit <-  fitdist(dd$AREA, distr = candid, method=met, discrete = F)
+          fit <-  fitdist(dd$SURF, distr = candid, method=met, discrete = F)
           gof <-  gofstat(fit)
 
           if (gof$aic < minAIC){
@@ -287,7 +287,7 @@ for (c in unique(df$ID_IRIS))
 {
 
   distribObservee <-  df %>% filter(ID_IRIS == c)
-  surfmax <-  round(max(distribObservee$AREA))
+  surfmax <-  round(max(distribObservee$SURF))
 
   tryCatch({
   models <-  fitter(df)
@@ -316,8 +316,8 @@ for (c in unique(df$ID_IRIS))
 
 
 getwd()
-write.csv(distribsResults, "areas_weights.csv")
-dd <-  read.csv("areas_weights.csv")
+write.csv(distribsResults, "surf_weights.csv")
+dd <-  read.csv("surf_weights.csv")
 
 
 ## on vérfie si ça somme à 1

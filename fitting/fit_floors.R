@@ -408,7 +408,7 @@ names(distribsResults) <-  bckupNames
 
 #sauvegarde en fichier
 setwd()
-write.csv(distribsResults, "distributionsEtagesFitted.csv")
+write.csv(distribsResults, "floors_weights.csv")
 
 
 
@@ -450,7 +450,7 @@ cdfcomp(list(meilleureDistAIC, meilleureDistchipval))
 
 #### IRIS recalcitrant : impossible de fitter automatiquement
 unique(dfniv$ID_IRIS)
-ddd <- dfniv %>% filter(ID_IRIS==340220101)
+ddd <- dfniv %>% filter(ID_IRIS==16)
 qplot(ddd$FLOOR)
 fitter(ddd, "chi2pval")
 warnings()

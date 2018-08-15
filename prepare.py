@@ -596,12 +596,12 @@ def statGridIris(buildings, grid, iris, outdir, csvDir):
         dicAreas[id].append(feat.attribute('area_g'))
         dicFloors[id].append(feat.attribute('NB_NIV'))
 
-    with (outdir/'distrib_floors.csv').open('w') as csvFloors, (outdir/'distrib_areas.csv').open('w') as csvAreas:
-        csvAreas.write('ID_IRIS, AREA\n')
+    with (outdir/'distrib_floors.csv').open('w') as csvFloors, (outdir/'distrib_surf.csv').open('w') as csvSurf:
+        csvSurf.write('ID_IRIS, SURF\n')
         csvFloors.write('ID_IRIS, FLOOR\n')
         for id, values in dicAreas.items():
             for area in values:
-                csvAreas.write(id + ', ' + str(area) + '\n')
+                csvSurf.write(id + ', ' + str(area) + '\n')
         for id, values in dicFloors.items():
             for niv in values:
                 csvFloors.write(id + ', ' + str(niv) + '\n')
@@ -1843,18 +1843,23 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
         copyfile(str(localData/'poids.csv'), str(project/'interet/poids.csv'))
         copyfile(str(workspace/'data'/pixResStr/'evo_surface_sol.csv'), str(project/'evo_surface_sol.csv'))
-        copyfile(str(workspace/'data'/pixResStr/'areas_weights.csv'), str(project/'poids_surfaces.csv'))
-        copyfile(str(workspace/'data'/pixResStr/'floors_weights.csv'), str(project/'poids_etages.csv'))
-        copyfile(str(workspace/'data'/pixResStr/'areas_weights_nofit.csv'), str(project/'poids_surfaces_nofit.csv'))
-        copyfile(str(workspace/'data'/pixResStr/'floors_weights_nofit.csv'), str(project/'poids_etages_nofit.csv'))
+        try:
+            copyfile(str(workspace/'data'/pixResStr/'surf_weights.csv'), str(project/'poids_surfaces.csv'))
+            copyfile(str(workspace/'data'/pixResStr/'floors_weights.csv'), str(project/'poids_etages.csv'))
+            copyfile(str(workspace/'data'/pixResStr/'surf_weights_nofit.csv'), str(project/'poids_surfaces_nofit.csv'))
+            copyfile(str(workspace/'data'/pixResStr/'floors_weights_nofit.csv'), str(project/'poids_etages_nofit.csv'))
+        except FileNotFoundError:
+            if not silent:
+                print('Les fichiers issus du fitting sont manquants, relancez le code après avoir utilisé les codes R...')
+            sys.exit()
 
         if not silent:
             print('\nFinished at ' + strftime('%H:%M:%S'))
         log.write(getTime(start_time) + '\n')
         if truth:
-            rmtree(str(workspace))
             if not silent:
                 print('Removing temporary data!')
+            rmtree(str(workspace))
 
     except:
         exc = sys.exc_info()
