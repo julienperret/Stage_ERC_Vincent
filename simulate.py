@@ -414,7 +414,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         tra = to_array(dataDir/'interet/proximite_transport.tif', np.float32)
         sir = to_array(dataDir/'interet/densite_sirene.tif', np.float32)
         # Création du raster final d'intérêt avec pondération
-        interet = np.where((restriction != 1), (eco * coef['ecologie']) + (rou * coef['routes']) + (tra * coef['transport']) + (sir * poids['sirene']), 0)
+        interet = np.where((restriction != 1), (eco * coef['ecologie']) + (rou * coef['routes']) + (tra * coef['transport']) + (sir * coef['sirene']), 0)
         maxInterest =  np.amax(interet)
 
         if maxInterest == 0 :
