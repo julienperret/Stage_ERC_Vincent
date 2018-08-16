@@ -182,7 +182,7 @@ def expand(row, col):
             urb[row][col] = 1
     return ss
 
-# Pour urbaniser verticalement à partir d'une surface au sol donnée et d'un nombre de niveaux tiré aléatoirement entre 1 et le nbNiv max par IRIS
+# Pour urbaniser verticalement une surface au sol donnée d'un nombre de niveaux tiré aléatoirement à partir du fitting
 def build(ss, row, col):
     id = irisId[row][col]
     nbNiv = chooseFloors(id, row, col)
@@ -192,7 +192,7 @@ def build(ss, row, col):
         sp = 0
     return sp
 
-# Densification d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
+# Densification d'une surface tirée à partir du fitting
 def densify(mode, row, col):
     global capaSol
     if mode == 'ground':
@@ -235,13 +235,23 @@ def urbanize(pop, srfMax=0, zau=False):
             row, col = chooseCell(tmpInteret)
             if urb[row][col] == 0:
                 ss = expand(row, col)
-            if ss > 0 :
-                artif += ss
-                tmpSrfSol[row][col] += ss
-                sp = build(ss, row, col)
-                if sp > 0:
-                    tmpSrfPla[row][col] += sp
-                    count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+                if ss > 0 :
+                    artif += ss
+                    tmpSrfSol[row][col] += ss
+                    if buildNonRes:
+                        ssr = ss * txSsr[row][col]
+                        sp = build(ssr, row, col)
+                    else:
+                        sp = build(ss, row, col)
+                    if sp > 0:
+                        tmpSrfPla[row][col] += sp
+                        count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+                    else:
+                        urb[row][col] = 0
+                        artif -= ss
+                        capaSol[row][col] += ss
+                        tmpSrfSol[row][col] -= ss
+                        tmpInteret[row][col] = 0
                 else:
                     tmpInteret[row][col] = 0
             else:
@@ -249,9 +259,7 @@ def urbanize(pop, srfMax=0, zau=False):
 
         # On densifie l'existant si les cellules vides sont déjà saturées
         if artif < srfMax and count < pop and densifyGround:
-            tmpInteret = np.where((capaSol >= ssrMed) & (urb == 1), interet, 0)
-            if zau:
-                tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
+            tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
             while artif < srfMax and count < pop and tmpInteret.sum() > 0:
                 ss = 0
                 sp = 0
@@ -260,11 +268,19 @@ def urbanize(pop, srfMax=0, zau=False):
                 if ss > 0 :
                     artif += ss
                     tmpSrfSol[row][col] += ss
-                    sp = build(ss, row, col)
+                    if buildNonRes:
+                        ssr = ss * txSsr[row][col]
+                        sp = build(ssr, row, col)
+                    else:
+                        sp = build(ss, row, col)
                     if sp > 0:
                         tmpSrfPla[row][col] += sp
                         count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
                     else:
+                        urb[row][col] = 0
+                        artif -= ss
+                        capaSol[row][col] += ss
+                        tmpSrfSol[row][col] -= ss
                         tmpInteret[row][col] = 0
                 else:
                     tmpInteret[row][col] = 0
