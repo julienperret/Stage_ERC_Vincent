@@ -85,7 +85,7 @@ if 'maximumDensity' not in globals():
 if 'winSize' not in globals():
     winSize = 3
 if 'minContig' not in globals():
-    minContig = 0.1
+    minContig = 0.2
 if 'maxContig' not in globals():
     maxContig = 0.8
 if 'writingTifs' not in globals():

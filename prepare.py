@@ -1836,6 +1836,13 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         else:
             rasterize(workspace/'data/ocsol.shp', project/'interet/non-importance_ecologique.tif', 'Float32', 'interet')
 
+        # Utilisation de l'OCSOL pour la restriction si la résolution le permet (ici spécifique à MTP)
+        if pixRes == 20:
+            if studyAreaName == 'mtp':
+                ocs = to_array(project/'classes_ocsol.tif', np.uint16)
+                ocsMask = np.where((ocs == 2) | (ocs == 4) | (ocs == 8), 1, 0)
+                restriction = np.where(ocsMask == 1, 1, restriction)
+
         to_tif(restriction, 'byte', proj, geot, project/'interet/restriction_totale.tif')
         to_tif(sirene, 'float32', proj, geot, project/'interet/densite_sirene.tif')
         to_tif(routes, 'float32', proj, geot, project/'interet/proximite_routes.tif')
