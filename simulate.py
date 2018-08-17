@@ -55,10 +55,36 @@ if len(sys.argv) == 5:
         elif 'writingSnapshots' in arg:
             writingSnapshots = literal_eval(arg.split('=')[1])
 
-# *** Ici, ajouter les paramètres pour openMole
+########### Paramètres pour openMole
 elif len(sys.argv) > 5:
-    print('Nombre de paramètres incorrect.')
-    sys.exit()
+    scenario = float(sys.argv[4])
+    if (scenario >=0) & (scenario < 1) :
+        tmpscenario = "tendanciel"
+    if (scenario >= 1) & (scenario < 2) :
+        tmpscenario = "stable"
+    if (scenario >= 2) & (scenario <= 3) :
+        tmpscenario = "reduction"
+    scenario = tmpscenario
+
+    def to_bool(r):
+        b = True if r > 0.5 else False
+        return b
+
+    pluPriority = to_bool(float(sys.argv[5]))
+    buildNonRes = to_bool(float(sys.argv[6]))
+    densifyGround = to_bool(float(sys.argv[7]))
+    maxBuiltRatio = float(sys.argv[8])
+    densifyOld = to_bool(float(sys.argv[9]))
+    maximumDensity = to_bool(float(sys.argv[10]))
+    winSize = round(float(sys.argv[11]))
+    minContig = float(sys.argv[12])
+    maxContig = float(sys.argv[13])
+    writingTifs = to_bool(float(sys.argv[14]))
+    seed = round(float(sys.argv[15]))
+    sirene =  round(float(sys.argv[16]))
+    transport =  round(float(sys.argv[17]))
+    routes =  round(float(sys.argv[18]))
+    ecologie =  round(float(sys.argv[19]))
 
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
