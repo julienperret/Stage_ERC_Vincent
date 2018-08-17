@@ -1,0 +1,33 @@
+import _file_.simulate_docker3._
+
+val env = LocalEnvironment(10)
+
+
+// hooks to save results
+val storeSimuCSV = AppendToCSVFileHook(workDirectory / "morris_simus" / "simu.csv")
+val storeSensitivityCSV = AppendToCSVFileHook(workDirectory / "morris_results" / "sensitivity.csv")
+
+
+
+// drive the sensitivity analysis
+val momo = SensitivityMorris(
+    evaluation =  runModel on env ,
+    inputs = Seq(   taux in (0.0 , 3.0 ), 
+                    //scenario in List("reduction", "stable", "tendanciel"),
+                    pluPriority in (0.0 , 1.0) ,
+                    buildNonRes in (0.0 , 1.0) ,
+                    densifyGround in (0.0 , 1.0) ,
+                    maxBuiltRatio in  (50.0 , 100.0 ),
+                    densifyOld in (0.0 , 1.0) ,
+                    maximumDensity in (0.0 , 1.0),
+                    winSize in (3.0 , 9.0),
+                    minContig in (0.0 , 0.3),
+                    maxContig in (0.6 , 1.0)
+                ),
+    outputs = Seq(impact),
+    repetitions = 100,
+    levels = 10) hook storeSensitivityCSV
+
+
+
+momo
