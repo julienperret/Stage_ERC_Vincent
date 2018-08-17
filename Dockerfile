@@ -1,4 +1,4 @@
-# Download base image debian stretch
+ # Download base image debian stretch
 FROM debian:stretch
 
 # Add GPG to be able to add key from keyserver
@@ -6,7 +6,8 @@ RUN apt-get update
 RUN apt-get -y install gnupg2 apt-transport-https
 # Add QGIS debian repository and its key
 RUN echo "deb     http://qgis.org/debian stretch main" >> /etc/apt/sources.list
-RUN gpg --keyserver keyserver.ubuntu.com --recv CAEB3DC3BDF7FB45
+RUN gpg --keyserver keyserver.ubuntu.com  --recv CAEB3DC3BDF7FB45
+#RUN gpg --keyserver keyserver.ubuntu.com --keyserver-options  http-proxy=http://proxy.ign.fr:3128  --keyserver-options  https-proxy=https://proxy.ign.fr:3128 --recv CAEB3DC3BDF7FB45
 RUN gpg --export --armor CAEB3DC3BDF7FB45 | apt-key add -
 
 # Update Software repository
