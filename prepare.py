@@ -92,11 +92,6 @@ if len(sys.argv) > 5:
         if 'pixRes' in arg:
             pixRes = int(arg.split("=")[1])
             pixResStr = str(pixRes) + 'm'
-        elif 'gridSize' in arg:
-            pixRes = int(arg.split("=")[1])
-            pixResStr = str(pixRes) + 'm'
-            print("! gridSize devient pixRes !")
-
         # Mots magiques !
         elif 'force' in arg:
             force = True
@@ -104,9 +99,6 @@ if len(sys.argv) > 5:
             speed = True
         elif 'truth' in arg:
             truth = True
-        elif 'silent' in arg:
-            silent = True
-
         # Taille du tampon utilisé pour extraire les iris et pour extraire la donnée utile au delà des limites de la zone (comme les points SIRENE)
         elif 'bufferDistance' in arg:
             bufferDistance = int(arg.split('=')[1])
@@ -122,7 +114,7 @@ if len(sys.argv) > 5:
         elif 'levelHeight' in arg:
             levelHeight = int(arg.split('=')[1])
         # Taux maximum de chevauchement entre les cellules et des couches à exclure (ex: bati industriel)
-        elif 'maxOverlapRes' in arg:
+        elif 'maxOverlapRatio' in arg:
             maxOverlapRatio = float(arg.split('=')[1])
         # Paramètres variables pour la création des rasters de distance
         elif 'roadDist' in arg:
@@ -134,8 +126,6 @@ if len(sys.argv) > 5:
             maxSlope = int(arg.split('=')[1])
 
 # Valeurs de paramètres par défaut
-if 'silent' not in globals():
-    silent = False
 if 'pixRes' not in globals():
     pixRes = 50
     pixResStr= str(pixRes) + 'm'
@@ -146,15 +136,15 @@ if 'minSurf' not in globals():
 if 'maxSurf' not in globals():
     maxSurf = 10000
 if 'usrTxrp' not in globals():
-    useTxrp = False
+    useTxrp = True
 if 'levelHeight' not in globals():
     levelHeight = 3
 if 'maxOverlapRatio' not in globals():
-    maxOverlapRatio = 0.2
+    maxOverlapRatio = 0.3
 if 'roadDist' not in globals():
-    roadDist = 200
+    roadDist = 300
 if 'transDist' not in globals():
-    transDist = 300
+    transDist = 200
 if 'maxSlope' not in globals():
     maxSlope = 30
 if 'force' not in globals():
@@ -172,9 +162,8 @@ else:
     print("Department " + dpt + " isn't part of the current study area !")
     sys.exit()
 
-if not 200 >= pixRes >= 20:
-    if not silent:
-        print('Pixel size should be between 20m and 200m')
+if not 100 >= pixRes >= 20:
+    print('Pixel size should be between 20m and 100m')
     sys.exit()
 
 if force and outputDir.exists():
@@ -221,8 +210,7 @@ feedback = QgsLoggingFeedback()
 statBlacklist = ['count', 'unique', 'min', 'max', 'range', 'sum', 'mean',
                  'median', 'stddev', 'minority', 'majority', 'q1', 'q3', 'iqr']
 
-if not silent:
-    print('Started at ' + strftime('%H:%M:%S'))
+print('Started at ' + strftime('%H:%M:%S'))
 
 # Découpe une couche avec gestion de l'encodage pour la BDTOPO
 def clip(file, overlay, outdir='memory:'):
@@ -964,24 +952,6 @@ def ocsExtractor(ocsPath, oso=False):
     ocsol.addExpressionField(expr, QgsField('interet', QVariant.Double))
     return ocsol
 
-# Séléctionne les zones restrictvies dans le PPRI
-def ppriExtractor(ppriPath):
-    params = {
-        'INPUT': ppriPath,
-        'OUTPUT': 'memory:ppri'
-    }
-    res = processing.run('native:fixgeometries', params, feedback=feedback)
-    ppri = res['OUTPUT']
-    expr = """ "NOM" LIKE '%-NU%' or "NOM" LIKE 'F-U%' """
-    params = {
-        'INPUT': ppri,
-        'EXPRESSION': expr,
-        'OUTPUT': 'memory:ppri',
-        'FAIL_OUTPUT': 'memory:'
-    }
-    res = processing.run('native:extractbyexpression', params, feedback=feedback)
-    return res['OUTPUT']
-
 # Corrige les géometries et reclasse un PLU
 def pluFixer(plu, overlay, outdir, encoding='utf-8'):
     plu.setProviderEncoding(encoding)
@@ -1007,7 +977,8 @@ def pluFixer(plu, overlay, outdir, encoding='utf-8'):
                 OR "coment" LIKE 'sauvegarde de sites naturels, paysages ou écosystèmes'
                 OR "coment" LIKE '% terrains réservés %'
                 OR "coment" LIKE '% protégée'
-                OR "coment" LIKE '% construction nouvelle est interdite %', 1, 0)
+                OR "coment" LIKE '% construction nouvelle est interdite %'
+                OR "coment" LIKE '% protection contre risques naturels', 1, 0)
             """
         plu.addExpressionField(expr, QgsField('restrict', QVariant.Int, len=1))
         expr = """
@@ -1017,8 +988,6 @@ def pluFixer(plu, overlay, outdir, encoding='utf-8'):
                 OR "coment" LIKE '% destinée à l_urbanisation%', 1, 0)
             """
         plu.addExpressionField(expr, QgsField('priority', QVariant.Int, len=1))
-        expr = """ IF ("coment" LIKE '% protection contre risques naturels', 1, 0) """
-        plu.addExpressionField(expr, QgsField('ppri', QVariant.Int, len=1))
     else:
         expr = """
                 CASE
@@ -1084,9 +1053,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
             etape = 1
             description = 'extracting and reprojecting data '
-            progres = "%i/7 : %s" %(etape, description)
-            if not silent:
-                printer(progres)
+            progres = "%i/8 : %s" %(etape, description)
+            printer(progres)
             start_time = time()
             log.write(description + ': ')
 
@@ -1232,14 +1200,22 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
             argList.append((clip(ocsol, zone), workspace/'data/'))
 
-            # Traitement du shape de l'intérêt écologique
-            if (localData/'ecologie.shp').exists():
+            # Traitement de la couche d'intérêt écologique
+            if (localData/'ecologie.tif').exists():
+                gdal.Warp(
+                    str(workspace/'data/ecologie.tif'), str(localData/'ecologie.tif'),
+                    format='GTiff', outputType=gdal.GDT_Float32,
+                    xRes=pixRes, yRes=pixRes,
+                    resampleAlg='cubicspline',
+                    srcSRS='EPSG:2154', dstSRS='EPSG:3035'
+                )
+
+            elif (localData/'ecologie.shp').exists():
                 ecologie = QgsVectorLayer(str(localData/'ecologie.shp'), 'ecologie')
                 fields = list(f.name() for f in ecologie.fields())
                 if 'importance' not in fields:
                     error = "Attribut requis 'importance' manquant ou mal nomme dans la couche d'importance ecologique"
-                    if not silent:
-                        print(error)
+                    print(error)
                     log.write('Erreur : ' + error)
                     sys.exit()
                 ecologie.addExpressionField('"importance"/100', QgsField('taux', QVariant.Double))
@@ -1250,29 +1226,53 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 del fields
                 argList.append((clip(ecologie, zone), workspace/'data/'))
 
-            # Traitement d'une couche facultative du PPRI
+
+            # Traitement d'une couche facultative du PPRI local : extraction des zones de restriction
             if (localData/'ppri.shp').exists():
-                ppri = ppriExtractor(str(localData/'ppri.shp'))
-                argList.append((clip(ppri, zone), workspace/'data/restriction/'))
-            # Sinon on utilise la couche AZI - zone d'innondations potentielles
-            elif (globalData/'azi').exists():
-                azi = QgsVectorLayer(str(globalData/'azi/r_azi_zone_inond_pot_s_r76.shp'), 'azi')
                 params = {
-                    'INPUT': azi,
-                    'OUTPUT':'memory:azi'
+                    'INPUT': str(localData/'ppri.shp'),
+                    'OUTPUT': 'memory:ppri'
                 }
                 res = processing.run('native:fixgeometries', params, feedback=feedback)
-                azi = res['OUTPUT']
-                argList.append((clip(azi, zone), workspace/'data/restriction/'))
+                ppri = res['OUTPUT']
+                # Attention, le zonage varie : ici on cherche R zone rouge mais R peut signifier résiduel...
+                expr = """ "CODEZONE" LIKE 'R%' """
+                params = {
+                    'INPUT': ppri,
+                    'EXPRESSION': expr,
+                    'OUTPUT': 'memory:ppri',
+                    'FAIL_OUTPUT': 'memory:'
+                }
+                res = processing.run('native:extractbyexpression', params, feedback=feedback)
+                ppri = res['OUTPUT']
+                argList.append((clip(ppri, zone), workspace/'data/restriction/'))
+
+            # Sinon on cherche une couche PPRI du département
+            elif (globalData/'ppri').exists() and dpt in ['30', '34']:
+                if dpt == '30':
+                    expr = """ "CODEZONE" LIKE 'TF%' OR "CODEZONE" LIKE '%-NU' OR "CODEZONE" = 'F-U'"""
+                    ppri = QgsVectorLayer(str(globalData/('ppri/L_ZONE_REG_PPRI_S_030.shp')), 'ppri')
+                elif dpt == '34':
+                    expr = """ "CODEZONE" LIKE 'R%' """
+                    ppri = QgsVectorLayer(str(globalData/('ppri/N_ZONE_REG_PPRI_S_034.shp')), 'ppri')
+                params = {
+                    'INPUT': ppri,
+                    'OUTPUT':'memory:ppri'
+                }
+                res = processing.run('native:fixgeometries', params, feedback=feedback)
+                ppri = res['OUTPUT']
+                params = {
+                    'INPUT': ppri,
+                    'EXPRESSION': expr,
+                    'OUTPUT': 'memory:ppri',
+                    'FAIL_OUTPUT': 'memory:'
+                }
+                res = processing.run('native:extractbyexpression', params, feedback=feedback)
+                ppri = res['OUTPUT']
+                argList.append((clip(ppri, zone), workspace/'data/restriction/'))
 
             # Utilisation des parcelles DGFIP pour exclure des bâtiments lors du calcul de densité
-            if (localData/'exclusion_parcelles.shp').exists():
-                params = {'INPUT': str(localData/'exclusion_parcelles.shp'), 'OUTPUT': 'memory:exclusion_parcelles' }
-                res = processing.run('native:fixgeometries', params, feedback=feedback)
-                parcelles = res['OUTPUT']
-                argList.append((clip(parcelles, zone), workspace/'data/restriction/'))
-
-            elif (globalData/'majic').exists():
+            if (globalData/('majic/exclusion_parcelles_' + dpt + '.shp')).exists():
                 parcelles = QgsVectorLayer(str(globalData/('majic/exclusion_parcelles_' + dpt + '.shp')), 'exclusion_parcelles')
                 argList.append((clip(parcelles, zone), workspace/'data/restriction/'))
 
@@ -1282,8 +1282,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
             # Traitement de la couche des mesures comensatoires
             if reg == 'R91' and (globalData/'comp').exists():
-                compensation = QgsVectorLayer(str(globalData/'comp/MesuresCompensatoires_R91.shp'), 'compensation')
-                argList.append((clip(compensation, zone), workspace/'data/restriction/'))
+                comp = QgsVectorLayer(str(globalData/'comp/MesuresCompensatoires_R91.shp'), 'compensation')
+                argList.append((clip(comp, zone), workspace/'data/restriction/'))
 
             if speed:
                 getDone(reproj, argList)
@@ -1296,10 +1296,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 del ecologie
             if 'ppri' in globals():
                 del ppri
-            if 'azi' in globals():
-                del azi
-            if 'compensation' in globals():
-                del compensation
+            if 'comp' in globals():
+                del comp
 
             # Traitement des couches de zonage de protection
             zonagesEnv = []
@@ -1343,7 +1341,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             params = {
                 'INPUT': str(workspace/'data/transport/route_primaire.shp'),
                 'EXPRESSION': """ "NATURE" != 'Autoroute' """,
-                'OUTPUT': 'memory:autoroutes',
+                'OUTPUT': 'memory:routes_primaires',
                 'FAIL_OUTPUT': 'memory:'
             }
             res = processing.run('native:extractbyexpression', params, feedback=feedback)
@@ -1393,9 +1391,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             start_time = time()
             etape = 2
             description = "cleaning buildings to estimate the population "
-            progres = "%i/7 : %s" %(etape, description)
-            if not silent:
-                printer(progres)
+            progres = "%i/8 : %s" %(etape, description)
+            printer(progres)
             log.write(description + ': ')
 
             # Nettoyage dans la couche de bâti indifferencié
@@ -1488,9 +1485,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             start_time = time()
             etape = 3
             description =  "creating a grid with resolution " + pixResStr
-            progres = "%i/7 : %s" %(etape, description)
-            if not silent:
-                printer(progres)
+            progres = "%i/8 : %s" %(etape, description)
+            printer(progres)
             log.write(description + ': ')
 
             # Création d'une grille régulière
@@ -1514,9 +1510,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             start_time = time()
             etape = 4
             description = "analysing the evolution of built areas "
-            progres = "%i/7 : %s" %(etape, description)
-            if not silent:
-                printer(progres)
+            progres = "%i/8 : %s" %(etape, description)
+            printer(progres)
             log.write(description + ': ')
 
             grid = QgsVectorLayer(str(workspace/'data'/pixResStr/'grid.shp'), 'grid')
@@ -1549,9 +1544,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             start_time = time()
             etape = 5
             description = "estimating the population in the grid "
-            progres = "%i/7 : %s" %(etape, description)
-            if not silent:
-                printer(progres)
+            progres = "%i/8 : %s" %(etape, description)
+            printer(progres)
             log.write(description + ': ')
 
             batiInterIris = QgsVectorLayer(str(workspace/'data/2014_bati/bati_inter_iris.shp'))
@@ -1562,9 +1556,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             start_time = time()
             etape = 6
             description = "computing restriction and interest rasters "
-            progres = "%i/7 : %s" %(etape, description)
-            if not silent:
-                printer(progres)
+            progres = "%i/8 : %s" %(etape, description)
+            printer(progres)
             log.write(description + ': ')
 
             # Création de la grille de restriction
@@ -1629,29 +1622,34 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 (workspace/'data/pai/surf_activ_non_com.shp', workspace/'data'/pixResStr/'tif/surf_activ_non_com.tif', 'Byte', None, 1)
             ]
 
-            if (workspace/'data/ecologie.shp').exists():
-                argList.append((workspace/'data/ecologie.shp', workspace/'data'/pixResStr/'tif/ecologie.tif', 'Float32', 'taux'))
-
             if (workspace/'data/restriction/exclusion_parcelles.shp').exists():
                 argList.append((workspace/'data/restriction/exclusion_parcelles.shp', workspace/'data'/pixResStr/'tif/exclusion_parcelles.tif', 'Byte', None, 1))
             if (workspace/'data/restriction/exclusion_manuelle.shp').exists():
                 argList.append((workspace/'data/restriction/exclusion_manuelle.shp', workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif', 'Byte', None, 1))
 
-            if (workspace/'data/restriction/azi.shp').exists():
-                argList.append((workspace/'data/restriction/azi.shp', workspace/'data'/pixResStr/'tif/azi.tif', 'Byte', None, 1))
-
             if (workspace/'data/restriction/ppri.shp').exists():
                 argList.append((workspace/'data/restriction/ppri.shp', workspace/'data'/pixResStr/'tif/ppri.tif', 'Byte', None, 1))
 
-            if (workspace/'data/restriction/compensation.shp').exists():
-                argList.append((workspace/'data/restriction/compensation.shp', workspace/'data'/pixResStr/'tif/compensation.tif', 'Byte', None, 1))
-
+            # Solution de repli si on a les zonnes PPRI dans le PLU
             elif (workspace/'data/plu.shp').exists():
                 layer = QgsVectorLayer(str(workspace/'data/plu.shp'), 'plu')
                 fields = list(f.name() for f in layer.fields())
                 if 'ppri' in fields:
                     argList.append((workspace/'data/plu.shp', workspace/'data'/pixResStr/'tif/ppri.tif', 'Byte', 'ppri'))
                 del layer, fields
+
+            if (workspace/'data/restriction/compensation.shp').exists():
+                argList.append((workspace/'data/restriction/compensation.shp', workspace/'data'/pixResStr/'tif/compensation.tif', 'Byte', None, 1))
+
+            # Découpe du tif d'intérêt écologique si il a été traité lors de l'étape 1
+            if (str(workspace/'data/ecologie.tif')).exists():
+                gdal.Warp(
+                    str(workspace/'data'/pixResStr/'tif/ecologie.tif'), str(workspace/'data/ecologie.tif'),
+                    format='GTiff', outputType=gdal.GDT_Float32,
+                    outputBounds=(xMin, yMin, xMax, yMax)
+                )
+            elif (workspace/'data/ecologie.shp').exists():
+                argList.append((workspace/'data/ecologie.shp', workspace/'data'/pixResStr/'tif/ecologie.tif', 'Float32', 'taux'))
 
             if speed:
                 getDone(rasterize, argList)
@@ -1709,12 +1707,56 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             del projwin, distancesSirene
             log.write(getTime(start_time) + '\n')
 
-        start_time = time()
-        etape = 7
-        description = "finalizing... "
-        progres = "%i/7 : %s" %(etape, description)
-        if not silent:
+        if not (workspace/'data'/pixResStr/'fitting').exists():
+            start_time = time()
+            etape = 7
+            description = "trying to fit floors and surfaces distributions "
+            progres = "%i/8 : %s" %(etape, description)
             printer(progres)
+            log.write(description + ': ')
+
+            argList = []
+            os.mkdir(workspace/'data'/pixResStr/'fitting')
+            scriptDir = Path(__file__).absolute().parent
+
+            argList.append(('Rscript ' + str(scriptDir/'fitting/fit_floors.R') + ' ' + str(workspace/'data'/pixResStr)
+                      + ' > ' + str(workspace/'data'/pixResStr/'fitting/Rlog_floors.txt')))
+            argList.append(('Rscript ' + str(scriptDir/'fitting/fit_surf.R') + ' ' + str(workspace/'data'/pixResStr)
+                      + ' > ' + str(workspace/'data'/pixResStr/'fitting/Rlog_surf.txt')))
+
+            if speed :
+                getDone(os.system, argList)
+            else:
+                for a in argList:
+                    os.system(*a)
+            log.write(getTime(start_time) + '\n')
+
+        else:
+            fitResults = os.listdir(workspace/'data'/pixResStr/'fitting')
+            if 'floors_weights.csv' not in fitResults or 'surf_weights.csv' not in fitResults:
+                start_time = time()
+                etape = 7
+                description = "trying to fit floors and surfaces distributions "
+                progres = "%i/8 : %s" %(etape, description)
+                printer(progres)
+                log.write(description + ': ')
+
+                scriptDir = Path(__file__).absolute().parent
+                if 'floors_weights.csv' not in fitResults:
+                    os.system('Rscript ' + str(scriptDir/'fitting/fit_floors.R') + ' ' + str(workspace/'data'/pixResStr)
+                              + ' > ' + str(workspace/'data'/pixResStr/'fitting/Rlog_floors.txt'))
+
+                if 'surf_weights.csv' not in fitResults:
+                    os.system('Rscript ' + str(scriptDir/'fitting/fit_surf.R') + ' ' + str(workspace/'data'/pixResStr)
+                              + ' > ' + str(workspace/'data'/pixResStr/'fitting/Rlog_surf.txt'))
+
+                log.write(getTime(start_time) + '\n')
+
+        start_time = time()
+        etape = 8
+        description = "finalizing... "
+        progres = "%i/8 : %s" %(etape, description)
+        printer(progres)
         log.write(description + ': ')
 
         # Calcul de la population totale de la zone pour export en csv
@@ -1748,8 +1790,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_ssr_med.tif', 'UInt16', 'ssr_med'),
             (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_tx_ssr.tif', 'Float32', 'tx_ssr'),
             (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_m2_hab.tif', 'UInt16', 'm2_hab'),
-            (workspace/'data'/pixResStr/'stat_iris.shp', project/'iris_nbniv_max.tif', 'UInt16', 'nbniv_max'),
-            (workspace/'data'/pixResStr/'stat_grid.shp', project/'demographie.tif', 'UInt16', 'pop'),
             (workspace/'data'/pixResStr/'stat_grid.shp', project/'demographie.tif', 'UInt16', 'pop'),
             (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_pla.tif', 'UInt32', 'srf_pla'),
             (workspace/'data'/pixResStr/'stat_grid.shp', project/'srf_sol_res.tif', 'UInt16', 'ssol_res'),
@@ -1816,10 +1856,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             ppriMask = to_array(workspace/'data'/pixResStr/'tif/ppri.tif', np.byte)
             restriction = np.where(ppriMask == 1, 1, restriction)
 
-        elif (workspace/'data'/pixResStr/'tif/azi.tif').exists():
-            aziMask = to_array(workspace/'data'/pixResStr/'tif/azi.tif', np.byte)
-            restriction = np.where(aziMask == 1, 1, restriction)
-
         if (workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif').exists():
             exclusionManuelle = to_array(workspace/'data'/pixResStr/'tif/exclusion_manuelle.tif', np.byte)
             restriction = np.where(exclusionManuelle == 1, 1, restriction)
@@ -1851,28 +1887,24 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
         copyfile(str(localData/'poids.csv'), str(project/'interet/poids.csv'))
         copyfile(str(workspace/'data'/pixResStr/'evo_surface_sol.csv'), str(project/'evo_surface_sol.csv'))
         try:
-            copyfile(str(workspace/'data'/pixResStr/'surf_weights.csv'), str(project/'poids_surfaces.csv'))
-            copyfile(str(workspace/'data'/pixResStr/'floors_weights.csv'), str(project/'poids_etages.csv'))
-            copyfile(str(workspace/'data'/pixResStr/'surf_weights_nofit.csv'), str(project/'poids_surfaces_nofit.csv'))
-            copyfile(str(workspace/'data'/pixResStr/'floors_weights_nofit.csv'), str(project/'poids_etages_nofit.csv'))
+            copyfile(str(workspace/'data'/pixResStr/'fitting/surf_weights.csv'), str(project/'poids_surfaces.csv'))
+            copyfile(str(workspace/'data'/pixResStr/'fitting/floors_weights.csv'), str(project/'poids_etages.csv'))
+            copyfile(str(workspace/'data'/pixResStr/'fitting/surf_weights_nofit.csv'), str(project/'poids_surfaces_nofit.csv'))
+            copyfile(str(workspace/'data'/pixResStr/'fitting/floors_weights_nofit.csv'), str(project/'poids_etages_nofit.csv'))
         except FileNotFoundError:
-            if not silent:
-                print('Les fichiers issus du fitting sont manquants, relancez le code après avoir utilisé les codes R...')
+            print('\nFitted distributions are missing, please check the R scripts logfiles in ' + str(workspace/'data'/pixResStr/'fitting'))
             sys.exit()
 
-        if not silent:
-            print('\nFinished at ' + strftime('%H:%M:%S'))
+        print('\nFinished at ' + strftime('%H:%M:%S'))
         log.write(getTime(start_time) + '\n')
         if truth:
-            if not silent:
-                print('Removing temporary data!')
+            print('Removing temporary data!')
             rmtree(str(workspace))
 
     except:
         exc = sys.exc_info()
-        if not silent:
-            print("\n*** Error :")
-            traceback.print_exception(*exc, limit=5, file=sys.stdout)
+        print("\n*** Error :")
+        traceback.print_exception(*exc, limit=5, file=sys.stdout)
         traceback.print_exception(*exc, limit=5, file=log)
         sys.exit()
 
