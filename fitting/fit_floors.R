@@ -4,11 +4,9 @@ library(readr)
 library(fitdistrplus)
 library(actuar)
 
-
-setwd("/home/delbarvi/Geomatique/simulation/prepared/34/mtp/data/20m")
-#setwd("/home/vins/Geomatique/stage/simulation/prepared/34/mtp/data/20m")
-
-
+args <- commandArgs(trailingOnly=TRUE)
+wd <- args[1]
+setwd(wd)
 dfniv <- read_csv("distrib_floors.csv")
 
 #les codes iris sont des facteurs
@@ -150,7 +148,7 @@ dPoidsNormExist  <- dfniv  %>% group_by(ID_IRIS) %>%  count(FLOOR)  %>% mutate(p
 names(dPoidsNormExist) <-  c("ID_IRIS", "FLOOR", "effectif", "poidsNormalise_a_l_IRIS" )
 
 # ecriture du fichier de poids
-write_csv(dPoidsNormExist,path = "floors_weights_nofit.csv")
+write_csv(dPoidsNormExist,path = "fitting/floors_weights_nofit.csv")
 
 
 #########################################################
@@ -407,14 +405,13 @@ names(distribsResults) <-  bckupNames
 
 
 #sauvegarde en fichier
-setwd()
-write.csv(distribsResults, "floors_weights.csv")
+write.csv(distribsResults, "fitting/floors_weights.csv")
 
 
 
 # on vérifie que la distribution somme à 1 ou presque  :
 
-ddd <-  read.csv("floors_weights.csv")
+ddd <-  read.csv("fitting/floors_weights.csv")
 #somme des poids par IRIS
 xx <- ddd %>% group_by(ID_IRIS) %>% summarise(totProbAIC = sum(poidsFitAIC), totProbCHI2 = sum(poidsFitCHI2))
 ## => le poifsFitAIC semble plus adapté puisque la la somme tend vers 1 (faudrait vérifier avec un statisticien )
@@ -430,7 +427,7 @@ xx <- ddd %>% group_by(ID_IRIS) %>% summarise(totProbAIC = sum(poidsFitAIC), tot
 
 
 
-dd <-  dfniv %>% filter(ID_IRIS == 340220101)
+dd <-  dfniv %>% filter(ID_IRIS == 67)
 
 
 meilleureDistAIC <- fitter(dd,"AIC")
