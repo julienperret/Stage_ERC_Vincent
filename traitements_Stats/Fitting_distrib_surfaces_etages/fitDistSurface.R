@@ -4,7 +4,8 @@ library(readr)
 library(fitdistrplus)
 library(actuar)
 
-setwd("/home/paulchapron/encadrement/repoJulienERC/erc//traitements_Stats/Sampling_surface_et_etages/")
+#setwd("/home/paulchapron/encadrement/repoJulienERC/erc/traitements_Stats/Sampling_surface_et_etages/")
+setwd("/home/chap/encadrement/repoJulien/erc/traitements_Stats/Fitting_distrib_surfaces_etages/")
 
 df <-  read_csv("surface_sol.csv")
 
@@ -199,8 +200,7 @@ return(besties)
 
 
 fittedDistSurfGenerator <-  function(surfmax, distribModels, surfaceBinwidth) {
-  
-  
+
   distribGamma <-  NULL  
   distribNorm <-  NULL  
   distribLognorm <-  NULL  
@@ -210,8 +210,8 @@ fittedDistSurfGenerator <-  function(surfmax, distribModels, surfaceBinwidth) {
   distribExp <-  NULL  
   distribLogis <-  NULL  
   distribBeta <-  NULL
-  
-  surfaceBins <-  seq(from=10, to=round(surfmax), by=surfaceBinwidth)
+
+  surfaceBins <-  seq(from=0, to=round(surfmax)+ surfaceBinwidth, by=surfaceBinwidth)
   
   #les candidats arrivent dans l'ordre :
   #list(bestCandidateAD, bestCandidateCVM, bestCandidateKS, bestCandidateAIC)
@@ -224,7 +224,10 @@ fittedDistSurfGenerator <-  function(surfmax, distribModels, surfaceBinwidth) {
     dBestKS= numeric(length(surfaceBins)),
     dBestAIC = numeric(length(surfaceBins))
    ) 
+  #bornes des bandes pour le calcul de probas 
   
+  Bmins <- surfaceBins
+  Bmaxs <- c(tail(surfaceBins, length(surfaceBins)-1), max(surfaceBins)+surfaceBinwidth)
   
   distrib <-  NULL
   
@@ -235,53 +238,53 @@ fittedDistSurfGenerator <-  function(surfmax, distribModels, surfaceBinwidth) {
     if (b$distname == "gamma") {
     cat(" distribution  gamma\n")
     shape <-  b$estimate
-    distribGamma <-  dgamma(surfaceBins , shape)
+    distribGamma <-  pgamma(Bmaxs, shape) - pgamma(Bmins, shape)
     }
 
     if (b$distname == "norm") {
       cat(" distribution  de loi normale\n")
       mu <-  b$estimate[1]
-      sigma <- b$estimate[2]
-      distrib <-  dnorm(surfaceBins, mu, sigma)
+      mysigma <- b$estimate[2]
+      distrib <-  pnorm(Bmaxs, mu, mysigma) - pnorm(Bmins, mu, mysigma)
     }
     if (b$distname == "lnorm") {
       cat(" distribution  lognormale\n")
       mulog <-  b$estimate[1]
       sigmalog <- b$estimate[2]
-      distrib <-  dlnorm(surfaceBins, mulog, sigmalog)
+      distrib <-  plnorm(Bmaxs, mulog, sigmalog) - plnorm(Bmins, mulog, sigmalog)
     }
     if (b$distname == "pois") {
       cat(" distribution  de Poisson\n")
-      mulog <-  b$estimate[1]
-      sigmalog <- b$estimate[2]
-      distrib <-  dlnorm(surfaceBins, mulog, sigmalog)
+      lambda <-  b$estimate[1]
+      distrib <-  ppois(Bmaxs, lambda) - ppois(Bmins, lambda)
     }
     if (b$distname == "exp") {
       cat(" distribution  exponentielle\n")
       rate <-  b$estimate
-      distrib <-  dexp(surfaceBins, rate)
+      distrib <-  pexp(Bmaxs, rate) - pexp(Bmins, rate)
     }
     if (b$distname == "cauchy") {
       cat(" distribution  de Cauchy\n")
       location <-  b$estimate[1]
       scale <-  b$estimate[2]
-      distrib <-  dcauchy(surfaceBins, location, scale)
+      distrib <-  pcauchy(Bmaxs, location, scale) - pcauchy(Bmins, location, scale)
     }
     if (b$distname == "geom") {
       cat(" distribution  geométrique\n")
       prob <- b$estimate[1]
-      distrib <-  dgeom(surfaceBins, prob)
+      distrib <-  pgeom(Bmaxs, prob) - pgeom(Bmins, prob)
     }
     if (b$distname == "beta") {
       cat(" distribution  beta\n")
       shape1 <- b$estimate[1]
       shape2 <- b$estimate[2]
-      distrib <-  dbeta(surfaceBins, shape1, shape2)
+      distrib <-  pbeta(Bmaxs, shape1, shape2) -pbeta(Bmins, shape1, shape2)
     }
     if (b$distname == "logis") {
       cat(" distribution  logistique\n")
       loc <-  b$estimate[1]
-      distrib <-  dlogis(surfaceBins, location)
+      sca <- b$estimate[2]
+      distrib <-  plogis(Bmaxs, loc,sca)-plogis(Bmins, loc,sca)
     }
   
     
@@ -321,17 +324,6 @@ for (c in unique(df$CODE_IRIS)) {
   surfbinwidth <-  20 
   fittedDistros <-  fittedDistSurfGenerator(surfmax , distribModels = models, surfaceBinwidth = surfbinwidth)
   
-  
-  
-  # 
-  # if (!is.null(distModelAIC)) {
-  #   distSimuleeAIC <-  fittedDistGenerator(netagesmax, distModelAIC)
-  # }
-  # if (!is.null(distModelchi2pval)) {
-  #   distSimuleechi2pval <-fittedDistGenerator(netagesmax, distModelchi2pval)
-  # }
-  # 
-  
   fittedDistros$CODE_IRIS <- c
   
   cptr  <-  cptr + 1
@@ -343,12 +335,45 @@ for (c in unique(df$CODE_IRIS)) {
 
 
 getwd()
-write.csv(distribsResults, "poidsSurface_fittes_by_IRIS.csv")
+write.csv(distribsResults, "poidsSurface_fittes_by_IRIS_SUMTO1.csv")
+
+
 dd <-  read.csv("poidsSurface_fittes_by_IRIS.csv")
 
 
 
 
+
+
+
+
+
+####### Code de tests pour obtenir les probas (poids) qui somment à 1
+
+
+fit <-  fitter(dd)
+smax <-  max(dd$SURFACE_SOL )
+binwidth <-  10
+
+surfaceBins <-  seq(from=0, to=round(smax)+binwidth, by=binwidth)
+didi <-  fittedDistSurfGenerator(fit,surfmax =smax, surfaceBinwidth = binwidth )
+
+
+
+
+Bmins <- head(surfaceBins, length(surfaceBins)-1 )
+Bmaxs <- tail(surfaceBins, length(surfaceBins)-1 )
+
+
+vraiesProbas <-  pgeom(Bmaxs, fit[[1]]$estimate ) -pgeom(Bmins, fit[[1]]$estimate )
+
+
+
+# version élégante que j'arrive pas àà faire tourner 
+integralDensite  <-  function(low,up){
+        integrate(approxfun(dnorm), low, up)
+  }
+mapply(integralDensite, Bmins, Bmaxs)
 
 
 ## on vérfie si ça somme à 1 
@@ -368,13 +393,6 @@ riri <-  df %>% filter(CODE_IRIS == 340220101)
 mods  <- fitter(dd = riri)
 #dessin comparant les distribs fittées et la distrib observée
 cdfcomp(mods)
-
-
-
-
-
-meilleureDistAIC
-meilleureDistchipval
 
 
 
