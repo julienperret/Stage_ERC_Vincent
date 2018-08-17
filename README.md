@@ -1,4 +1,4 @@
-**__! Les dernières modifications sur prepare.py obligent à recharger la donnée locale depuis le SFTP !__**
+** Modèle pour simuler l'urbanisation en région Occitanie **
 
 ## ./prepare.py
 Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
@@ -30,9 +30,6 @@ Ce script doit être lancé en ligne de commande avec au moins 2 arguments :
 * force = suppression du répertoire de sortie si il existe
 * speed = utilisation de plusieurs threads (peut coûter cher en RAM !)
 * truth = écriture des .tif directement dans le répertoire de sortie sans conserver les données intermédiaires
-* silent = aucun 'print' durant l'exécution
-
-En cas de problème avec les "distance_trucmuche.tif", vérifier qu'il y a un header dans les fichiers csv.
 
 Usage :
 ```shell
@@ -57,19 +54,20 @@ Deux paramètres au minimum :
 
 | Variable ou fichier  | Minimum   | Maximum    | Unité  | Valeur par défaut | Description                                                                                                           |
 |----------------------|-----------|------------|--------|-------------------|-----------------------------------------------------------------------------------------------------------------------|
-| rate                 | 0         | 3          | %      | non               | Taux d’évolution annuel de la population                                                                              |
+| local_data/poids.csv | 1         | +          | int    |                   | Poids de chaque raster d’aménités pour la création du raster de l'interet à urbaniser                                 |
+| growth               | 0         | 3          | %      | non               | Taux d’évolution annuel de la population                                                                              |
 | scenario             | reduction | tendanciel | string | tendanciel        | Scénario de consommation d’espace (réduction, stable, tendanciel)                                                     |
 | pluPriority          | False     | True       | bool   | True              | Utilisation du PLU pour peupler les ZAU en priorité                                                                   |
 | buildNonRes          | False     | True       | bool   | True              | Pour simuler la construction au sol de bâtiments non résidentiels (en utilisant un taux de résidentiel par IRIS)      |
 | densifyGround        | False     | True       | bool   | False             | Pour autoriser à densifier au sol des cellules déjà construite (si la capacité au sol le permet - voir maxBuiltRatio) |
 | maxBuiltRatio        | 50.0      | 100.0      | %      | 80                | Taux maximal de la surface bâtie au sol d’une cellule                                                                 |
 | densifyOld           | False     | True       | bool   | False             | Pour autoriser à augmenter la surface plancher dans des cellules urbanisées avant le début de la simulation           |
-| maximumDensifty      | False     | True       | bool   | False             | Pour utiliser le maximum de la surface autorisée dans chaque cellule - au sol ou en plancher                          |
-| winSize              | 3         | 9          | pixel  | 3                 | Taille en pixels du côté de la fenêtre glissante pour calcul de la somme ou de la moyenne des valeurs voisines        |
-| minContig            | 0         | 0.3        | float  | 0.1               | Nombre minimal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
-| maxContig            | 0.6       | 1          | float  | 0.8               | Nombre maximal de cellules urbanisées contiguës pour urbanisation d’une cellule vide                                  |
-| writeTifs            | False     | True       | bool   | true              | Indique si les tiffs sont sauvés en sortie                                                                            |
-| local_data/poids.csv | 1         | +          | int    |                   | Poids de chaque raster d’aménités pour la création du raster final interet                                            |
+| winSize              | 3         | 7          | pixel  | 3                 | Taille en pixels du côté de la fenêtre glissante pour contraindre la contiguïté                                       |
+| minContig            | 0         | 0.33       | float  | 0.1               | Taux minimal de cellules urbanisées dans le voisinage pour construction dans une cellule vide                         |
+| maxContig            | 0.5       | 1          | float  | 0.8               | Taux maximal de cellules urbanisées dans le voisinage pour construction dans une cellule vide                         |
+| tiffs                | False     | True       | bool   | true              | Indique si les tiffs sont sauvés en sortie                                                                            |
+| snaps                | False     | True       | bool   | true              | Indique si les tiffs sont sauvés en sortie                                                                            |
+
 
 Usage :
 ```shell
@@ -84,7 +82,7 @@ Dépendances pour python3 :
 ```shell
 care -o ./prepare.tgz.bin  -p ./mtp -p ./global_data ./prepare.py ./global_data/ 34  ./mtp/ ./results/ "pixRes=50 useTxrp=True levelHeight=3 force"
 
-care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data/ /my/output/dir/ 50 0.5 "mode=souple saturateFirst=True pluPriority=False"
+care -o /my/care/output/dir/simulation.tgz.bin -p /my/global/data/ -p /my/local/data/ -p /my/prepared/data/ ./simulation.py /my/prepared/data/ /my/output/dir/ 0.5 " pluPriority=False"
 ```
 
 ATTENTION : derrière -p : mettre les chemins en absolu
@@ -142,7 +140,7 @@ Votre image docker *erc* est sauvée dans l'archive *erc.tar*. Vous pouvez maint
 ## Outils
 
 ### ./magic.py
-Convertit les fichiers positionnels MAJIC III en CSV avec création de tables PSQL
+Convertit les fichiers positionnels MAJIC en CSV avec création de tables PSQL
 
 ### ./toolbox.py
 Contient les fonctions communes; à déplacer avec tout script sorti du dépôt.
@@ -162,7 +160,7 @@ Génère un GIF à partir des instantanés (TIF) générés pour chaque année d
 Trois paramètres au minimum:
     1 : dossier contenant les images pour chaque année
     2 : dossier de sortie
-    3 : type de donnée des images (byte, uint16, uint32, float32)
+    3 : type de donnée des images (byte, uint16-32, float32)
     4 : chaîne contenant la durée du GIF et la valeur max à utiliser ( delay=n , maxValue=n)
 
 Usage :
