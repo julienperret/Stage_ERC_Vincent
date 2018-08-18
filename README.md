@@ -61,7 +61,7 @@ Deux paramètres au minimum :
 | buildNonRes          | False     | True       | bool   | True              | Pour simuler la construction au sol de bâtiments non résidentiels (en utilisant un taux de résidentiel par IRIS)      |
 | densifyGround        | False     | True       | bool   | False             | Pour autoriser à densifier au sol des cellules déjà construite (si la capacité au sol le permet - voir maxBuiltRatio) |
 | maxBuiltRatio        | 50.0      | 100.0      | %      | 80                | Taux maximal de la surface bâtie au sol d’une cellule                                                                 |
-| maxUsedPlaSurf       | 50        | 300        | m²     | 200               | Surface plancher maximale à utiliser pour loger une personne                                                          |
+| maxUsedSrfPla       | 50        | 300        | m²     | 200               | Surface plancher maximale à utiliser pour loger une personne                                                          |
 | densifyOld           | False     | True       | bool   | False             | Pour autoriser à augmenter la surface plancher dans des cellules urbanisées avant le début de la simulation           |
 | winSize              | 3         | 7          | pixel  | 3                 | Taille en pixels du côté de la fenêtre glissante pour contraindre la contiguïté                                       |
 | minContig            | 0         | 0.33       | float  | 0.1               | Taux minimal de cellules urbanisées dans le voisinage pour construction dans une cellule vide                         |

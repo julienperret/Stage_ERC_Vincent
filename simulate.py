@@ -37,8 +37,8 @@ if len(sys.argv) == 5:
             densifyOld = literal_eval(arg.split('=')[1])
         elif 'maxBuiltRatio' in arg:
             maxBuiltRatio = int(arg.split('=')[1])
-        elif 'maxUsedPlaSurf' in arg:
-            maxUsedPlaSurf = int(arg.split('=')[1])
+        elif 'maxUsedSrfPla' in arg:
+            maxUsedSrfPla = int(arg.split('=')[1])
         elif 'winSize' in arg:
             winSize = int(arg.split('=')[1])
         elif 'minContig' in arg:
@@ -104,8 +104,8 @@ if 'densifyOld' not in globals():
 # Pour seuiller l'artificialisation d'une cellule
 if 'maxBuiltRatio' not in globals():
     maxBuiltRatio = 80
-if 'maxUsedPlaSurf' not in globals():
-    maxUsedPlaSurf = 200
+if 'maxUsedSrfPla' not in globals():
+    maxUsedSrfPla = 200
 # Paramètres pour les règles de contiguïtés
 if 'winSize' not in globals():
     winSize = 3
@@ -240,15 +240,16 @@ def densify(mode, row, col):
         return sp
 
 # Fonction principale pour gérer artificialisation puis densification
-def urbanize(pop, srfMax=0, zau=False):
+def urbanize(pop, srfMax=None, zau=False, rebuildOld=False):
     artif = 0
     count = 0
+    tmpInteret = None
     tmpUrb = np.zeros([rows, cols], np.byte)
     tmpSrfPla = np.zeros([rows, cols], np.uint16)
     tmpSrfSol = np.zeros([rows, cols], np.uint16)
     global demographie, capaSol, srfSol, srfSolRes, srfPla, urb
     # Expansion par ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
-    if srfMax > 0:
+    if srfMax:
         tmpInteret = np.where(capaSol > 0, interet, 0)
         if not densifyGround:
             # On limite l'urbanisation aux espaces non artificialisés en début de simulation
@@ -256,7 +257,9 @@ def urbanize(pop, srfMax=0, zau=False):
         if zau:
             # On limite l'urbanisation aux ZAU (if pluPriority)
             tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
-        while (artif < srfMax or count < pop) and tmpInteret.sum() > 0:
+
+        while artif < srfMax and count < pop and tmpInteret.sum() > 0:
+            # Tant qu'il reste des gens à loger et de la surface à construire
             ss = 0
             sp = 0
             row, col = chooseCell(tmpInteret)
@@ -292,7 +295,7 @@ def urbanize(pop, srfMax=0, zau=False):
             else:
                 tmpInteret[row][col] = 0
 
-    else:
+    elif rebuildOld:
         # Densification du bâti existant si on n'a pas pu loger tout le monde
         tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
         while count < pop and tmpInteret.sum() > 0:
@@ -346,7 +349,7 @@ os.makedirs(str(project/'output'))
 
 if tiffs and snaps:
     mkdirList = [
-        'snapshots',
+        'snapshots'
         'snapshots/demographie',
         'snapshots/urbanisation',
         'snapshots/surface_sol',
@@ -438,7 +441,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 id = int(values[1].replace('"',''))
                 etages = int(values[2].replace('"',''))
                 # AIC=[4] ; Chi²=[5]
-                poidsEtages[id][etages] = float(values[4]) if values[4] != 'NA' else 0
+                poidsEtages[id][etages] = float(values[5].replace('\n','')) if 'NA' not in values[5] else 0
 
         poidsSurfaces = {}
         for i in range(nbIris):
@@ -493,7 +496,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         srfSolRes14 = to_array(dataDir/'srf_sol_res.tif', np.uint16)
         ssrMed = to_array(dataDir/'iris_ssr_med.tif', np.uint16)
         m2PlaHab = to_array(dataDir/'iris_m2_hab.tif', np.uint16)
-        m2PlaHab = np.where(m2PlaHab > maxUsedPlaSurf, maxUsedPlaSurf, m2PlaHab)
+        m2PlaHab = np.where(m2PlaHab > maxUsedSrfPla, maxUsedSrfPla, m2PlaHab)
         srfPla14 = to_array(dataDir/'srf_pla.tif', np.uint16)
         if buildNonRes:
             txSsr = to_array(dataDir/'iris_tx_ssr.tif', np.float32)
@@ -543,16 +546,17 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             popALoger = popDic[year]
             if pluPriority and not skipZau:
                 restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt, zau=True)
-                if resteSrf >= srfMax:
+                if resteSrf >= srfMax and restePop >= popALoger:
                     skipZau = True
                     skipZauYear = year
                     restePop, resteSrf = urbanize(restePop, resteSrf)
             else:
                 restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt)
                 if restePop > 0 and densifyOld:
-                    restePop, _ = urbanize(restePop)
+                    restePop, _ = urbanize(restePop, rebuildOld=True)
             preBuilt = -resteSrf
             preLog = -restePop
+            print('\nprebuilt : ', str(preBuilt), 'non logee : ', str(-preLog))
 
             # Snapshots
             if tiffs and snaps:
