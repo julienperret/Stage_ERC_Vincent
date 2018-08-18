@@ -150,14 +150,14 @@ def chooseArea(id, row, col):
     c = [0]
     surf = np.array(list(poidsSurfaces[id].keys()))
     pds = np.array(list(poidsSurfaces[id].values()))
-    if len(surf) > 0 or len(pds) > 0 :
+    if len(surf) > 0 and sum(pds) > 0 :
         while c[0] == 0:
             c = np.random.choice(surf, 1, p=pds)
         ss = float(c[0])
     else:
         surf = np.array(list(poidsSurfacesNoFit[id].keys()))
         pds = np.array(list(poidsSurfacesNoFit[id].values()))
-        if len(surf) > 0 or len(pds) > 0 :
+        if len(surf) > 0 and sum(pds) > 0 :
             while c[0] == 0:
                 c = np.random.choice(surf, 1, p=pds)
             ss = float(c[0])
@@ -167,13 +167,13 @@ def chooseFloors(id, row, col):
     nbNiv = 0
     etages = np.array(list(poidsEtages[id].keys()))
     pds = np.array(list(poidsEtages[id].values()))
-    if len(etages) > 0 or len(pds) > 0:
+    if len(etages) > 0 and sum(pds) > 0:
         c = np.random.choice(etages, 1, p=pds)
         nbNiv = c[0]
     else:
         etages = np.array(list(poidsEtagesNoFit[id].keys()))
         pds = np.array(list(poidsEtagesNoFit[id].values()))
-        if len(etages) > 0 or len(pds) > 0:
+        if len(etages) > 0 and sum(pds) > 0:
             c = np.random.choice(etages, 1, p=pds)
             nbNiv = c[0]
     return nbNiv
@@ -402,7 +402,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 id = int(values[1].replace('"',''))
                 etages = int(values[2].replace('"',''))
                 # AIC=[4] ; Chi²=[5]
-                poidsEtages[id][etages] = float(values[4])
+                poidsEtages[id][etages] = float(values[4]) if float(values[4]) != 'NA' else 0
 
         poidsSurfaces = {}
         for i in range(nbIris):
