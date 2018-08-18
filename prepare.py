@@ -850,7 +850,6 @@ def envRestrict(layerList, overlay, outdir):
 
 # Jointure avec données INSEE et extraction des IRIS dans la zone
 def irisExtractor(iris, overlay, csvdir, outdir):
-    iris.addExpressionField('$id + 1', QgsField('ID_IRIS', QVariant.Int, len=4))
     # Conversion des chaînes en nombre
     csvPop09 = QgsVectorLayer(str(csvdir/'inseePop09.csv'))
     csvPop09.addExpressionField('to_int("P09_POP")', QgsField('POP09', QVariant.Int))
@@ -1517,10 +1516,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             grid = QgsVectorLayer(str(workspace/'data'/pixResStr/'grid.shp'), 'grid')
             grid.dataProvider().createSpatialIndex()
             iris = QgsVectorLayer(str(workspace/'data/iris.shp'))
-<<<<<<< HEAD
-=======
             iris.addExpressionField('$id + 1', QgsField('ID_IRIS', QVariant.Int, len=4))
->>>>>>> a348cd75a1779cfbfacb16676ed2b56fcee138fb
             iris.dataProvider().createSpatialIndex()
 
             buildStatDic = {
@@ -1556,10 +1552,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
             grid = QgsVectorLayer(str(workspace/'data'/pixResStr/'grid.shp'), 'grid')
             iris = QgsVectorLayer(str(workspace/'data/iris.shp'))
-<<<<<<< HEAD
-=======
             iris.addExpressionField('$id + 1', QgsField('ID_IRIS', QVariant.Int, len=4))
->>>>>>> a348cd75a1779cfbfacb16676ed2b56fcee138fb
             batiInterIris = QgsVectorLayer(str(workspace/'data/2014_bati/bati_inter_iris.shp'))
             popGridStat(batiInterIris, grid, iris, workspace/'data'/pixResStr, workspace/'data'/pixResStr/'urb_csv/')
             del grid, iris
