@@ -411,10 +411,10 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             r.readline()
             for l in r.readlines():
                 values = l.split()
-                id = int(values[7].replace('\n',''))
-                surf = int(values[2])
-                # AD=[3] ; CVM=[4] ; KS=[5] ; AIC=[6] ;
-                poidsSurfaces[id][surf] = float(values[5])
+                id = int(values[6].replace('\n',''))
+                surf = int(values[1])
+                # AD=[2] ; CVM=[3] ; KS=[4] ; AIC=[5] ;
+                poidsSurfaces[id][surf] = float(values[4])
 
         poidsEtagesNoFit = {}
         for i in range(nbIris):
