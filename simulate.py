@@ -402,11 +402,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 id = int(values[1].replace('"',''))
                 etages = int(values[2].replace('"',''))
                 # AIC=[4] ; Chi²=[5]
-<<<<<<< HEAD
-                poidsEtages[id][etages] = float(values[4]) if float(values[4]) != 'NA' else 0
-=======
                 poidsEtages[id][etages] = float(values[4]) if values[4] != 'NA' else 0
->>>>>>> 05f7e13690fce96d599818631a92f658a1e6681a
 
         poidsSurfaces = {}
         for i in range(nbIris):
