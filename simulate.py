@@ -251,7 +251,7 @@ def urbanize(pop, srfMax=0, zau=False):
         # Expansion par ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
         tmpInteret = np.where(capaSol > 0, interet, 0)
         if not densifyGround:
-            # On limite l'urbanisation aux espaces pas encore artificialisés
+            # On limite l'urbanisation aux espaces pas non artificialisés en début de simulation
             tmpInteret = np.where(urb14 == 0, tmpInteret, 0)
         if zau:
             # On limite l'urbanisation aux ZAU (if pluPriority)
@@ -281,8 +281,9 @@ def urbanize(pop, srfMax=0, zau=False):
                         capaSol[row][col] -= ss
                         tmpSrfSol[row][col] += ss
                         tmpSrfPla[row][col] += sp
-                        artif, count = artif + ss, np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
                         tmpInteret[row][col] = 0
+                        count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+                        artif += ss
             # Sinon on ajuste l'intérêt à 0 pour que la cellule ne soit plus tirée (pour l'année en cours)
                     else:
                         tmpInteret[row][col] = 0
@@ -478,7 +479,6 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         ratioPlaSol14 = np.where(srfSol14 != 0, srfPla14 / srfSol14, 0).astype(np.float32)
         txArtif = (srfSol14 / srfCell).astype(np.float32)
 
-
         # Statistiques sur l'évolution du bâti
         with (dataDir/'evo_surface_sol.csv').open('r') as r:
             reader = csv.reader(r)
@@ -541,7 +541,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             srfMax = dicSrf[year]
             popALoger = popDic[year]
             if pluPriority and not skipZau:
-                restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt,  zau=True)
+                restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt, zau=True)
                 if restePop > 0 and resteSrf > 0:
                     skipZau = True
                     restePop, resteSrf = urbanize(restePop, resteSrf)
