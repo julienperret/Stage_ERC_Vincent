@@ -127,8 +127,7 @@ if minContig > maxContig:
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
 def chooseCell(weight, size=1):
-    global countChoices
-    countChoices += size
+    global heatMap
     cells = []
     flatWeight = weight.flatten()
     choices = np.random.choice(flatWeight.size, size, p=flatWeight / flatWeight.sum())
@@ -137,6 +136,7 @@ def chooseCell(weight, size=1):
         row = choices[i] // weight.shape[1]
         col = choices[i] % weight.shape[1]
         cells.append((row, col))
+        heatMap[row][col] += 1
         i += 1
     if size == 1:
         return cells[0]
