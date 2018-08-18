@@ -1560,7 +1560,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             log.write(getTime(start_time) + '\n')
 
         if not (workspace/'data'/pixResStr/'restrict').exists():
-
             os.mkdir(str(workspace/'data'/pixResStr/'restrict'))
             start_time = time()
             etape = 6
@@ -1578,11 +1577,12 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             restrictList = [b_removed, cimetiere, s_eau]
             restrictGrid(restrictList, grid, maxOverlapRatio, workspace/'data'/pixResStr/'restrict')
             del b_removed, cimetiere, s_eau, restrictList, grid
-        if not (workspace/'data'/pixResStr/'tif').exists():
-            start_time = time()
-            description = "computing interest rasters "
-            progres = "6.5/8 : %s"%(description)
-            printer(progres)
+
+        # if not (workspace/'data'/pixResStr/'tif').exists():
+        #     start_time = time()
+        #     description = "computing interest rasters "
+        #     progres = "6.5/8 : %s"%(description)
+        #     printer(progres)
             os.mkdir(str(workspace/'data'/pixResStr/'tif'))
             os.mkdir(str(workspace/'data'/pixResStr/'tif/tmp'))
             # Objet pour transformation de coordonées
