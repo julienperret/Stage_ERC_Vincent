@@ -1578,11 +1578,11 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             restrictList = [b_removed, cimetiere, s_eau]
             restrictGrid(restrictList, grid, maxOverlapRatio, workspace/'data'/pixResStr/'restrict')
             del b_removed, cimetiere, s_eau, restrictList, grid
-        # if not (workspace/'data'/pixResStr/'tif').exists():
-        #    start_time = time()
-        #    description = "computing interest rasters "
-        #    progres = "%7.5/8 : %s" %(etape, description)
-        #    printer(progres)
+        if not (workspace/'data'/pixResStr/'tif').exists():
+            start_time = time()
+            description = "computing interest rasters "
+            progres = "6.5/8 : %s"%(description)
+            printer(progres)
             os.mkdir(str(workspace/'data'/pixResStr/'tif'))
             os.mkdir(str(workspace/'data'/pixResStr/'tif/tmp'))
             # Objet pour transformation de coordonées
@@ -1661,6 +1661,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
                 gdal.Warp(
                     str(workspace/'data'/pixResStr/'tif/ecologie.tif'), str(workspace/'data/ecologie.tif'),
                     format='GTiff', outputType=gdal.GDT_Float32,
+                    xRes=pixRes, yRes=pixRes,
                     outputBounds=(xMin, yMin, xMax, yMax)
                 )
             elif (workspace/'data/ecologie.shp').exists():
