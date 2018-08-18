@@ -487,7 +487,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             pluPriority = False
 
         # Déclaration des matrices
-        heatMap = np.zeros([rows, cols], np.byte)
+        heatMap = np.zeros([rows, cols], np.uint16)
         demographie14 = to_array(dataDir/'demographie.tif', np.uint16)
         srfSol14 = to_array(dataDir/'srf_sol.tif', np.uint16)
         srfSolRes14 = to_array(dataDir/'srf_sol_res.tif', np.uint16)
