@@ -410,9 +410,9 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         with (dataDir/'poids_surfaces.csv').open('r') as r:
             r.readline()
             for l in r.readlines():
-                values = l.split()
-                id = int(values[6].replace('\n',''))
-                surf = int(values[1])
+                values = l.split(',')
+                id = int(values[6].replace('"','').replace('\n',''))
+                surf = float(values[1])
                 # AD=[2] ; CVM=[3] ; KS=[4] ; AIC=[5] ;
                 poidsSurfaces[id][surf] = float(values[4])
 
