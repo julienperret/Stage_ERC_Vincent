@@ -1480,7 +1480,6 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
         if not (workspace/'data'/pixResStr).exists():
             os.mkdir(str(workspace/'data'/pixResStr))
-            os.mkdir(str(workspace/'data'/pixResStr/'urb_csv'))
             start_time = time()
             etape = 3
             description =  "creating a grid with resolution " + pixResStr
@@ -1506,6 +1505,8 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             del zone_buffer, extent, extentStr
             log.write(getTime(start_time) + '\n')
 
+        if not (workspace/'data'/pixResStr/'urb_csv').exists():
+            os.mkdir(str(workspace/'data'/pixResStr/'urb_csv'))
             start_time = time()
             etape = 4
             description = "analysing the evolution of built areas "
