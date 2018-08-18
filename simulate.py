@@ -260,7 +260,7 @@ def build(row, col, ss=None):
         spla = srfPla[row][col]
         nivMoy = float(spla / ssol) if ssol != 0 else 0
         nivMax = int(etages.max()) if len(etages) > 0 else 0
-        if round(nivMoy) <= int(nivMax):
+        if int(nivMax) > round(nivMoy) :
             while nbNiv <= nivMoy:
                 nbNiv = chooseFloors(id, row, col)
             sp = ssol * nbNiv
@@ -622,7 +622,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write("Total number of randomly chosen cells: " + str(countChoices) + '\n')
         log.write("Execution time: " + str(execTime) + '\n')
 
-        if densifyGround:
+        if maxArtifRatio > 0:
             densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
             if tiffs:
                 to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
