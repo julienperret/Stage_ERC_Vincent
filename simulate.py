@@ -388,14 +388,15 @@ os.makedirs(str(project/'output'))
 
 if tiffs and snaps:
     mkdirList = [
-        'snapshots'
+        'snapshots',
         'snapshots/demographie',
         'snapshots/urbanisation',
         'snapshots/surface_sol',
         'snapshots/surface_plancher'
     ]
     for d in mkdirList:
-        os.mkdir(str(project/d))
+        dir = project/d
+        os.mkdir(str(dir))
 
 with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('w') as mesures:
     try:
