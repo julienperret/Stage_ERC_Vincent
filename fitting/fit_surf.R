@@ -287,7 +287,7 @@ cptr <- 0
 for (c in unique(df$ID_IRIS)) {
 
   distribObservee <-  df %>% filter(ID_IRIS == c)
-  surfmax <-  round(max(distribObservee$SURFACE_SOL))
+  surfmax <-  round(max(distribObservee$SURF))
 
   tryCatch({
   models <-  fitter(df)
@@ -312,7 +312,7 @@ dd <-  read.csv("fitting/surf_weights.csv")
 
 
 fit <-  fitter(dd)
-smax <-  max(dd$SURFACE_SOL )
+smax <-  max(dd$SURF )
 binwidth <-  10
 
 surfaceBins <-  seq(from=0, to=round(smax)+binwidth, by=binwidth)
