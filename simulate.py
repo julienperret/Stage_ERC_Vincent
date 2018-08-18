@@ -240,7 +240,7 @@ def expand(row, col, new=True):
         ss = chooseArea(id, row, col)
         if ss > 0:
             while ss >= maxSrf:
-                ss = chooseArea
+                ss = chooseArea(id, row, col)
             if ss > maxSrf :
                 ss = maxSrf
     return ss
