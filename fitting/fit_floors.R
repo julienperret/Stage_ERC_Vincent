@@ -388,8 +388,8 @@ for (c in unique(dfniv$ID_IRIS)) {
                               seq(from = 1, to = netagesmax, by = 1),
                               effectifComplets))
 
-    currentIrisResult$poidsFitAIC <- currentIrisResult$effectifComplets / sum(currentIrisResult$effectifComplets)
-    currentIrisResult$poidsFitCHI2 <- currentIrisResult$effectifComplets / sum(currentIrisResult$effectifComplets)
+    currentIrisResult$poidsFitAIC <- currentIrisResult$effectifComplets / sum(as.numeric(as.character(currentIrisResult$effectifComplets)))
+    currentIrisResult$poidsFitCHI2 <- currentIrisResult$effectifComplets / sum(as.numeric(as.character(currentIrisResult$effectifComplets)))
 
     names(currentIrisResult) <-  bckupNames
     names(distribsResults) <-  bckupNames
