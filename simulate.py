@@ -152,14 +152,14 @@ def chooseArea(id, row, col):
     pds = np.array(list(poidsSurfaces[id].values()))
     if len(surf) > 0 and sum(pds) > 0 :
         while c[0] == 0:
-            c = np.random.choice(surf, 1, p=pds)
+            c = np.random.choice(surf, 1, p=pds/pds.sum())
         ss = float(c[0])
     else:
         surf = np.array(list(poidsSurfacesNoFit[id].keys()))
         pds = np.array(list(poidsSurfacesNoFit[id].values()))
         if len(surf) > 0 and sum(pds) > 0 :
             while c[0] == 0:
-                c = np.random.choice(surf, 1, p=pds)
+                c = np.random.choice(surf, 1, p=pds/pds.sum())
             ss = float(c[0])
     return ss
 
@@ -168,13 +168,13 @@ def chooseFloors(id, row, col):
     etages = np.array(list(poidsEtages[id].keys()))
     pds = np.array(list(poidsEtages[id].values()))
     if len(etages) > 0 and sum(pds) > 0:
-        c = np.random.choice(etages, 1, p=pds)
+        c = np.random.choice(etages, 1, p=pds/pds.sum())
         nbNiv = c[0]
     else:
         etages = np.array(list(poidsEtagesNoFit[id].keys()))
         pds = np.array(list(poidsEtagesNoFit[id].values()))
         if len(etages) > 0 and sum(pds) > 0:
-            c = np.random.choice(etages, 1, p=pds)
+            c = np.random.choice(etages, 1, p=pds/pds.sum())
             nbNiv = c[0]
     return nbNiv
 
