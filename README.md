@@ -59,16 +59,15 @@ Deux paramètres au minimum :
 | scenario             | reduction | tendanciel | string | tendanciel        | Scénario de consommation d’espace (réduction, stable, tendanciel)                                                     |
 | pluPriority          | False     | True       | bool   | True              | Utilisation du PLU pour peupler les ZAU en priorité                                                                   |
 | buildNonRes          | False     | True       | bool   | True              | Pour simuler la construction au sol de bâtiments non résidentiels (en utilisant un taux de résidentiel par IRIS)      |
-| densifyGround        | False     | True       | bool   | False             | Pour autoriser à densifier au sol des cellules déjà construite (si la capacité au sol le permet - voir maxBuiltRatio) |
-| maxBuiltRatio        | 50.0      | 100.0      | %      | 80                | Taux maximal de la surface bâtie au sol d’une cellule                                                                 |
-| maxUsedSrfPla       | 50        | 300        | m²     | 200               | Surface plancher maximale à utiliser pour loger une personne                                                          |
-| densifyOld           | False     | True       | bool   | False             | Pour autoriser à augmenter la surface plancher dans des cellules urbanisées avant le début de la simulation           |
+| maxBuiltRatio        | 50        | 100        | %      | 80                | Taux maximal de la surface bâtie au sol d’une cellule                                                                 |
+| maxArtifRatio        | 0         | 0.8        | float  | 0.5               | Taux pour exclure de la couche d'intérêt les cellules déjà artificialisées (remplace densifyGround)                   |
+| densifyOld           | False     | True       | bool   | False             | Pour densifier en hauteur le bâti pré-existant si besoin en fin de simulation                                         |
+| forceEachYear        | False     | True       | bool   | True              | Pour essayer de loger tout le monde en densifiant en hauteur à chaque tour (souvent nécessaire depuis le fitting)     |
 | winSize              | 3         | 7          | pixel  | 3                 | Taille en pixels du côté de la fenêtre glissante pour contraindre la contiguïté                                       |
 | minContig            | 0         | 0.33       | float  | 0.1               | Taux minimal de cellules urbanisées dans le voisinage pour construction dans une cellule vide                         |
 | maxContig            | 0.5       | 1          | float  | 0.8               | Taux maximal de cellules urbanisées dans le voisinage pour construction dans une cellule vide                         |
-| tiffs                | False     | True       | bool   | true              | Indique si les tiffs sont sauvés en sortie                                                                            |
-| snaps                | False     | True       | bool   | true              | Indique si les tiffs sont sauvés en sortie                                                                            |
-
+| tiffs                | False     | True       | bool   | True              | Indique si les tiffs sont sauvés en sortie                                                                            |
+| snaps                | False     | True       | bool   | False             | Pour enregistrer des instantanés chaque année (et générer de GIF)                                                     |
 
 Usage :
 ```shell

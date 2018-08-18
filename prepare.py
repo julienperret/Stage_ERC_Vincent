@@ -1887,7 +1887,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
         # Traitement de l'intérêt écologique
         if (workspace/'data'/pixResStr/'tif/ecologie.tif').exists():
-            ecologie = to_array(workspace/'data'/pixResStr/'tif/ecologie.tif',  np.float32)
+            ecologie = to_array(workspace/'data'/pixResStr/'tif/ecologie.tif', np.float32)
             ecologie = np.where((ecologie == 0), 1, 1 - ecologie)
             to_tif(ecologie, 'float32', proj, geot, project/'interet/non-importance_ecologique.tif')
         else:

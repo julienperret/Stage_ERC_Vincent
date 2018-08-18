@@ -6,7 +6,7 @@ import csv
 import gdal
 import traceback
 import numpy as np
-from time import time
+from time import time, strftime
 from pathlib import Path
 from shutil import rmtree
 from ast import literal_eval
@@ -15,7 +15,7 @@ from toolbox import to_tif, printer, to_array
 # Ignorer les erreurs de numpy lors d'une division par 0
 np.seterr(divide='ignore', invalid='ignore')
 
-# Stockage et contrôle de la validité des paramètres utilisateur
+# Stockage et contrôle de la validité des arguments passés au script
 dataDir = Path(sys.argv[1])
 outputDir = Path(sys.argv[2])
 growth = float(sys.argv[3])
@@ -35,8 +35,12 @@ if len(sys.argv) == 5:
             densifyGround = literal_eval(arg.split('=')[1])
         elif 'densifyOld' in arg:
             densifyOld = literal_eval(arg.split('=')[1])
+        elif 'forceEachYear' in arg:
+            forceEachYear = literal_eval(arg.split('=')[1])
         elif 'maxBuiltRatio' in arg:
             maxBuiltRatio = int(arg.split('=')[1])
+        elif 'maxArtifRatio' in arg:
+            maxArtifRatio = float(arg.split('=')[1])
         elif 'maxUsedSrfPla' in arg:
             maxUsedSrfPla = int(arg.split('=')[1])
         elif 'winSize' in arg:
@@ -92,21 +96,24 @@ if 'scenario' not in globals():
 # Priorité aux ZAU
 if 'pluPriority' not in globals():
     pluPriority = True
+# Pour seuiller l'artificialisation d'une cellule dans le raster de capacité au sol
+if 'maxBuiltRatio' not in globals():
+    maxBuiltRatio = 80
+# Taux pour exclure de la couche d'intérêt les cellules déjà artificialisées
+if 'maxArtifRatio' not in globals():
+    maxArtifRatio = 0.5
+# Pour seuiller le nombre de mêtres carrés utilisés par habitants et par iris
+if 'maxUsedSrfPla' not in globals():
+    maxUsedSrfPla = 200
 # Pour simuler également la construction des surfaces non résidentielles
 if 'buildNonRes' not in globals():
     buildNonRes = True
-# Pour autoriser à construire de nouveaux bâtiments dans des cellules déjà urbanisées
-if 'densifyGround' not in globals():
-    densifyGround = True
+if 'forceEachYear' not in globals():
+    forceEachYear = True
 # Pour autoriser à densifier la surface plancher pré-éxistante
 if 'densifyOld' not in globals():
     densifyOld = False
-# Pour seuiller l'artificialisation d'une cellule
-if 'maxBuiltRatio' not in globals():
-    maxBuiltRatio = 80
-if 'maxUsedSrfPla' not in globals():
-    maxUsedSrfPla = 200
-# Paramètres pour les règles de contiguïtés
+# Paramètres pour les règles de contiguïtés """fractales""" -_-
 if 'winSize' not in globals():
     winSize = 3
 if 'minContig' not in globals():
@@ -118,7 +125,7 @@ if 'tiffs' not in globals():
 if 'snaps' not in globals():
     snaps = False
 
-# Contrôle des paramètres
+# Contrôle de la validité des paramètres
 if growth > 3:
     print("Maximum evolution rate fixed at: 3 %")
     sys.exit()
@@ -128,6 +135,30 @@ if maxContig > 1 or minContig > 1:
 if minContig > maxContig:
     print("Error : maxContig should be higher than minContig !")
     sys.exit()
+
+def parseDistrib(file, type=None, fit=True):
+    poids = {}
+    for i in range(nbIris):
+        poids[i+1] = {}
+    file.readline()
+    for l in file.readlines():
+        values = l.split(',')
+        if fit:
+            if type == 'floors':
+                id = int(values[1].replace('"',''))
+                etages = int(values[2].replace('"',''))
+                # AIC=[4] ; Chi²=[5]
+                poids[id][etages] = float(values[5].replace('\n','')) if 'NA' not in values[5] else 0
+            elif type == 'surf':
+                id = int(values[6].replace('"','').replace('\n',''))
+                surf = float(values[1])
+                # AD=[2] ; CVM=[3] ; KS=[4] ; AIC=[5] ;
+                poids[id][surf] = float(values[4])
+        else:
+            id = int(values[0])
+            dist = int(values[1])
+            poids[id][dist] = float(values[3])
+    return poids
 
 # Tirage pondéré qui retourne un index par défaut ou une liste de tuples (row, col)
 def chooseCell(weight, size=1):
@@ -192,116 +223,124 @@ def winMean(array, row, col, size=3):
         value = s / (size * size)
     return value
 
-# Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
-def expand(row, col):
+# Artificialisation d'une surface cellule vide ou déjà urbanisée (dans ce cas on ne vérifie pas la contiguité)
+def expand(row, col, new=True):
     ss = 0
-    contig = winMean(urb, row, col, winSize)
-    if contig and minContig < contig <= maxContig:
-        id = irisId[row][col]
+    id = irisId[row][col]
+    if new:
+        contig = winMean(urb, row, col, winSize)
+        if contig and minContig < contig <= maxContig:
+            ss = chooseArea(id, row, col)
+            if ss > 0:
+                maxSrf = capaSol[row][col]
+                if ss > maxSrf :
+                    ss = maxSrf
+    else:
+        maxSrf = capaSol[row][col]
         ss = chooseArea(id, row, col)
         if ss > 0:
-            maxSrf = capaSol[row][col]
+            while ss >= maxSrf:
+                ss = chooseArea
             if ss > maxSrf :
                 ss = maxSrf
     return ss
 
-# Pour urbaniser verticalement une surface au sol donnée d'un nombre de niveaux tiré aléatoirement à partir du fitting
-def build(ss, row, col):
+# Pour urbaniser ou densifier verticalement une surface au sol donnée à partir du fitting "floors"
+def build(row, col, ss=None):
     sp = 0
+    nbNiv = 0
     id = irisId[row][col]
-    nbNiv = chooseFloors(id, row, col)
-    if nbNiv > 0:
-        sp = ss * nbNiv
-    return sp
-
-# Densification d'une surface tirée à partir du fitting
-def densify(mode, row, col):
-    ss = 0
-    sp = 0
-    if mode == 'ground':
-        id = irisId[row][col]
-        ss = chooseArea(id, row, col)
-        if ss > 0:
-            maxSrf = capaSol[row][col]
-            if ss > maxSrf :
-                ss = maxSrf
-        return ss
-    elif mode == 'height':
-        ssol = srfSolRes[row][col]
-        id = irisId[row][col]
+    if type(ss) == np.float64:
         nbNiv = chooseFloors(id, row, col)
         if nbNiv > 0:
+            sp = ss * nbNiv
+    elif ss == 'reshape':
+        etages = np.array(list(poidsEtages[id].keys()))
+        ssol = srfSolRes[row][col]
+        spla = srfPla[row][col]
+        nivMoy = float(spla / ssol) if ssol != 0 else 0
+        nivMax = int(etages.max()) if len(etages) > 0 else 0
+        if round(nivMoy) <= int(nivMax):
+            while nbNiv <= nivMoy:
+                nbNiv = chooseFloors(id, row, col)
             sp = ssol * nbNiv
-            sp -= srfPla[row][col]
-            if sp < m2PlaHab[row][col]:
+            if sp > srfPla[row][col]:
+                sp -= srfPla[row][col]
+                if sp < m2PlaHab[row][col]:
+                    sp = 0
+            else:
                 sp = 0
         else:
             sp = 0
-        return sp
+    return sp
 
 # Fonction principale pour gérer artificialisation puis densification
-def urbanize(pop, srfMax=0, zau=False, rebuildOld=False):
+def urbanize(pop, srfMax, zau=False):
+    global demographie, capaSol, srfSol, srfSolRes, srfPla, urb, skipZau
     artif = 0
     count = 0
-    tmpInteret = None
     tmpUrb = np.zeros([rows, cols], np.byte)
     tmpSrfPla = np.zeros([rows, cols], np.uint16)
     tmpSrfSol = np.zeros([rows, cols], np.uint16)
-    global demographie, capaSol, srfSol, srfSolRes, srfPla, urb
+    tmpInteret = np.where(capaSol > 0, interet, 0)
+    if zau:
+        # On limite l'urbanisation aux ZAU (if pluPriority)
+        tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
     # Expansion par ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
-    if srfMax != 0 and not rebuildOld:
-        tmpInteret = np.where(capaSol > 0, interet, 0)
-        if not densifyGround:
-            # On limite l'urbanisation aux espaces non artificialisés en début de simulation
-            tmpInteret = np.where(urb14 == 0, tmpInteret, 0)
-        if zau:
-            # On limite l'urbanisation aux ZAU (if pluPriority)
-            tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
-
-        while artif < srfMax and count < pop and tmpInteret.sum() > 0:
-            # Tant qu'il reste des gens à loger et de la surface à construire
-            ss = 0
-            sp = 0
-            row, col = chooseCell(tmpInteret)
-            neededSurf = m2PlaHab[row][col]
-            if capaSol[row][col] > 0 and neededSurf > 0:
-                if urb[row][col] == 0 and tmpUrb[row][col] == 0:
-                    # Pour ouvrir une nouvelle cellule à l'urbanisation
-                    ss = expand(row, col)
+    while artif < srfMax and count < pop and tmpInteret.sum() > 0:
+        # Tant qu'il reste des gens à loger et de la surface à construire
+        ss = 0
+        sp = 0
+        row, col = chooseCell(tmpInteret)
+        if capaSol[row][col] > 0:
+            if urb[row][col] == 0 and tmpUrb[row][col] == 0:
+                # Pour ouvrir une nouvelle cellule à l'urbanisation
+                ss = expand(row, col)
+            else:
+                # Sinon on construit à côté d'autres bâtiments
+                ss = expand(row, col, new=False)
+            if ss > 0 :
+                # Les fonctions retournent 0 si quelque chose empêche d'urbaniser la cellule
+                if buildNonRes:
+                    # On réduit la surface construite à une part de résidentiel avant de calculer la surface plancher
+                    ssr = ss * txSsr[row][col] if txSsr[row][col] > 0 else ss
+                    sp = build(row, col, ssr)
                 else:
-                    # Sinon on construit à côté d'autres bâtiments
-                    ss = densify('ground', row, col)
-                if ss > 0 :
-                    # Les fonctions retournent 0 si quelque chose empêche d'urbaniser la cellule
-                    if buildNonRes:
-                        # On réduit la surface construite à une part de résidentiel avant de calculer la surface plancher
-                        ssr = ss * txSsr[row][col] if txSsr[row][col] > 0 else ss
-                        sp = build(ssr, row, col)
-                    else:
-                        sp = build(ss, row, col)
-                    if sp > 0 and sp/neededSurf >= 1 :
-                        # On met à jour les rasters uniquement si on la construction sol et plancher s'est déroulée correctement
-                        tmpUrb[row][col] = 1
-                        capaSol[row][col] -= ss
-                        tmpSrfSol[row][col] += ss
-                        tmpSrfPla[row][col] += sp
-                        count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
-                        artif += ss
-            # Sinon on ajuste l'intérêt à 0 pour que la cellule ne soit plus tirée (pour l'année en cours)
-                    else:
-                        tmpInteret[row][col] = 0
+                    sp = build(row, col, ss)
+                if sp > 0:
+                    # On met à jour les rasters uniquement si on la construction sol et plancher s'est déroulée correctement
+                    tmpUrb[row][col] = 1
+                    capaSol[row][col] -= ss
+                    tmpSrfSol[row][col] += ss
+                    tmpSrfPla[row][col] += sp
+                    count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+                    artif += ss
+        # Sinon on ajuste l'intérêt à 0 pour que la cellule ne soit plus tirée (pour l'année en cours)
                 else:
                     tmpInteret[row][col] = 0
             else:
                 tmpInteret[row][col] = 0
+        else:
+            tmpInteret[row][col] = 0
 
-    elif rebuildOld:
-        # Densification du bâti existant si on n'a pas pu loger tout le monde
-        tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
+    if count < pop and ((forceEachYear and (artif >= srfMax or tmpInteret.sum() == 0)) or (year == finalYear and densifyGround)):
+        if year != finalYear:
+            if zau and tmpInteret.sum() == 0:
+                skipZau = True
+            # Ici on force à densifier l'existant en hauteur pour loger tout le monde (à chaque itération)
+            if forceEachYear:
+                if tmpInteret.sum() == 0:
+                    tmpInteret = np.where(tmpUrb > 0, interet, 0)
+        # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde
+        elif densifyOld:
+            srfMax = 0
+            tmpInteret = np.where(srfSolRes > 0, interet, 0)
+
+        # On tente de loger les personnes restantes
         while count < pop and tmpInteret.sum() > 0:
             sp = 0
             row, col = chooseCell(tmpInteret)
-            sp = densify('height', row, col)
+            sp = build(row, col, 'reshape')
             if sp > 0:
                 tmpSrfPla[row][col] += sp
                 count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
@@ -330,18 +369,18 @@ srfCell = pixSize * pixSize
 nbIris = int(irisId.max())
 ds = None
 
-projectStr = '%im_tx%s_%s_winSize%i_minContig%s_maxContig%s_maxBuiltRatio%i'%(pixSize, str(growth), scenario, winSize, str(minContig), str(maxContig), maxBuiltRatio)
+projectStr = 'pixRes : %im\ntx : %s\nscenario : %s\nwinSize : %i\nminContig : %s\nmaxContig : %s\nmaxBuiltRatio : %i\nmaxArtifRatio : %s'%(pixSize, str(growth), scenario, winSize, str(minContig), str(maxContig), maxBuiltRatio, str(maxArtifRatio))
 if pluPriority:
-    projectStr += '_pluPrio'
+    projectStr += '\npluPrio : True'
 if buildNonRes:
-    projectStr += '_buildNonRes'
-if densifyGround:
-    projectStr += '_densifyGround'
+    projectStr += '\nbuildNonRes : True'
+if forceEachYear:
+    projectStr += '\nforceEachYear : True'
 if densifyOld:
-    projectStr += '_densifyOld'
+    projectStr += '\ndensifyOld : True'
 if finalYear != 2040:
     projectStr += '_' + str(finalYear)
-project = outputDir/projectStr
+project = outputDir/(strftime('%H:%M:%S'))
 
 if project.exists():
     rmtree(str(project))
@@ -431,51 +470,14 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 w.write(key + ', ' + str(coef[key]) + '\n')
 
         # Enregistrements des poids pour le tirage des étages et surface
-        poidsEtages = {}
-        for i in range(nbIris):
-            poidsEtages[i+1] = {}
         with (dataDir/'poids_etages.csv').open('r') as r:
-            r.readline()
-            for l in r.readlines():
-                values = l.split(',')
-                id = int(values[1].replace('"',''))
-                etages = int(values[2].replace('"',''))
-                # AIC=[4] ; Chi²=[5]
-                poidsEtages[id][etages] = float(values[5].replace('\n','')) if 'NA' not in values[5] else 0
-
-        poidsSurfaces = {}
-        for i in range(nbIris):
-            poidsSurfaces[i+1] = {}
+            poidsEtages = parseDistrib(r, 'floors')
         with (dataDir/'poids_surfaces.csv').open('r') as r:
-            r.readline()
-            for l in r.readlines():
-                values = l.split(',')
-                id = int(values[6].replace('"','').replace('\n',''))
-                surf = float(values[1])
-                # AD=[2] ; CVM=[3] ; KS=[4] ; AIC=[5] ;
-                poidsSurfaces[id][surf] = float(values[4])
-
-        poidsEtagesNoFit = {}
-        for i in range(nbIris):
-            poidsEtagesNoFit[i+1] = {}
+            poidsSurfaces = parseDistrib(r, 'surf')
         with (dataDir/'poids_etages_nofit.csv').open('r') as r:
-            r.readline()
-            for l in r.readlines():
-                values = l.split(',')
-                id = int(values[0])
-                etages = int(values[1])
-                poidsEtagesNoFit[id][etages] = float(values[3])
-
-        poidsSurfacesNoFit = {}
-        for i in range(nbIris):
-            poidsSurfacesNoFit[i+1] = {}
+            poidsEtagesNoFit = parseDistrib(r, fit = False)
         with (dataDir/'poids_surfaces_nofit.csv').open('r') as r:
-            r.readline()
-            for l in r.readlines():
-                values = l.split(',')
-                id = int(values[0])
-                surf = int(values[1])
-                poidsSurfacesNoFit[id][surf] = float(values[3])
+            poidsSurfacesNoFit = parseDistrib(r, fit=False)
 
         # Préparation des restrictions et gestion du PLU
         restriction = to_array(dataDir/'interet/restriction_totale.tif')
@@ -517,6 +519,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         srfSolNonRes = srfSol14 - srfSolRes14
         ratioPlaSol14 = np.where(srfSol14 != 0, srfPla14 / srfSol14, 0).astype(np.float32)
         txArtif = (srfSol14 / srfCell).astype(np.float32)
+        interet = np.where(txArtif <= maxArtifRatio, interet, 0)
 
         # Instantanés de la situation à t0
         if tiffs:
@@ -546,18 +549,11 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             popALoger = popDic[year]
             if pluPriority and not skipZau:
                 restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt, zau=True)
-                if resteSrf >= srfMax and restePop >= popALoger:
-                    skipZau = True
-                    skipZauYear = year
-                    restePop, resteSrf = urbanize(restePop, resteSrf)
-                if restePop > 0 and densifyOld:
-                    restePop, _ = urbanize(restePop, rebuildOld=True)
             else:
                 restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt)
-                if restePop > 0 and densifyOld:
-                    restePop, _ = urbanize(restePop, rebuildOld=True)
             preBuilt = -resteSrf
             preLog = -restePop
+            # print('\nReste pop : '  + str(restePop), '\nReste à construire : ' + str(resteSrf))
 
             # Snapshots
             if tiffs and snaps:
