@@ -97,7 +97,7 @@ if 'buildNonRes' not in globals():
     buildNonRes = True
 # Pour autoriser à construire de nouveaux bâtiments dans des cellules déjà urbanisées
 if 'densifyGround' not in globals():
-    densifyGround = False
+    densifyGround = True
 # Pour autoriser à densifier la surface plancher pré-éxistante
 if 'densifyOld' not in globals():
     densifyOld = False
@@ -240,7 +240,7 @@ def densify(mode, row, col):
         return sp
 
 # Fonction principale pour gérer artificialisation puis densification
-def urbanize(pop, srfMax=None, zau=False, rebuildOld=False):
+def urbanize(pop, srfMax=0, zau=False, rebuildOld=False):
     artif = 0
     count = 0
     tmpInteret = None
@@ -249,7 +249,7 @@ def urbanize(pop, srfMax=None, zau=False, rebuildOld=False):
     tmpSrfSol = np.zeros([rows, cols], np.uint16)
     global demographie, capaSol, srfSol, srfSolRes, srfPla, urb
     # Expansion par ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
-    if srfMax:
+    if srfMax != 0 and not rebuildOld:
         tmpInteret = np.where(capaSol > 0, interet, 0)
         if not densifyGround:
             # On limite l'urbanisation aux espaces non artificialisés en début de simulation
@@ -550,13 +550,14 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                     skipZau = True
                     skipZauYear = year
                     restePop, resteSrf = urbanize(restePop, resteSrf)
+                if restePop > 0 and densifyOld:
+                    restePop, _ = urbanize(restePop, rebuildOld=True)
             else:
                 restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt)
                 if restePop > 0 and densifyOld:
                     restePop, _ = urbanize(restePop, rebuildOld=True)
             preBuilt = -resteSrf
             preLog = -restePop
-            print('\nprebuilt : ', str(preBuilt), 'non logee : ', str(-preLog))
 
             # Snapshots
             if tiffs and snaps:
