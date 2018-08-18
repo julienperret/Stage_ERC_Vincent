@@ -322,6 +322,7 @@ proj = ds.GetProjection()
 geot = ds.GetGeoTransform()
 pixSize = int(geot[1])
 srfCell = pixSize * pixSize
+nbIris = int(irisId.max())
 ds = None
 
 projectStr = '%im_tx%s_%s_winSize%i_minContig%s_maxContig%s'%(pixSize, str(growth), scenario, winSize, str(minContig), str(maxContig))
