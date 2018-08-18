@@ -37,8 +37,8 @@ if len(sys.argv) == 5:
             densifyOld = literal_eval(arg.split('=')[1])
         elif 'maxBuiltRatio' in arg:
             maxBuiltRatio = int(arg.split('=')[1])
-        elif 'usedSurfMax' in arg:
-            usedSurfMax = int(arg.split('=')[1])
+        elif 'maxUsedPlaSurf' in arg:
+            maxUsedPlaSurf = int(arg.split('=')[1])
         elif 'winSize' in arg:
             winSize = int(arg.split('=')[1])
         elif 'minContig' in arg:
@@ -104,8 +104,8 @@ if 'densifyOld' not in globals():
 # Pour seuiller l'artificialisation d'une cellule
 if 'maxBuiltRatio' not in globals():
     maxBuiltRatio = 80
-if 'usedSurfMax' not in globals():
-    usedSurfMax = 200
+if 'maxUsedPlaSurf' not in globals():
+    maxUsedPlaSurf = 200
 # Paramètres pour les règles de contiguïtés
 if 'winSize' not in globals():
     winSize = 3
@@ -260,7 +260,7 @@ def urbanize(pop, srfMax=0, zau=False):
             ss = 0
             sp = 0
             row, col = chooseCell(tmpInteret)
-            neededSurf = m2PlaHab[row][col] if m2PlaHab[row][col] <= usedSurfMax else usedSurfMax
+            neededSurf = m2PlaHab[row][col]
             if capaSol[row][col] > 0 and neededSurf > 0:
                 if urb[row][col] == 0 and tmpUrb[row][col] == 0:
                     # Pour ouvrir une nouvelle cellule à l'urbanisation
@@ -493,6 +493,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         srfSolRes14 = to_array(dataDir/'srf_sol_res.tif', np.uint16)
         ssrMed = to_array(dataDir/'iris_ssr_med.tif', np.uint16)
         m2PlaHab = to_array(dataDir/'iris_m2_hab.tif', np.uint16)
+        m2PlaHab = np.where(m2PlaHab > maxUsedPlaSurf, maxUsedPlaSurf, m2PlaHab)
         srfPla14 = to_array(dataDir/'srf_pla.tif', np.uint16)
         if buildNonRes:
             txSsr = to_array(dataDir/'iris_tx_ssr.tif', np.float32)
