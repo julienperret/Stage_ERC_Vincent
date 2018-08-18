@@ -37,6 +37,8 @@ if len(sys.argv) == 5:
             densifyOld = literal_eval(arg.split('=')[1])
         elif 'maxBuiltRatio' in arg:
             maxBuiltRatio = int(arg.split('=')[1])
+        elif 'usedSurfMax' in arg:
+            usedSurfMax = int(arg.split('=')[1])
         elif 'winSize' in arg:
             winSize = int(arg.split('=')[1])
         elif 'minContig' in arg:
@@ -102,6 +104,8 @@ if 'densifyOld' not in globals():
 # Pour seuiller l'artificialisation d'une cellule
 if 'maxBuiltRatio' not in globals():
     maxBuiltRatio = 80
+if 'usedSurfMax' not in globals():
+    usedSurfMax = 200
 # Paramètres pour les règles de contiguïtés
 if 'winSize' not in globals():
     winSize = 3
@@ -142,8 +146,6 @@ def chooseCell(weight, size=1):
         return cells[0]
     elif size > 1:
         return cells
-    else:
-        return None
 
 def chooseArea(id, row, col):
     ss = 0
@@ -205,12 +207,11 @@ def expand(row, col):
 
 # Pour urbaniser verticalement une surface au sol donnée d'un nombre de niveaux tiré aléatoirement à partir du fitting
 def build(ss, row, col):
+    sp = 0
     id = irisId[row][col]
     nbNiv = chooseFloors(id, row, col)
     if nbNiv > 0:
         sp = ss * nbNiv
-    else:
-        sp = 0
     return sp
 
 # Densification d'une surface tirée à partir du fitting
@@ -246,9 +247,8 @@ def urbanize(pop, srfMax=0, zau=False):
     tmpSrfPla = np.zeros([rows, cols], np.uint16)
     tmpSrfSol = np.zeros([rows, cols], np.uint16)
     global demographie, capaSol, srfSol, srfSolRes, srfPla, urb
-
+    # Expansion par ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
     if srfMax > 0:
-        # Expansion par ouverture de nouvelles cellules ou densification au sol de cellules déja urbanisées
         tmpInteret = np.where(capaSol > 0, interet, 0)
         if not densifyGround:
             # On limite l'urbanisation aux espaces pas non artificialisés en début de simulation
@@ -256,12 +256,13 @@ def urbanize(pop, srfMax=0, zau=False):
         if zau:
             # On limite l'urbanisation aux ZAU (if pluPriority)
             tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
-        while artif < srfMax and count < pop and tmpInteret.sum() > 0:
+        while (artif < srfMax or count < pop) and tmpInteret.sum() > 0:
             ss = 0
             sp = 0
             row, col = chooseCell(tmpInteret)
-            if capaSol[row][col] > 0:
-                if urb[row][col] == 0:
+            neededSurf = m2PlaHab[row][col] if m2PlaHab[row][col] <= usedSurfMax else usedSurfMax
+            if capaSol[row][col] > 0 and neededSurf > 0:
+                if urb[row][col] == 0 and tmpUrb[row][col] == 0:
                     # Pour ouvrir une nouvelle cellule à l'urbanisation
                     ss = expand(row, col)
                 else:
@@ -271,11 +272,11 @@ def urbanize(pop, srfMax=0, zau=False):
                     # Les fonctions retournent 0 si quelque chose empêche d'urbaniser la cellule
                     if buildNonRes:
                         # On réduit la surface construite à une part de résidentiel avant de calculer la surface plancher
-                        ssr = ss * txSsr[row][col]
+                        ssr = ss * txSsr[row][col] if txSsr[row][col] > 0 else ss
                         sp = build(ssr, row, col)
                     else:
                         sp = build(ss, row, col)
-                    if sp > 0:
+                    if sp > 0 and sp/neededSurf >= 1 :
                         # On met à jour les rasters uniquement si on la construction sol et plancher s'est déroulée correctement
                         tmpUrb[row][col] = 1
                         capaSol[row][col] -= ss
@@ -291,7 +292,6 @@ def urbanize(pop, srfMax=0, zau=False):
                     tmpInteret[row][col] = 0
             else:
                 tmpInteret[row][col] = 0
-
 
     elif count < pop and densifyOld:
         # Densification du bâti existant si on n'a pas pu loger tout le monde
@@ -380,6 +380,41 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
 
         sumPopALoger = sum(popDic.values())
         log.write("Population to put up until " + str(finalYear) + " : " + str(sumPopALoger) + "\n")
+
+        # Statistiques sur l'évolution du bâti
+        with (dataDir/'evo_surface_sol.csv').open('r') as r:
+            reader = csv.reader(r)
+            next(reader, None)
+            dicSsol = {rows[0]:int(rows[1]) for rows in reader}
+        m2SolHab09 = dicSsol['2009'] / pop09
+        m2SolHab14 = dicSsol['2014'] / pop14
+        m2SolHabEvo = (m2SolHab14 - m2SolHab09) / m2SolHab09 / 5
+
+        # Création du dictionnaire pour nombre de m2 ouverts à l'urbanisation par année, selon le scénario
+        dicSrf = {}
+        year = 2015
+        if scenario == 'tendanciel':
+            srfMax = m2SolHab14
+            while year <= finalYear :
+                srfMax += srfMax * m2SolHabEvo
+                dicSrf[year] = int(round(srfMax) * popDic[year])
+                year += 1
+        elif scenario == 'stable':
+            srfMax = m2SolHab14
+            while year <= finalYear :
+                dicSrf[year] = int(round(srfMax) * popDic[year])
+                year += 1
+        elif scenario == 'reduction':
+            srfMax = m2SolHab14
+            totalYears = finalYear - year
+            while year <= finalYear :
+                dicSrf[year] = int(round(srfMax) * popDic[year])
+                srfMax -= m2SolHab14 * (0.75 / totalYears)
+                year += 1
+
+        log.write('Area consumption per person in 2014: ' + str(int(round(m2SolHab14))) + ' m2\n')
+        log.write('Average annual evolution of area consumption per person: ' + str(round(m2SolHabEvo * 100, 4)) + ' %\n')
+        log.write('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m2\n')
 
         # Calcul des coefficients de pondération de chaque raster d'intérêt, csv des poids dans le répertoire des données locales
         with (dataDir/'interet/poids.csv').open('r') as r:
@@ -479,41 +514,6 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         ratioPlaSol14 = np.where(srfSol14 != 0, srfPla14 / srfSol14, 0).astype(np.float32)
         txArtif = (srfSol14 / srfCell).astype(np.float32)
 
-        # Statistiques sur l'évolution du bâti
-        with (dataDir/'evo_surface_sol.csv').open('r') as r:
-            reader = csv.reader(r)
-            next(reader, None)
-            dicSsol = {rows[0]:int(rows[1]) for rows in reader}
-        m2SolHab09 = dicSsol['2009'] / pop09
-        m2SolHab14 = dicSsol['2014'] / pop14
-        m2SolHabEvo = (m2SolHab14 - m2SolHab09) / m2SolHab09 / 5
-
-        # Création du dictionnaire pour nombre de m2 ouverts à l'urbanisation par année, selon le scénario
-        dicSrf = {}
-        year = 2015
-        if scenario == 'tendanciel':
-            srfMax = m2SolHab14
-            while year <= finalYear :
-                srfMax += srfMax * m2SolHabEvo
-                dicSrf[year] = int(round(srfMax) * popDic[year])
-                year += 1
-        elif scenario == 'stable':
-            srfMax = m2SolHab14
-            while year <= finalYear :
-                dicSrf[year] = int(round(srfMax) * popDic[year])
-                year += 1
-        elif scenario == 'reduction':
-            srfMax = m2SolHab14
-            totalYears = finalYear - year
-            while year <= finalYear :
-                dicSrf[year] = int(round(srfMax) * popDic[year])
-                srfMax -= m2SolHab14 * (0.75 / totalYears)
-                year += 1
-
-        log.write('Area consumption per person in 2014: ' + str(int(round(m2SolHab14))) + ' m2\n')
-        log.write('Average annual evolution of area consumption per person: ' + str(round(m2SolHabEvo * 100, 4)) + ' %\n')
-        log.write('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m2\n')
-
         # Instantanés de la situation à t0
         if tiffs:
             to_tif(urb14, 'byte', proj, geot, project/'urbanisation.tif')
@@ -526,10 +526,11 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         # Initilalisation des variables globales de la grille du bâti
         heatMap = np.zeros([rows, cols], np.byte)
         demographie = demographie14.copy()
-        srfSol = srfSol14.copy()
         srfSolRes = srfSolRes14.copy()
+        srfSol = srfSol14.copy()
         srfPla = srfPla14.copy()
         urb = urb14.copy()
+        skipZauYear = 0
         preBuilt = 0
         nonBuilt = 0
         preLog = 0
@@ -544,6 +545,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt, zau=True)
                 if restePop > 0 and resteSrf > 0:
                     skipZau = True
+                    skipZauYear = year
                     restePop, resteSrf = urbanize(restePop, resteSrf)
                 if restePop > 0 and densifyOld:
                     restePop, _ = urbanize(restePop)
@@ -617,6 +619,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write("Population not put up: " + str(nonLog) + '\n')
         log.write("Population put up: " + str(popNouvCount) + '\n')
         log.write("Final demography: " + str(demographie.sum()) + '\n')
+        log.write("ZAU saturation year: " + str(skipZauYear) + '\n')
         log.write("Total number of randomly chosen cells: " + str(countChoices) + '\n')
         log.write("Execution time: " + str(execTime) + '\n')
 
