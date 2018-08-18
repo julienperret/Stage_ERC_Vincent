@@ -251,7 +251,7 @@ def urbanize(pop, srfMax=0, zau=False):
     if srfMax > 0:
         tmpInteret = np.where(capaSol > 0, interet, 0)
         if not densifyGround:
-            # On limite l'urbanisation aux espaces pas non artificialisés en début de simulation
+            # On limite l'urbanisation aux espaces non artificialisés en début de simulation
             tmpInteret = np.where(urb14 == 0, tmpInteret, 0)
         if zau:
             # On limite l'urbanisation aux ZAU (if pluPriority)
@@ -282,7 +282,6 @@ def urbanize(pop, srfMax=0, zau=False):
                         capaSol[row][col] -= ss
                         tmpSrfSol[row][col] += ss
                         tmpSrfPla[row][col] += sp
-                        tmpInteret[row][col] = 0
                         count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
                         artif += ss
             # Sinon on ajuste l'intérêt à 0 pour que la cellule ne soit plus tirée (pour l'année en cours)
@@ -293,7 +292,7 @@ def urbanize(pop, srfMax=0, zau=False):
             else:
                 tmpInteret[row][col] = 0
 
-    elif count < pop and densifyOld:
+    else:
         # Densification du bâti existant si on n'a pas pu loger tout le monde
         tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
         while count < pop and tmpInteret.sum() > 0:
@@ -328,7 +327,7 @@ srfCell = pixSize * pixSize
 nbIris = int(irisId.max())
 ds = None
 
-projectStr = '%im_tx%s_%s_winSize%i_minContig%s_maxContig%s'%(pixSize, str(growth), scenario, winSize, str(minContig), str(maxContig))
+projectStr = '%im_tx%s_%s_winSize%i_minContig%s_maxContig%s_maxBuiltRatio%i'%(pixSize, str(growth), scenario, winSize, str(minContig), str(maxContig), maxBuiltRatio)
 if pluPriority:
     projectStr += '_pluPrio'
 if buildNonRes:
@@ -488,6 +487,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             pluPriority = False
 
         # Déclaration des matrices
+        heatMap = np.zeros([rows, cols], np.byte)
         demographie14 = to_array(dataDir/'demographie.tif', np.uint16)
         srfSol14 = to_array(dataDir/'srf_sol.tif', np.uint16)
         srfSolRes14 = to_array(dataDir/'srf_sol_res.tif', np.uint16)
@@ -523,19 +523,18 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             to_tif(interet, 'float32', proj, geot, project/'interet.tif')
             to_tif(ratioPlaSol14, 'float32', proj, geot, project/'ratio_plancher_sol.tif')
 
+        # Début de la simulation
         start_time = time()
-        # Initilalisation des variables globales de la grille du bâti
-        heatMap = np.zeros([rows, cols], np.byte)
-        demographie = demographie14.copy()
-        srfSolRes = srfSolRes14.copy()
-        srfSol = srfSol14.copy()
-        srfPla = srfPla14.copy()
-        urb = urb14.copy()
-        skipZauYear = 0
-        preBuilt = 0
-        nonBuilt = 0
         preLog = 0
         nonLog = 0
+        preBuilt = 0
+        nonBuilt = 0
+        skipZauYear = None
+        urb = urb14.copy()
+        srfSol = srfSol14.copy()
+        srfPla = srfPla14.copy()
+        srfSolRes = srfSolRes14.copy()
+        demographie = demographie14.copy()
         # Boucle principale pour itération annuelle
         for year in range(2015, finalYear + 1):
             progres = "Year %i/%i" %(year, finalYear)
@@ -544,12 +543,10 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             popALoger = popDic[year]
             if pluPriority and not skipZau:
                 restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt, zau=True)
-                if restePop > 0 and resteSrf > 0:
+                if resteSrf >= srfMax:
                     skipZau = True
                     skipZauYear = year
                     restePop, resteSrf = urbanize(restePop, resteSrf)
-                if restePop > 0 and densifyOld:
-                    restePop, _ = urbanize(restePop)
             else:
                 restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt)
                 if restePop > 0 and densifyOld:
