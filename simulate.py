@@ -380,7 +380,7 @@ if densifyOld:
     projectStr += '\ndensifyOld : True'
 if finalYear != 2040:
     projectStr += '_' + str(finalYear)
-project = outputDir/(strftime('%H:%M:%S'))
+project = outputDir/projectStr
 
 if project.exists():
     rmtree(str(project))
@@ -399,6 +399,7 @@ if tiffs and snaps:
 
 with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('w') as mesures:
     try:
+        log.write(projectStr)
         # Création des dictionnaires contenant la population par année
         with (dataDir/'population.csv').open('r') as csvFile:
             reader = csv.reader(csvFile)
