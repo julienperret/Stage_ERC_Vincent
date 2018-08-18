@@ -1517,6 +1517,10 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             grid = QgsVectorLayer(str(workspace/'data'/pixResStr/'grid.shp'), 'grid')
             grid.dataProvider().createSpatialIndex()
             iris = QgsVectorLayer(str(workspace/'data/iris.shp'))
+<<<<<<< HEAD
+=======
+            iris.addExpressionField('$id + 1', QgsField('ID_IRIS', QVariant.Int, len=4))
+>>>>>>> a348cd75a1779cfbfacb16676ed2b56fcee138fb
             iris.dataProvider().createSpatialIndex()
 
             buildStatDic = {
@@ -1552,6 +1556,10 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
 
             grid = QgsVectorLayer(str(workspace/'data'/pixResStr/'grid.shp'), 'grid')
             iris = QgsVectorLayer(str(workspace/'data/iris.shp'))
+<<<<<<< HEAD
+=======
+            iris.addExpressionField('$id + 1', QgsField('ID_IRIS', QVariant.Int, len=4))
+>>>>>>> a348cd75a1779cfbfacb16676ed2b56fcee138fb
             batiInterIris = QgsVectorLayer(str(workspace/'data/2014_bati/bati_inter_iris.shp'))
             popGridStat(batiInterIris, grid, iris, workspace/'data'/pixResStr, workspace/'data'/pixResStr/'urb_csv/')
             del grid, iris
@@ -1730,7 +1738,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             log.write(description + ': ')
 
             argList = []
-            os.mkdir(workspace/'data'/pixResStr/'fitting')
+            os.mkdir(str(workspace/'data'/pixResStr/'fitting'))
             scriptDir = Path(__file__).absolute().parent
 
             subprocess.run('Rscript ' + str(scriptDir/'fitting/fit_floors.R') + ' ' + str(workspace/'data'/pixResStr)
@@ -1740,7 +1748,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             log.write(getTime(start_time) + '\n')
 
         else:
-            fitResults = os.listdir(workspace/'data'/pixResStr/'fitting')
+            fitResults = os.listdir(str(workspace/'data'/pixResStr/'fitting'))
             if 'floors_weights.csv' not in fitResults or 'surf_weights.csv' not in fitResults:
                 start_time = time()
                 etape = 7
