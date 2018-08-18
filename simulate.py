@@ -372,11 +372,11 @@ ds = None
 projectStr = 'pixRes%im_tx%s_%s_winSize%i_minContig%s_maxContig%s_maxBuiltRatio%i_maxArtifRatio%s'%(pixSize, str(growth), scenario, winSize, str(minContig), str(maxContig), maxBuiltRatio, str(maxArtifRatio))
 if pluPriority:
     projectStr += '_pluPrio'
-if buildNonRes:
-    projectStr += '_buildNonRes'
-if forceEachYear:
-    projectStr += '_forceEachYear'
-if densifyOld:
+# if buildNonRes:
+#     projectStr += '_buildNonRes'
+# if forceEachYear:
+#     projectStr += '_forceEachYear'
+# if densifyOld:
     projectStr += '_densifyOld'
 if finalYear != 2040:
     projectStr += '_' + str(finalYear)
