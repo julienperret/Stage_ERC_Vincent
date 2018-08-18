@@ -180,15 +180,15 @@ def chooseFloors(id, row, col):
 
 # Fenêtre glissante pour statistique dans le voisinage d'un pixel
 def winMean(array, row, col, size=3):
-    if (row > size - 1 and row + size-1 < rows) and (col > size - 1 and col + size-1 < cols):
-        s = 0
+    value = None
+    if (row >= size// 2 and row + size//2 < rows) and (col >= size//2 and col + size//2 < cols):
+        s = 0 
         pos = [i + 1 for i in range(- size//2, size//2)]
         for r in pos:
             for c in pos:
                 s += array[row + r][col + c]
-        return s / (size * size)
-    else:
-        return None
+        value = s / (size * size)
+    return value
 
 # Artificialisation d'une surface tirée comprise entre la taille moyenne d'un bâtiment (IRIS) et la capacité max de la cellule
 def expand(row, col):
