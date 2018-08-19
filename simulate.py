@@ -508,8 +508,11 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         # Préparation des restrictions et gestion du PLU
         restriction = to_array(dataDir/'interet/restriction_totale.tif')
         if (dataDir/'interet/plu_restriction.tif').exists() and (dataDir/'interet/plu_priorite.tif').exists():
-            skipZau = False
-            pluPrio = to_array(dataDir/'interet/plu_priorite.tif')
+            if pluPriority:
+                skipZau = False
+                pluPrio = to_array(dataDir/'interet/plu_priorite.tif')
+            else:
+                skipZau = True
             pluRest = to_array(dataDir/'interet/plu_restriction.tif')
             restrictionNonPlu = restriction.copy()
             restriction = np.where(pluRest == 1, 1, restriction)
