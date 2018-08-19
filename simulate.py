@@ -326,8 +326,6 @@ def urbanize(pop, srfMax, zau=False):
                     tmpInteret[row][col] = 0
             else:
                 tmpInteret[row][col] = 0
-                if verboose:
-                        print("Warning : capacity in cell " + str(row) + ', ' + str(col) + " is null.")
         else:
             tmpInteret[row][col] = 0
 
