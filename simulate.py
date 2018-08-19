@@ -102,7 +102,7 @@ if 'maxBuiltRatio' not in globals():
 # Taux pour exclure de la couche d'intérêt les cellules déjà artificialisées
 if 'exclusionRatio' not in globals():
     exclusionRatio = 0.5
-# Pour seuiller le nombre de mêtres carrés utilisés par habitants et par iris
+# Pour seuiller le nombre de mètres carrés utilisés par habitants et par iris
 if 'maxUsedSrfPla' not in globals():
     maxUsedSrfPla = 200
 # Pour simuler également la construction des surfaces non résidentielles
