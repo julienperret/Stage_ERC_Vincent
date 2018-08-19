@@ -352,6 +352,8 @@ def urbanize(pop, srfMax, zau=False):
                 tmpInteret = np.where((tmpUrb == 1) & (srfSolRes > 0), interet, 0)
             else:
                 tmpInteret = np.zeros([rows, cols], np.byte)
+        else:
+            tmpInteret = np.zeros([rows, cols], np.byte)
 
         choosableCells = (np.where(tmpInteret > 0, 1, 0)).sum()
         if verboose:
