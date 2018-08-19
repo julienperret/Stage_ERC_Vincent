@@ -277,13 +277,13 @@ def build(row, col, ss=None):
 
 # Fonction principale pour gérer artificialisation puis densification
 def urbanize(pop, srfMax, zau=False):
-    global demographie, capaSol, srfSol, srfSolRes, srfSolNonRes, srfPla, urb, skipZau, skipZauYear
+    global demographie, capaSol, srfSol, srfSolRes, srfSolNonRes, srfPla, urb, skipZau, skipZauYear, txArtif
     artif = 0
     count = 0
     tmpUrb = np.zeros([rows, cols], np.byte)
     tmpSrfPla = np.zeros([rows, cols], np.uint16)
     tmpSrfSol = np.zeros([rows, cols], np.uint16)
-    tmpInteret = np.where(capaSol > 0, interet, 0)
+    tmpInteret = np.where((txArtif <= exclusionRatio) & (capaSol > 0), interet, 0)
     if zau:
         # On limite l'urbanisation aux ZAU (if pluPriority)
         tmpInteret = np.where(pluPrio == 1, tmpInteret, 0)
@@ -335,6 +335,7 @@ def urbanize(pop, srfMax, zau=False):
                 print("pluPriority : interest sum == 0 ; skipping ZAU from now on.")
 
     if count < pop and (forceEachYear or (densifyOld and year == finalYear)):
+        tmpInteret = np.zeros([rows, cols], np.byte)
         ignoredCells = 0
         chosenCells = 0
         # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde
@@ -348,10 +349,6 @@ def urbanize(pop, srfMax, zau=False):
                     print("forceEachYear : trying to densify and get " + str(int(pop-count)) + " people under a roof.")
             if tmpUrb.sum() > 0:
                 tmpInteret = np.where((tmpUrb == 1) & (srfSolRes > 0), interet, 0)
-            else:
-                tmpInteret = np.zeros([rows, cols], np.byte)
-        else:
-            tmpInteret = np.zeros([rows, cols], np.byte)
 
         choosableCells = (np.where(tmpInteret > 0, 1, 0)).sum()
         if verboose:
@@ -551,7 +548,6 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         # Nombre moyen d'étages dans la cellule
         ratioPlaSol14 = np.where(srfSol14 != 0, srfPla14 / srfSol14, 0).astype(np.float32)
         # On filtre les cellules d'intéret pour limiter les tirages inutiles
-        interet = np.where(txArtif <= exclusionRatio, interet, 0)
         interet = np.where(m2PlaHab > 0, interet, 0)
 
         # Instantanés de la situation à t0
