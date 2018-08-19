@@ -238,9 +238,7 @@ def expand(row, col, new=True):
     else:
         maxSrf = capaSol[row][col]
         ss = chooseArea(id, row, col)
-        if ss > 0:
-            while ss >= maxSrf:
-                ss = chooseArea(id, row, col)
+        if ss > 0 and maxSrf > 0:
             if ss > maxSrf :
                 ss = maxSrf
     return ss
@@ -261,17 +259,19 @@ def build(row, col, ss=None):
         nivMoy = float(spla / ssol) if ssol != 0 else 0
         nivMax = int(etages.max()) if len(etages) > 0 else 0
         if int(nivMax) > round(nivMoy) :
-            while nbNiv <= nivMoy:
-                nbNiv = chooseFloors(id, row, col)
-            sp = ssol * nbNiv
-            if sp > srfPla[row][col]:
-                sp -= srfPla[row][col]
-                if sp < m2PlaHab[row][col]:
-                    sp = 0
+            nbNiv = chooseFloors(id, row, col)
+            if nbNiv > nivMoy:
+                sp = ssol * nbNiv
+                if sp > srfPla[row][col]:
+                    sp -= srfPla[row][col]
+                    if sp < m2PlaHab[row][col]:
+                        sp = 0
+                else:
+                    p = 0
             else:
                 sp = 0
         else:
-            sp = 0
+            sp =0
     return sp
 
 # Fonction principale pour gérer artificialisation puis densification
@@ -329,8 +329,14 @@ def urbanize(pop, srfMax, zau=False):
                 skipZau = True
             # Ici on force à densifier l'existant en hauteur pour loger tout le monde (à chaque itération)
             if forceEachYear:
-                if tmpInteret.sum() == 0:
-                    tmpInteret = np.where(tmpUrb > 0, interet, 0)
+                if tmpInteret.sum() > 0:
+                    if tmpUrb.sum() > 0:
+                        tmpInteret = np.where(tmpUrb > 0, tmpInteret, 0)
+                else:
+                    if tmpUrb.sum() > 0:
+                        tmpInteret = np.where(tmpUrb == 1, interet, 0)
+                    else:
+                        tmpInteret = np.where((urb == 1) & (urb14 == 0), interet, 0)
         # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde
         elif densifyOld:
             srfMax = 0
@@ -580,6 +586,8 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         peuplementMoyen = round(np.nanmean(np.where(popNouv == 0, np.nan, popNouv)), 3)
         srfSolNouv = srfSol - srfSol14
         srfPlaNouv = srfPla - srfPla14
+        densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
+        densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
         txArtifNouv = (srfSolNouv / srfCell).astype(np.float32)
         txArtifMoyen = round(np.nanmean(np.where(txArtifNouv == 0, np.nan, txArtifNouv)) * 100, 3)
         ratioPlaSol = np.where(srfSol != 0, srfPla / srfSol, 0).astype(np.float32)
@@ -615,6 +623,8 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         mesures.write("Cells open to urbanisation, " + str(expansion.sum()) + "\n")
         mesures.write("Average artificialisation rate, " + str(txArtifMoyen) + "\n")
         mesures.write("Cumulated environnemental impact, " + str(int(impactEnv)) + "\n")
+        mesures.write("Ground-densified cells count, " + str(densifSol.sum()) + "\n")
+        mesures.write("Floor-densified cells count, " + str(densifPla.sum()) + "\n")
 
         log.write("Unbuilt area: " + str(nonBuilt) + '\n')
         log.write("Population not put up: " + str(nonLog) + '\n')
@@ -624,21 +634,12 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write("Total number of randomly chosen cells: " + str(countChoices) + '\n')
         log.write("Execution time: " + str(execTime) + '\n')
 
-        if maxArtifRatio > 0:
-            densifSol = np.where((srfSol > srfSol14) & (srfSolRes14 > 0), 1, 0)
-            if tiffs:
+        if tiffs !
+            if maxArtifRatio > 0:
                 to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
-            mesures.write("Ground-densified cells count, " + str(densifSol.sum()) + "\n")
-        else:
-            mesures.write("Ground-densified cells count, NA\n")
-
-        if densifyOld:
-            densifPla = np.where((srfPla > srfPla14) & (srfSolRes14 > 0), 1, 0)
-            if tiffs:
+            if densifyOld:
                 to_tif(densifPla, 'byte', proj, geot, project/'output/densification_plancher.tif')
-            mesures.write("Floor-densified cells count, " + str(densifPla.sum()) + "\n")
-        else:
-            mesures.write("Floor-densified cells count, NA\n")
+
 
     except:
         print("\n*** Error :")
