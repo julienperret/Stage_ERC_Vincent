@@ -78,6 +78,7 @@ if 'outDir' not in globals():
 try:
     # Création des variables GDAL pour écriture de raster, indispensables pour la fonction to_tif()
     snapsType = os.listdir(inDir)
+    snapsType.sort()
     c = 0
     for basename in snapsType:
         print('Processing "' + basename + '"' )
