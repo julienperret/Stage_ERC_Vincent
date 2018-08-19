@@ -330,48 +330,47 @@ def urbanize(pop, srfMax, zau=False):
             tmpInteret[row][col] = 0
 
     if count < pop :
-        if (artif <= srfMax and tmpInteret.sum() == 0) and zau:
+        ignoredCells = 0
+        chosenCells = 0
+        if tmpInteret.sum() == 0 and zau:
             skipZau = True
             skipZauYear = year
             if verboose:
                     print("pluPriority : interest sum == 0 ; skipping ZAU from now on.")
 
         # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde
-        if (forceEachYear and (artif >= srfMax or tmpInteret.sum() == 0)) or (year == finalYear and densifyOld):
-            ignoredCells = 0
-            chosenCells = 0
-            if year == finalYear and densifyOld:
-                srfMax = 0
-                tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
-                if verboose:
-                        print("densifyOld : trying to densify old buildings because " + str(int(pop - count)) + " peoples are still homeless.")
-            elif forceEachYear:
-                # Ici on force à densifier l'existant en hauteur pour loger tout le monde (à chaque itération)
-                if verboose:
-                        print("forceEachYear : trying to densify and get " + str(int(pop-count)) + " people under a roof.")
-                if tmpUrb.sum() > 0:
-                    tmpInteret = np.where((tmpUrb == 1) & (srfSolRes > 0), interet, 0)
-                else:
-                    tmpInteret = np.where((srfSolRes > 0) & (urb14 == 0) & (urb == 1), interet, 0)
+        if year == finalYear and densifyOld:
+            srfMax = 0
+            tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
+            if verboose:
+                    print("densifyOld : trying to densify old buildings because " + str(int(pop - count)) + " peoples are still homeless.")
+        elif forceEachYear and (artif >= srfMax or tmpInteret.sum() == 0):
+            # Ici on force à densifier l'existant en hauteur pour loger tout le monde (à chaque itération)
+            if verboose:
+                    print("forceEachYear : trying to densify and get " + str(int(pop-count)) + " people under a roof.")
+            if tmpUrb.sum() > 0:
+                tmpInteret = np.where((tmpUrb == 1) & (srfSolRes > 0), interet, 0)
+            else:
+                tmpInteret = np.zeros([rows, cols], np.byte)
 
             choosableCells = (np.where(tmpInteret > 0, 1, 0)).sum()
             if verboose:
                 print(str(choosableCells) + ' available cells for the densification process...')
             # On tente de loger les personnes restantes
 
-            while count < pop and tmpInteret.sum() > 0:
-                sp = 0
-                row, col = chooseCell(tmpInteret)
-                sp = build(row, col, 'reshape')
-                if sp > 0:
-                    chosenCells += 1
-                    tmpSrfPla[row][col] += sp
-                    count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
-                else:
-                    tmpInteret[row][col] = 0
+        while count < pop and tmpInteret.sum() > 0:
+            sp = 0
+            row, col = chooseCell(tmpInteret)
+            sp = build(row, col, 'reshape')
+            if sp > 0:
+                chosenCells += 1
+                tmpSrfPla[row][col] += sp
+                count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+            else:
+                tmpInteret[row][col] = 0
 
-            if verboose:
-                print(str(chosenCells) + " cells were successfully rebuilt.")
+        if verboose:
+            print(str(chosenCells) + " cells were successfully rebuilt.")
 
     # Mise à jour des variables globales
     urb = np.where(tmpUrb == 1, 1, urb)
