@@ -353,10 +353,10 @@ def urbanize(pop, srfMax, zau=False):
             else:
                 tmpInteret = np.zeros([rows, cols], np.byte)
 
-            choosableCells = (np.where(tmpInteret > 0, 1, 0)).sum()
-            if verboose:
-                print(str(choosableCells) + ' available cells for the densification process...')
-            # On tente de loger les personnes restantes
+        choosableCells = (np.where(tmpInteret > 0, 1, 0)).sum()
+        if verboose:
+            print(str(choosableCells) + ' available cells for the densification process...')
+        # On tente de loger les personnes restantes
 
         while count < pop and tmpInteret.sum() > 0:
             sp = 0
