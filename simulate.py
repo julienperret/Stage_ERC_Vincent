@@ -279,7 +279,8 @@ def build(row, col, ss=None):
 def urbanize(pop, srfMax, zau=False):
     if verboose:
         print('\n')
-    global demographie, capaSol, srfSol, srfSolRes, srfPla, urb, skipZau, skipZauYear
+    global demographie, capaSol, srfSol, srfSolRes, srfSolNonRes, srfPla, urb, skipZau, skipZauYear
+
     artif = 0
     count = 0
     tmpUrb = np.zeros([rows, cols], np.byte)
@@ -308,6 +309,7 @@ def urbanize(pop, srfMax, zau=False):
                     if buildNonRes:
                         # On réduit la surface construite à une part de résidentiel avant de calculer la surface plancher
                         ssr = ss * txSsr[row][col] if txSsr[row][col] > 0 else ss
+                        ssnr = ss - ssr
                         sp = build(row, col, ssr)
                     else:
                         sp = build(row, col, ss)
@@ -542,21 +544,23 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         interet = np.where((restriction != 1), (eco * coef['ecologie']) + (rou * coef['routes']) + (tra * coef['transport']) + (sir * coef['sirene']), 0)
         interet = (interet / np.amax(interet)).astype(np.float32)
 
+        srfSolNonRes14 = srfSol14 - srfSolRes14
         # Création des rasters de capacité en surfaces sol et plancher
         capaSol = np.zeros([rows, cols], np.uint16) + srfCell * maxBuiltRatio / 100
         capaSol = np.where((restriction != 1) & (srfSol14 < capaSol), capaSol - srfSol14, 0).astype(np.uint16)
         totalCapacity = int(np.where(capaSol > 0, 1, 0).sum())
+        # Cellules urbanisées (tout bâti inclu)
         urb14 = np.where(srfSol14 > 0, 1, 0).astype(np.byte)
-        srfSolNonRes = srfSol14 - srfSolRes14
-        ratioPlaSol14 = np.where(srfSol14 != 0, srfPla14 / srfSol14, 0).astype(np.float32)
         txArtif = (srfSol14 / srfCell).astype(np.float32)
-
+        # Nombre moyen d'étages dans la cellule
+        ratioPlaSol14 = np.where(srfSol14 != 0, srfPla14 / srfSol14, 0).astype(np.float32)
         # On filtre les cellules d'intéret pour limiter les tirages inutiles
         interet = np.where(txArtif <= exclusionRatio, interet, 0)
         interet = np.where(m2PlaHab > 0, interet, 0)
 
         # Instantanés de la situation à t0
         if tiffs:
+            to_tif(srfSolNonRes14, 'uint16', proj, geot, project/'surface_sol_non_residentielle.tif')
             to_tif(urb14, 'byte', proj, geot, project/'urbanisation.tif')
             to_tif(capaSol, 'uint16', proj, geot, project/'capacite_sol.tif')
             to_tif(txArtif, 'float32', proj, geot, project/'taux_artif.tif')
@@ -604,9 +608,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         print('\nDuration of the simulation: ' + str(execTime) + ' seconds')
 
         # Calcul et export des résultats
-
         popNouv = demographie - demographie14
-
         peuplementMoyen = round(np.nanmean(np.where(popNouv == 0, np.nan, popNouv)), 3)
         ratioPlaSol = np.where(srfSol != 0, srfPla / srfSol, 0).astype(np.float32)
         srfSolNouv = srfSol - srfSol14
@@ -617,6 +619,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         txArtifMoyen = round(np.nanmean(np.where(txArtifNouv == 0, np.nan, txArtifNouv)) * 100, 3)
         txArtifFinal = (srfSol / srfCell).astype(np.float32)
         expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
+        srfSolNonRes = srfSol - srfSolRes
         dsfSol = densifSol.sum() if densifSol.sum() > 0 else 'NA'
         dsfPla = densifPla.sum() if densifPla.sum() > 0 else 'NA'
         countChoices = heatMap.sum()
@@ -636,6 +639,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             to_tif(srfSolNouv, 'uint16', proj, geot, project/'output/surface_sol_construite.tif')
             to_tif(srfPlaNouv, 'uint16', proj, geot, project/'output/surface_plancher_construite.tif')
             to_tif(popNouv, 'uint16', proj, geot, project/'output/population_nouvelle.tif')
+            to_tif(srfSolNonRes, 'uint16', proj, geot, project/'surface_sol_non_residentielle_' + str(finalYear) + '.tif')
 
         ocs = to_array(dataDir/'classes_ocsol.tif', np.float32)
         with (project/'output/conso_ocs.csv').open('w') as w:
