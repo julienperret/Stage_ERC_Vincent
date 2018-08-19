@@ -178,9 +178,9 @@ def chooseCell(weight):
             cells  = (row, col)
             heatMap[row][col] += 1
         elif verboose:
-                print("Warning : can't choose a cell with those weights.")
+                print("Error : can't choose a cell with those weights.")
     elif verboose:
-            print("Warning : it seems like interest raster sums to 0.")
+            print("Error : it seems like interest raster sums to 0.")
     return cells
 
 def chooseArea(id, row, col):
@@ -225,8 +225,6 @@ def winMean(array, row, col, size=3):
             for c in pos:
                 s += array[row + r][col + c]
         value = s / (size * size)
-    elif verboose:
-            print("Warning : can't compute winMean for cell " + str(row) + ', ' + str(col))
     return value
 
 # Artificialisation d'une surface cellule vide ou déjà urbanisée (dans ce cas on ne vérifie pas la contiguité)
@@ -265,11 +263,14 @@ def build(row, col, ss=None):
         nivMoy = float(spla / ssol) if ssol != 0 else 0
         nivMax = int(etages.max()) if len(etages) > 0 else 0
         if int(nivMax) > round(nivMoy) :
+            # On cherche à tirer un nombre d'étage spérieur à l'existant
             nbNiv = chooseFloors(id, row, col)
             if nbNiv > nivMoy:
                 sp = ssol * nbNiv
+                # On enlève l'existant pour connaîte la surface nouvelle
                 if sp > srfPla[row][col]:
                     sp -= srfPla[row][col]
+                    # On vérifie que la surface finale suffit à loger au moins une personne
                     if sp < m2PlaHab[row][col]:
                         sp = 0
                 else:
@@ -280,7 +281,7 @@ def build(row, col, ss=None):
 def urbanize(pop, srfMax, zau=False):
     if verboose:
         print('\n')
-    global demographie, capaSol, srfSol, srfSolRes, srfPla, urb, skipZau
+    global demographie, capaSol, srfSol, srfSolRes, srfPla, urb, skipZau, skipZauYear
     artif = 0
     count = 0
     tmpUrb = np.zeros([rows, cols], np.byte)
@@ -328,29 +329,29 @@ def urbanize(pop, srfMax, zau=False):
             else:
                 tmpInteret[row][col] = 0
                 if verboose:
-                        print("Warning : capacity in cell " + str(row) + ', ' + str(col) + " is None.")
+                        print("Warning : capacity in cell " + str(row) + ', ' + str(col) + " is null.")
         else:
             tmpInteret[row][col] = 0
 
     if tmpInteret.sum() == 0 and zau:
         skipZau = True
+        skipZauYear = year
         if verboose:
                 print("pluPriority : interest sum == 0 ; skipping ZAU from now on.")
 
     if count < pop and ((forceEachYear and (artif >= srfMax or tmpInteret.sum() == 0)) or (year == finalYear and densifyGround)):
         ignoredCells = 0
         chosenCells = 0
-        if year != finalYear:
+        if forceEachYear:
             # Ici on force à densifier l'existant en hauteur pour loger tout le monde (à chaque itération)
-            if forceEachYear:
-                if verboose:
-                        print("forceEachYear : trying to densify and get " + str(int(pop-count)) + " people under a roof.")
-                if tmpUrb.sum() > 0:
-                    tmpInteret = np.where((tmpUrb == 1) & (srfSolRes > 0), interet, 0)
-                else:
-                    tmpInteret = np.where((srfSolRes > 0) & (urb14 == 0) & (urb == 1), interet, 0)
+            if verboose:
+                    print("forceEachYear : trying to densify and get " + str(int(pop-count)) + " people under a roof.")
+            if tmpUrb.sum() > 0:
+                tmpInteret = np.where((tmpUrb == 1) & (srfSolRes > 0), interet, 0)
+            else:
+                tmpInteret = np.where((srfSolRes > 0) & (urb14 == 0) & (urb == 1), interet, 0)
         # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde
-        elif densifyOld:
+        elif year == finalYear and densifyOld:
             srfMax = 0
             tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
             if verboose:
@@ -588,6 +589,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt)
             preBuilt = -resteSrf
             preLog = -restePop
+
             if verboose:
                 print('Remaining population : '  + str(restePop))
                 print('Remaining surface to build : ' + str(resteSrf))
