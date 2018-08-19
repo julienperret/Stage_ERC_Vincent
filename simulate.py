@@ -339,7 +339,6 @@ def urbanize(pop, srfMax, zau=False):
         chosenCells = 0
         # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde
         if year == finalYear and densifyOld:
-            srfMax = 0
             tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
             if verboose:
                     print("densifyOld : trying to densify old buildings because " + str(int(pop - count)) + " peoples are still homeless.")
