@@ -399,7 +399,7 @@ if pluPriority:
 if forceEachYear:
     projectStr += '_forceEachYear'
 if densifyOld:
-     projectStr += '_densifyOld'
+    projectStr += '_densifyOld'
 if finalYear != 2040:
     projectStr += '_' + str(finalYear)
 project = outputDir/projectStr
