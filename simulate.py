@@ -398,8 +398,8 @@ if pluPriority:
 #     projectStr += '_buildNonRes'
 if forceEachYear:
     projectStr += '_forceEachYear'
-# if densifyOld:
-#     projectStr += '_densifyOld'
+if densifyOld:
+     projectStr += '_densifyOld'
 if finalYear != 2040:
     projectStr += '_' + str(finalYear)
 project = outputDir/projectStr
