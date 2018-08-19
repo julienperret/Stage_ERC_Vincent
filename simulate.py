@@ -346,7 +346,7 @@ def urbanize(pop, srfMax, zau=False):
                 srfMax = 0
                 tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
                 if verboose:
-                        print("densifyOld : trying to densify old buildings beacause " + str(int(pop - count)) + "peoples are still homeless.")
+                        print("densifyOld : trying to densify old buildings because " + str(int(pop - count)) + " peoples are still homeless.")
             elif forceEachYear:
                 # Ici on force à densifier l'existant en hauteur pour loger tout le monde (à chaque itération)
                 if verboose:
