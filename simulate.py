@@ -178,9 +178,9 @@ def chooseCell(weight):
             cells  = (row, col)
             heatMap[row][col] += 1
         elif verboose:
-                print("Warning : can't choose a cell.")
+                print("Warning : can't choose a cell with those weights.")
     elif verboose:
-            print("Warning : interest raster sum to 0.")
+            print("Warning : it seems like interest raster sums to 0.")
     return cells
 
 def chooseArea(id, row, col):
