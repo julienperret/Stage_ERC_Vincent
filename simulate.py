@@ -643,7 +643,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             to_tif(srfSolNouv, 'uint16', proj, geot, project/'output/surface_sol_construite.tif')
             to_tif(srfPlaNouv, 'uint16', proj, geot, project/'output/surface_plancher_construite.tif')
             to_tif(popNouv, 'uint16', proj, geot, project/'output/population_nouvelle.tif')
-            to_tif(srfSolNonRes, 'uint16', proj, geot, project/('surface_sol_non_residentielle_' + str(finalYear) + '.tif'))
+            to_tif(srfSolNonRes, 'uint16', proj, geot, project/('output/surface_sol_non_residentielle_' + str(finalYear) + '.tif'))
             if exclusionRatio > 0:
                 to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
             if densifyOld:
