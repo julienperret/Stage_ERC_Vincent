@@ -90,9 +90,6 @@ try:
             dataType = 'uint16'
 
         d = inDir + basename + '/'
-        if os.path.exists(d + 'tmp'):
-            rmtree(d + 'tmp')
-        os.makedirs(d + 'tmp')
         lastFile = d + os.listdir(d)[len(os.listdir(d)) - 1]
         ds = gdal.Open(lastFile)
         geot = ds.GetGeoTransform()
@@ -101,6 +98,9 @@ try:
         tif = ds.GetRasterBand(1).ReadAsArray().astype(npType)
         driver = gdal.GetDriverByName('GTiff')
         ds = None
+        if os.path.exists(d + 'tmp'):
+            rmtree(d + 'tmp')
+        os.makedirs(d + 'tmp')
 
         if 'delay' not in globals():
             delay = str(round(len(os.listdir(d))/2))
@@ -125,7 +125,6 @@ try:
                     array = (array * highValue / maxV).astype(npType)
 
                 to_tif(array, dataType, d + 'tmp/' + basename + file.replace('.tif','').split('_')[1] + '.tif')
-
 
         if not oneOutDir:
             outDir = d
