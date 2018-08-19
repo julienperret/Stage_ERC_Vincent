@@ -108,6 +108,7 @@ if 'maxUsedSrfPla' not in globals():
 # Pour simuler également la construction des surfaces non résidentielles
 if 'buildNonRes' not in globals():
     buildNonRes = True
+# Pour densifier l'existant en hauteur, à chaque itération annuelle - si besoin
 if 'forceEachYear' not in globals():
     forceEachYear = True
 # Pour autoriser à densifier la surface plancher pré-éxistante
