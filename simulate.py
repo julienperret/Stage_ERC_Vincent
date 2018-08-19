@@ -73,19 +73,20 @@ elif len(sys.argv) > 5:
 
     pluPriority = to_bool(float(sys.argv[5]))
     buildNonRes = to_bool(float(sys.argv[6]))
-    #densifyGround = to_bool(float(sys.argv[7]))
+    exclusionRatio = float(sys.argv[7])
     maxBuiltRatio = float(sys.argv[8])
-    densifyOld = to_bool(float(sys.argv[9]))
-    maximumDensity = to_bool(float(sys.argv[10]))
-    winSize = round(float(sys.argv[11]))
-    minContig = float(sys.argv[12])
-    maxContig = float(sys.argv[13])
-    writingTifs = to_bool(float(sys.argv[14]))
-    seed = round(float(sys.argv[15]))
-    sirene =  round(float(sys.argv[16]))
-    transport =  round(float(sys.argv[17]))
-    routes =  round(float(sys.argv[18]))
-    ecologie =  round(float(sys.argv[19]))
+    forceEachYear = to_bool(float(sys.argv[9]))
+    densifyOld = to_bool(float(sys.argv[10]))
+    maximumDensity = to_bool(float(sys.argv[11]))
+    winSize = round(float(sys.argv[12]))
+    minContig = float(sys.argv[13])
+    maxContig = float(sys.argv[14])
+    sirene =  round(float(sys.argv[15]))
+    transport =  round(float(sys.argv[16]))
+    routes =  round(float(sys.argv[17]))
+    ecologie =  round(float(sys.argv[18]))
+    seed = round(float(sys.argv[19]))
+    #snaps or tiffs or verboose = to_bool(float(sys.argv[20]))
 
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
@@ -102,7 +103,7 @@ if 'maxBuiltRatio' not in globals():
 # Taux pour exclure de la couche d'intérêt les cellules déjà artificialisées
 if 'exclusionRatio' not in globals():
     exclusionRatio = 0.5
-# Pour seuiller le nombre de mètres carrés utilisés par habitants et par iris
+# Pour seuiller le nombre de mètres carrés utilisés par habitants et par iris, à laisser fixe de préférence (quelques IRIS a + de 300m² par habitants)
 if 'maxUsedSrfPla' not in globals():
     maxUsedSrfPla = 200
 # Pour simuler également la construction des surfaces non résidentielles
@@ -122,15 +123,15 @@ if 'minContig' not in globals():
 if 'maxContig' not in globals():
     maxContig = 0.8
 if 'tiffs' not in globals():
-    tiffs = True
+    tiffs = False
 if 'snaps' not in globals():
     snaps = False
 if 'verboose' not in globals():
     verboose = False
 
 # Contrôle de la validité des paramètres
-if growth > 3:
-    print("Maximum evolution rate fixed at: 3 %")
+if growth > 2:
+    print("Maximum evolution rate fixed at: 2 %")
     sys.exit()
 if maxContig > 1 or minContig > 1:
     print("Error : minContig and maxContig should be float numbers < 1 !")
@@ -238,42 +239,49 @@ def expand(row, col, new=True):
                 maxSrf = capaSol[row][col]
                 if ss > maxSrf :
                     ss = maxSrf
+                    if verboose:
+                        print("expand() : cell [" + str(row) + ', ' + str(col) + "] is ground-saturated (IRIS n°" + str(id) + ")")
     else:
         maxSrf = capaSol[row][col]
         ss = chooseArea(id, row, col)
         if ss > 0:
             if ss > maxSrf :
                 ss = maxSrf
+                if verboose:
+                    print("expand() : cell [" + str(row) + ', ' + str(col) + "] is ground-saturated (IRIS n°" + str(id) + ")")
     return ss
 
-# Pour urbaniser ou densifier verticalement une surface au sol donnée à partir du fitting "floors"
-def build(row, col, ss=None):
+# Pour construire verticalement une surface au sol donnée après le tirage "surfaces"
+def build(row, col, ss):
     sp = 0
-    nbNiv = 0
     id = irisId[row][col]
-    if type(ss) == np.float64:
+    nbNiv = chooseFloors(id, row, col)
+    if nbNiv > 0:
+        sp = ss * nbNiv
+    return sp
+
+# Pour densifier verticalement une surface au sol donnée, à partir du fitting "floors"
+def reshape(row, col):
+    sp = 0
+    id = irisId[row][col]
+    etages = np.array(list(poidsEtages[id].keys()))
+    ssol = srfSolRes[row][col]
+    spla = srfPla[row][col]
+    nivMoy = float(spla / ssol) if ssol != 0 else 0
+    nivMax = int(etages.max()) if len(etages) > 0 else 0
+    if int(nivMax) > round(nivMoy) :
+        # On cherche à tirer un nombre d'étage spérieur à l'existant
         nbNiv = chooseFloors(id, row, col)
-        if nbNiv > 0:
-            sp = ss * nbNiv
-    elif ss == 'reshape':
-        etages = np.array(list(poidsEtages[id].keys()))
-        ssol = srfSolRes[row][col]
-        spla = srfPla[row][col]
-        nivMoy = float(spla / ssol) if ssol != 0 else 0
-        nivMax = int(etages.max()) if len(etages) > 0 else 0
-        if int(nivMax) > round(nivMoy) :
-            # On cherche à tirer un nombre d'étage spérieur à l'existant
-            nbNiv = chooseFloors(id, row, col)
-            if nbNiv > nivMoy:
-                sp = ssol * nbNiv
-                # On enlève l'existant pour connaîte la surface nouvelle
-                if sp > srfPla[row][col]:
-                    sp -= srfPla[row][col]
-                    # On vérifie que la surface finale suffit à loger au moins une personne
-                    if sp < m2PlaHab[row][col]:
-                        sp = 0
-                else:
+        if nbNiv > nivMoy:
+            sp = ssol * nbNiv
+            # On enlève l'existant pour connaîte la surface nouvelle
+            if sp > srfPla[row][col]:
+                sp -= srfPla[row][col]
+                # On vérifie que la surface finale suffit à loger au moins une personne
+                if sp < m2PlaHab[row][col]:
                     sp = 0
+            else:
+                sp = 0
     return sp
 
 # Fonction principale pour gérer artificialisation puis densification
@@ -294,33 +302,30 @@ def urbanize(pop, srfMax, zau=False):
         ss = 0
         sp = 0
         row, col = chooseCell(tmpInteret)
-        if row > 0 and col > 0:
-            if capaSol[row][col] > 0:
-                if urb[row][col] == 0 and tmpUrb[row][col] == 0:
-                    # Pour ouvrir une nouvelle cellule à l'urbanisation
-                    ss = expand(row, col)
+        if (row > 0 and col > 0) and capaSol[row][col] > 0:
+            if urb[row][col] == 0 and tmpUrb[row][col] == 0:
+                # Pour ouvrir une nouvelle cellule à l'urbanisation
+                ss = expand(row, col)
+            else:
+                # Sinon on construit à côté d'autres bâtiments
+                ss = expand(row, col, new=False)
+            if ss > 0 :
+                # Les fonctions retournent 0 si quelque chose empêche d'urbaniser la cellule
+                if buildNonRes:
+                    # On réduit la surface construite à une part de résidentiel avant de calculer la surface plancher
+                    ssr = ss * txSsr[row][col] if txSsr[row][col] > 0 else ss
+                    sp = build(row, col, ssr)
                 else:
-                    # Sinon on construit à côté d'autres bâtiments
-                    ss = expand(row, col, new=False)
-                if ss > 0 :
-                    # Les fonctions retournent 0 si quelque chose empêche d'urbaniser la cellule
-                    if buildNonRes:
-                        # On réduit la surface construite à une part de résidentiel avant de calculer la surface plancher
-                        ssr = ss * txSsr[row][col] if txSsr[row][col] > 0 else ss
-                        sp = build(row, col, ssr)
-                    else:
-                        sp = build(row, col, ss)
-                    if sp > 0:
-                        # On met à jour les rasters uniquement si on la construction sol et plancher s'est déroulée correctement
-                        tmpUrb[row][col] = 1
-                        capaSol[row][col] -= ss
-                        tmpSrfSol[row][col] += ss
-                        tmpSrfPla[row][col] += sp
-                        count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
-                        artif += ss
-                    # Sinon on ajuste l'intérêt à 0 pour que la cellule ne soit plus tirée (pour l'année en cours)
-                    else:
-                        tmpInteret[row][col] = 0
+                    sp = build(row, col, ss)
+                if sp > 0:
+                    # On met à jour les rasters uniquement si on la construction sol et plancher s'est déroulée correctement
+                    tmpUrb[row][col] = 1
+                    capaSol[row][col] -= ss
+                    tmpSrfSol[row][col] += ss
+                    tmpSrfPla[row][col] += sp
+                    count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+                    artif += ss
+                # Sinon on ajuste l'intérêt à 0 pour que la cellule ne soit plus tirée (pour l'année en cours)
                 else:
                     tmpInteret[row][col] = 0
             else:
@@ -328,17 +333,18 @@ def urbanize(pop, srfMax, zau=False):
         else:
             tmpInteret[row][col] = 0
 
+    print(str((np.where(tmpInteret > 0, 1, 0)).sum()))
     if tmpInteret.sum() == 0 and zau:
         skipZau = True
         skipZauYear = year
         if verboose:
-                print("pluPriority : interest sum == 0 ; skipping ZAU from now on.")
+            print("pluPriority : tmpInteret.sum() == 0 -> skipping ZAU from now on.")
 
     if count < pop and (forceEachYear or (densifyOld and year == finalYear)):
         tmpInteret = np.zeros([rows, cols], np.byte)
         ignoredCells = 0
         chosenCells = 0
-        # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde
+        # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde (if densifyOld)
         if year == finalYear and densifyOld:
             tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
             if verboose:
@@ -354,11 +360,10 @@ def urbanize(pop, srfMax, zau=False):
         if verboose:
             print(str(choosableCells) + ' available cells for the densification process...')
         # On tente de loger les personnes restantes
-
         while count < pop and tmpInteret.sum() > 0:
             sp = 0
             row, col = chooseCell(tmpInteret)
-            sp = build(row, col, 'reshape')
+            sp = reshape(row, col)
             if sp > 0:
                 chosenCells += 1
                 tmpSrfPla[row][col] += sp
@@ -575,7 +580,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         # Boucle principale pour itération annuelle
         for year in range(2015, finalYear + 1):
             if verboose:
-                print('\n\n')
+                print('\n')
             progres = "Year %i/%i" %(year, finalYear)
             printer(progres)
             if verboose:
@@ -603,6 +608,8 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         end_time = time()
         execTime = round(end_time - start_time, 2)
         print('\nDuration of the simulation: ' + str(execTime) + ' seconds')
+        if verboose:
+            print('\nWriting outputs...')
 
         # Calcul et export des résultats
         popNouv = demographie - demographie14
@@ -637,6 +644,10 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             to_tif(srfPlaNouv, 'uint16', proj, geot, project/'output/surface_plancher_construite.tif')
             to_tif(popNouv, 'uint16', proj, geot, project/'output/population_nouvelle.tif')
             to_tif(srfSolNonRes, 'uint16', proj, geot, project/('surface_sol_non_residentielle_' + str(finalYear) + '.tif'))
+            if exclusionRatio > 0:
+                to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
+            if densifyOld:
+                to_tif(densifPla, 'byte', proj, geot, project/'output/densification_plancher.tif')
 
         ocs = to_array(dataDir/'classes_ocsol.tif', np.float32)
         with (project/'output/conso_ocs.csv').open('w') as w:
@@ -664,11 +675,8 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write("Total number of randomly chosen cells: " + str(countChoices) + '\n')
         log.write("Execution time: " + str(execTime) + '\n')
 
-        if tiffs :
-            if exclusionRatio > 0:
-                to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
-            if densifyOld:
-                to_tif(densifPla, 'byte', proj, geot, project/'output/densification_plancher.tif')
+        if verboose:
+            print('Done.')
 
     except:
         print("\n*** Error :")
