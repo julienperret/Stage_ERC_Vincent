@@ -634,7 +634,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write("Total number of randomly chosen cells: " + str(countChoices) + '\n')
         log.write("Execution time: " + str(execTime) + '\n')
 
-        if tiffs !
+        if tiffs :
             if maxArtifRatio > 0:
                 to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
             if densifyOld:
