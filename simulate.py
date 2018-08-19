@@ -307,7 +307,6 @@ def urbanize(pop, srfMax, zau=False):
                     if buildNonRes:
                         # On réduit la surface construite à une part de résidentiel avant de calculer la surface plancher
                         ssr = ss * txSsr[row][col] if txSsr[row][col] > 0 else ss
-                        ssnr = ss - ssr
                         sp = build(row, col, ssr)
                     else:
                         sp = build(row, col, ss)
