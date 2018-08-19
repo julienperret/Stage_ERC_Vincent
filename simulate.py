@@ -31,8 +31,6 @@ if len(sys.argv) == 5:
             pluPriority = literal_eval(arg.split('=')[1])
         elif 'buildNonRes' in arg:
             buildNonRes = literal_eval(arg.split('=')[1])
-        elif 'densifyGround' in arg:
-            densifyGround = literal_eval(arg.split('=')[1])
         elif 'densifyOld' in arg:
             densifyOld = literal_eval(arg.split('=')[1])
         elif 'forceEachYear' in arg:
@@ -75,7 +73,7 @@ elif len(sys.argv) > 5:
 
     pluPriority = to_bool(float(sys.argv[5]))
     buildNonRes = to_bool(float(sys.argv[6]))
-    densifyGround = to_bool(float(sys.argv[7]))
+    #densifyGround = to_bool(float(sys.argv[7]))
     maxBuiltRatio = float(sys.argv[8])
     densifyOld = to_bool(float(sys.argv[9]))
     maximumDensity = to_bool(float(sys.argv[10]))
@@ -321,7 +319,7 @@ def urbanize(pop, srfMax, zau=False):
                         tmpSrfPla[row][col] += sp
                         count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
                         artif += ss
-            # Sinon on ajuste l'intérêt à 0 pour que la cellule ne soit plus tirée (pour l'année en cours)
+                    # Sinon on ajuste l'intérêt à 0 pour que la cellule ne soit plus tirée (pour l'année en cours)
                     else:
                         tmpInteret[row][col] = 0
                 else:
@@ -333,48 +331,49 @@ def urbanize(pop, srfMax, zau=False):
         else:
             tmpInteret[row][col] = 0
 
-    if tmpInteret.sum() == 0 and zau:
-        skipZau = True
-        skipZauYear = year
-        if verboose:
-                print("pluPriority : interest sum == 0 ; skipping ZAU from now on.")
-
-    if count < pop and ((forceEachYear and (artif >= srfMax or tmpInteret.sum() == 0)) or (year == finalYear and densifyGround)):
-        ignoredCells = 0
-        chosenCells = 0
-        if forceEachYear:
-            # Ici on force à densifier l'existant en hauteur pour loger tout le monde (à chaque itération)
+    if count < pop :
+        if (artif <= srfMax and tmpInteret.sum() == 0) and zau:
+            skipZau = True
+            skipZauYear = year
             if verboose:
-                    print("forceEachYear : trying to densify and get " + str(int(pop-count)) + " people under a roof.")
-            if tmpUrb.sum() > 0:
-                tmpInteret = np.where((tmpUrb == 1) & (srfSolRes > 0), interet, 0)
-            else:
-                tmpInteret = np.where((srfSolRes > 0) & (urb14 == 0) & (urb == 1), interet, 0)
+                    print("pluPriority : interest sum == 0 ; skipping ZAU from now on.")
+
         # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde
-        elif year == finalYear and densifyOld:
-            srfMax = 0
-            tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
+        if (forceEachYear and (artif >= srfMax or tmpInteret.sum() == 0)) or (year == finalYear and densifyOld):
+            ignoredCells = 0
+            chosenCells = 0
+            if year == finalYear and densifyOld:
+                srfMax = 0
+                tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
+                if verboose:
+                        print("densifyOld : trying to densify old buildings beacause " + str(int(pop - count)) + "peoples are still homeless.")
+            elif forceEachYear:
+                # Ici on force à densifier l'existant en hauteur pour loger tout le monde (à chaque itération)
+                if verboose:
+                        print("forceEachYear : trying to densify and get " + str(int(pop-count)) + " people under a roof.")
+                if tmpUrb.sum() > 0:
+                    tmpInteret = np.where((tmpUrb == 1) & (srfSolRes > 0), interet, 0)
+                else:
+                    tmpInteret = np.where((srfSolRes > 0) & (urb14 == 0) & (urb == 1), interet, 0)
+
+            choosableCells = (np.where(tmpInteret > 0, 1, 0)).sum()
             if verboose:
-                    print("densifyOld : trying to densify old buildings beacause " + str(int(pop - count)) + "peoples are still homeless.")
+                print(str(choosableCells) + ' available cells for the densification process...')
+            # On tente de loger les personnes restantes
 
-        choosableCells = (np.where(tmpInteret > 0, 1, 0)).sum()
-        if verboose:
-            print(str(choosableCells) + ' available cells for the densification process...')
-        # On tente de loger les personnes restantes
+            while count < pop and tmpInteret.sum() > 0:
+                sp = 0
+                row, col = chooseCell(tmpInteret)
+                sp = build(row, col, 'reshape')
+                if sp > 0:
+                    chosenCells += 1
+                    tmpSrfPla[row][col] += sp
+                    count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
+                else:
+                    tmpInteret[row][col] = 0
 
-        while count < pop and tmpInteret.sum() > 0:
-            sp = 0
-            row, col = chooseCell(tmpInteret)
-            sp = build(row, col, 'reshape')
-            if sp > 0:
-                chosenCells += 1
-                tmpSrfPla[row][col] += sp
-                count = np.where(m2PlaHab != 0, (tmpSrfPla / m2PlaHab).round(), 0).astype(np.uint16).sum()
-            else:
-                tmpInteret[row][col] = 0
-
-        if verboose:
-            print(str(chosenCells) + " cells were successfully rebuilt.")
+            if verboose:
+                print(str(chosenCells) + " cells were successfully rebuilt.")
 
     # Mise à jour des variables globales
     urb = np.where(tmpUrb == 1, 1, urb)
@@ -403,8 +402,8 @@ if pluPriority:
     projectStr += '_pluPrio'
 # if buildNonRes:
 #     projectStr += '_buildNonRes'
-# if forceEachYear:
-#     projectStr += '_forceEachYear'
+if forceEachYear:
+    projectStr += '_forceEachYear'
 # if densifyOld:
     projectStr += '_densifyOld'
 if finalYear != 2040:
@@ -583,10 +582,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             printer(progres)
             srfMax = dicSrf[year]
             popALoger = popDic[year]
-            if pluPriority and not skipZau:
-                restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt, zau=True)
-            else:
-                restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt)
+            restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt, zau=not skipZau)
             preBuilt = -resteSrf
             preLog = -restePop
 
@@ -601,23 +597,31 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 to_tif(srfSol, 'uint16', proj, geot, project/('snapshots/surface_sol/sol_' + str(year) + '.tif'))
                 to_tif(srfPla, 'uint16', proj, geot, project/('snapshots/surface_plancher/plancher_' + str(year) + '.tif'))
 
+        resteSrf = str(int(round(resteSrf if resteSrf > 0 else 0)))
+        restePop = str(int(round(restePop if restePop > 0 else 0)))
+
         end_time = time()
         execTime = round(end_time - start_time, 2)
         print('\nDuration of the simulation: ' + str(execTime) + ' seconds')
 
         # Calcul et export des résultats
-        countChoices = heatMap.sum()
+
         popNouv = demographie - demographie14
-        popNouvCount = popNouv.sum()
+
         peuplementMoyen = round(np.nanmean(np.where(popNouv == 0, np.nan, popNouv)), 3)
+        ratioPlaSol = np.where(srfSol != 0, srfPla / srfSol, 0).astype(np.float32)
         srfSolNouv = srfSol - srfSol14
         srfPlaNouv = srfPla - srfPla14
         densifSol = np.where((srfSol > srfSol14) & (urb14 == 1), 1, 0)
         densifPla = np.where((srfPla > srfPla14) & (urb14 == 1), 1, 0)
         txArtifNouv = (srfSolNouv / srfCell).astype(np.float32)
         txArtifMoyen = round(np.nanmean(np.where(txArtifNouv == 0, np.nan, txArtifNouv)) * 100, 3)
-        ratioPlaSol = np.where(srfSol != 0, srfPla / srfSol, 0).astype(np.float32)
+        txArtifFinal = (srfSol / srfCell).astype(np.float32)
         expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
+        dsfSol = densifSol.sum() if densifSol.sum() > 0 else 'NA'
+        dsfPla = densifPla.sum() if densifPla.sum() > 0 else 'NA'
+        countChoices = heatMap.sum()
+        popNouvCount = popNouv.sum()
         expansionSum = expansion.sum()
         builtCellsRatio = expansionSum / totalCapacity
         impactEnv = round((srfSolNouv * (1 - eco)).sum() * builtCellsRatio)
@@ -628,7 +632,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             to_tif(srfPla, 'uint16', proj, geot, project/('output/surface_plancher_' + str(finalYear) + '.tif'))
             to_tif(demographie, 'uint16', proj, geot, project/('output/demographie_' + str(finalYear) + '.tif'))
             to_tif(ratioPlaSol, 'float32', proj, geot, project/('output/ratio_plancher_sol_' + str(finalYear) + '.tif'))
-            to_tif(txArtifNouv, 'float32', proj, geot, project/('output/taux_artif_' + str(finalYear) + '.tif'))
+            to_tif(txArtifFinal, 'float32', proj, geot, project/('output/taux_artif_' + str(finalYear) + '.tif'))
             to_tif(expansion, 'byte', proj, geot, project/'output/expansion.tif')
             to_tif(srfSolNouv, 'uint16', proj, geot, project/'output/surface_sol_construite.tif')
             to_tif(srfPlaNouv, 'uint16', proj, geot, project/'output/surface_plancher_construite.tif')
@@ -641,19 +645,19 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 if int(c) != 0:
                     w.write(str(int(c)) +', ' + str( ((ocs == c) * srfSolNouv).sum()) + '\n')
 
-        mesures.write("Population not put up, " + str(int(round(restePop))) + '\n')
-        mesures.write("Unbuilt area, " + str(int(round(resteSrf))) + '\n')
+        mesures.write("Population not put up, " + restePop + '\n')
+        mesures.write("Unbuilt area, " + resteSrf + '\n')
         mesures.write("Average cell populating, " + str(peuplementMoyen) + "\n")
         mesures.write("Area expansion, " + str(srfSolNouv.sum()) + "\n")
         mesures.write("Built floor area, " + str(srfPlaNouv.sum()) + "\n")
-        mesures.write("Cells open to urbanisation, " + str(expansion.sum()) + "\n")
+        mesures.write("Cells open to urbanisation, " + str(expansionSum) + "\n")
         mesures.write("Average artificialisation rate, " + str(txArtifMoyen) + "\n")
         mesures.write("Cumulated environnemental impact, " + str(int(impactEnv)) + "\n")
-        mesures.write("Ground-densified cells count, " + str(densifSol.sum()) + "\n")
-        mesures.write("Floor-densified cells count, " + str(densifPla.sum()) + "\n")
+        mesures.write("Ground-densified cells count, " + str(dsfSol) + "\n")
+        mesures.write("Floor-densified cells count, " + str(dsfPla) + "\n")
 
-        log.write("Unbuilt area: " + str(int(round(resteSrf))) + '\n')
-        log.write("Population not put up: " + str(int(round(restePop))) + '\n')
+        log.write("Unbuilt area: " + restePop + '\n')
+        log.write("Population not put up: " + resteSrf + '\n')
         log.write("Population put up: " + str(popNouvCount) + '\n')
         log.write("Final demography: " + str(demographie.sum()) + '\n')
         log.write("ZAU saturation year: " + str(skipZauYear) + '\n')
