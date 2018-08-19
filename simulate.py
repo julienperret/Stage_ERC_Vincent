@@ -277,10 +277,7 @@ def build(row, col, ss=None):
 
 # Fonction principale pour gérer artificialisation puis densification
 def urbanize(pop, srfMax, zau=False):
-    if verboose:
-        print('\n')
     global demographie, capaSol, srfSol, srfSolRes, srfSolNonRes, srfPla, urb, skipZau, skipZauYear
-
     artif = 0
     count = 0
     tmpUrb = np.zeros([rows, cols], np.byte)
@@ -583,6 +580,8 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
                 print('\n\n')
             progres = "Year %i/%i" %(year, finalYear)
             printer(progres)
+            if verboose:
+                print('\n')
             srfMax = dicSrf[year]
             popALoger = popDic[year]
             restePop, resteSrf = urbanize(popALoger - preLog, srfMax - preBuilt, zau=not skipZau)
