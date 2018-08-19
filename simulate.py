@@ -331,15 +331,15 @@ def urbanize(pop, srfMax, zau=False):
         else:
             tmpInteret[row][col] = 0
 
-    if count < pop :
+    if tmpInteret.sum() == 0 and zau:
+        skipZau = True
+        skipZauYear = year
+        if verboose:
+                print("pluPriority : interest sum == 0 ; skipping ZAU from now on.")
+
+    if count < pop and (forceEachYear or (densifyOld and year == finalYear)):
         ignoredCells = 0
         chosenCells = 0
-        if tmpInteret.sum() == 0 and zau:
-            skipZau = True
-            skipZauYear = year
-            if verboose:
-                    print("pluPriority : interest sum == 0 ; skipping ZAU from now on.")
-
         # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde
         if year == finalYear and densifyOld:
             srfMax = 0
