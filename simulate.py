@@ -286,7 +286,7 @@ def reshape(row, col):
 
 # Fonction principale pour gérer artificialisation puis densification
 def urbanize(pop, srfMax, zau=False):
-    global demographie, capaSol, srfSol, srfSolRes, srfSolNonRes, srfPla, urb, skipZau, skipZauYear, txArtif
+    global demographie, capaSol, srfSol, srfSolRes, srfPla, urb, skipZau, skipZauYear, txArtif
     artif = 0
     count = 0
     tmpUrb = np.zeros([rows, cols], np.byte)
@@ -545,7 +545,6 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         interet = np.where((restriction != 1), (eco * coef['ecologie']) + (rou * coef['routes']) + (tra * coef['transport']) + (sir * coef['sirene']), 0)
         interet = (interet / np.amax(interet)).astype(np.float32)
 
-        srfSolNonRes14 = srfSol14 - srfSolRes14
         # Création des rasters de capacité en surfaces sol et plancher
         capaSol = np.zeros([rows, cols], np.uint16) + srfCell * maxBuiltRatio / 100
         capaSol = np.where((restriction != 1) & (srfSol14 < capaSol), capaSol - srfSol14, 0).astype(np.uint16)
@@ -560,7 +559,6 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
 
         # Instantanés de la situation à t0
         if tiffs:
-            to_tif(srfSolNonRes14, 'uint16', proj, geot, project/'surface_sol_non_residentielle.tif')
             to_tif(urb14, 'byte', proj, geot, project/'urbanisation.tif')
             to_tif(capaSol, 'uint16', proj, geot, project/'capacite_sol.tif')
             to_tif(txArtif, 'float32', proj, geot, project/'taux_artif.tif')
@@ -623,7 +621,6 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         txArtifMoyen = round(np.nanmean(np.where(txArtifNouv == 0, np.nan, txArtifNouv)) * 100, 3)
         txArtifFinal = (srfSol / srfCell).astype(np.float32)
         expansion = np.where((urb14 == 0) & (urb == 1), 1, 0)
-        srfSolNonRes = srfSol - srfSolRes
         dsfSol = densifSol.sum() if densifSol.sum() > 0 else 'NA'
         dsfPla = densifPla.sum() if densifPla.sum() > 0 else 'NA'
         countChoices = heatMap.sum()
@@ -643,7 +640,6 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             to_tif(srfSolNouv, 'uint16', proj, geot, project/'output/surface_sol_construite.tif')
             to_tif(srfPlaNouv, 'uint16', proj, geot, project/'output/surface_plancher_construite.tif')
             to_tif(popNouv, 'uint16', proj, geot, project/'output/population_nouvelle.tif')
-            to_tif(srfSolNonRes, 'uint16', proj, geot, project/('output/surface_sol_non_residentielle_' + str(finalYear) + '.tif'))
             if exclusionRatio > 0:
                 to_tif(densifSol, 'byte', proj, geot, project/'output/densification_sol.tif')
             if densifyOld:
