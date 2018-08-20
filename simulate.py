@@ -660,8 +660,8 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         mesures.write("Ground-densified cells count, " + str(dsfSol) + "\n")
         mesures.write("Floor-densified cells count, " + str(dsfPla) + "\n")
 
-        log.write("Unbuilt area: " + restePop + '\n')
-        log.write("Population not put up: " + resteSrf + '\n')
+        log.write("Unbuilt area: " + resteSrf + '\n')
+        log.write("Population not put up: " + restePop + '\n')
         log.write("Population put up: " + str(popNouvCount) + '\n')
         log.write("Final demography: " + str(demographie.sum()) + '\n')
         log.write("ZAU saturation year: " + str(skipZauYear) + '\n')
