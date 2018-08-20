@@ -163,13 +163,11 @@ Usage :
 
 ### ./tif_to_gif.py
 Génère un GIF à partir des instantanés (TIF) générés pour chaque année de la simulation.
-Trois paramètres au minimum:
-    1 : dossier contenant les images pour chaque année
-    2 : dossier de sortie
-    3 : type de donnée des images (byte, uint16-32, float32)
-    4 : chaîne contenant la durée du GIF et la valeur max à utiliser ( delay=n , maxValue=n)
+Paramètres:
+    1 : chemin vers le dossier contenant les 4 types de snapshots  
+    2 : chaîne contenant la durée du GIF et la valeur max à utiliser (delay=n, maxValue=[n,n,n,n] (0 = tif.max() ), outDir='/...' )  
 
 Usage :
 ```shell
-./utils/tif_to_gif.py ../results/snapshots/surface_sol ../output/ uint16
+./utils/tif_to_gif.py ../results/snapshots 'delay=10 maxValues=[40,0,0,0]
 ```
