@@ -13,11 +13,11 @@ from time import strftime, time
 
 # Pour affichage dynamique de la progression
 def printer(string):
-	if sys.platform == 'linux':
-		sys.stdout.write("\r\x1b[K" + string)
-	elif sys.platform == 'win32':
-		sys.stdout.write("\r" + string)
-	sys.stdout.flush()
+    if sys.platform == 'win32':
+        sys.stdout.write("\r" + string)
+    else :
+        sys.stdout.write("\r\x1b[K" + string)
+    sys.stdout.flush()
 
 nbCores  = int(sys.argv[1])
 inputDir = Path(sys.argv[2])
@@ -60,7 +60,7 @@ def writeHeaders(prefix, dep, tab):
         for field in modelSorted[tab]:
             i += 1
             lgr = model[tab][field][2]
-            h += '"' + field + '" varchar(' + str(lgr) + ')'
+            h += '"' + field.lower() + '" varchar(' + str(lgr) + ')'
             if i < len(modelSorted[tab]):
                 h += ','
             else:
