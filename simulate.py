@@ -51,8 +51,8 @@ if len(sys.argv) == 5:
             tiffs = True
         elif 'snaps' in arg:
             snaps = True
-        elif 'verboose' in arg:
-            verboose = True
+        elif 'verbose' in arg:
+            verbose = True
         elif 'finalYear' in arg:
             finalYear = int(arg.split('=')[1])
 
@@ -86,7 +86,7 @@ elif len(sys.argv) > 5:
     routes =  round(float(sys.argv[17]))
     ecologie =  round(float(sys.argv[18]))
     seed = round(float(sys.argv[19]))
-    #snaps or tiffs or verboose = to_bool(float(sys.argv[20]))
+    #snaps or tiffs or verbose = to_bool(float(sys.argv[20]))
 
 ### Valeurs de paramètres par défaut ###
 if 'finalYear' not in globals():
@@ -126,8 +126,8 @@ if 'tiffs' not in globals():
     tiffs = False
 if 'snaps' not in globals():
     snaps = False
-if 'verboose' not in globals():
-    verboose = False
+if 'verbose' not in globals():
+    verbose = False
 
 # Contrôle de la validité des paramètres
 if growth > 2:
@@ -177,9 +177,9 @@ def chooseCell(weight):
         if row > 0 and col > 0:
             cells  = (row, col)
             heatMap[row][col] += 1
-        elif verboose:
+        elif verbose:
                 print("Error : can't choose a cell with those weights.")
-    elif verboose:
+    elif verbose:
             print("Error : it seems like interest raster sums to 0.")
     return cells
 
@@ -239,16 +239,16 @@ def expand(row, col, new=True):
                 maxSrf = capaSol[row][col]
                 if ss > maxSrf :
                     ss = maxSrf
-                    if verboose:
-                        print("expand() : cell [" + str(row) + ', ' + str(col) + "] is ground-saturated (IRIS n°" + str(id) + ")")
+                    # if verbose:
+                    #     print("expand() : cell [" + str(row) + ', ' + str(col) + "] was ground-saturated (IRIS n°" + str(id) + ")")
     else:
         maxSrf = capaSol[row][col]
         ss = chooseArea(id, row, col)
         if ss > 0:
             if ss > maxSrf :
                 ss = maxSrf
-                if verboose:
-                    print("expand() : cell [" + str(row) + ', ' + str(col) + "] is ground-saturated (IRIS n°" + str(id) + ")")
+                # if verbose:
+                #     print("expand() : cell [" + str(row) + ', ' + str(col) + "] was ground-saturated (IRIS n°" + str(id) + ")")
     return ss
 
 # Pour construire verticalement une surface au sol donnée après le tirage "surfaces"
@@ -337,7 +337,7 @@ def urbanize(pop, srfMax, zau=False):
     if tmpInteret.sum() == 0 and zau:
         skipZau = True
         skipZauYear = year
-        if verboose:
+        if verbose:
             print("pluPriority : tmpInteret.sum() == 0 -> skipping ZAU from now on.")
 
     if count < pop and (forceEachYear or (densifyOld and year == finalYear)):
@@ -347,17 +347,17 @@ def urbanize(pop, srfMax, zau=False):
         # Densification du bâti existant en fin de simu si on n'a pas pu loger tout le monde (if densifyOld)
         if year == finalYear and densifyOld:
             tmpInteret = np.where(srfSolRes14 > 0, interet, 0)
-            if verboose:
+            if verbose:
                     print("densifyOld : trying to densify old buildings because " + str(int(pop - count)) + " peoples are still homeless.")
         elif forceEachYear and (artif >= srfMax or tmpInteret.sum() == 0):
             # Ici on force à densifier l'existant en hauteur pour loger tout le monde (à chaque itération)
-            if verboose:
+            if verbose:
                     print("forceEachYear : trying to densify and get " + str(int(pop-count)) + " people under a roof.")
             if tmpUrb.sum() > 0:
                 tmpInteret = np.where((tmpUrb == 1) & (srfSolRes > 0), interet, 0)
 
         choosableCells = (np.where(tmpInteret > 0, 1, 0)).sum()
-        if verboose:
+        if verbose:
             print(str(choosableCells) + ' available cells for the densification process...')
         # On tente de loger les personnes restantes
         while count < pop and tmpInteret.sum() > 0:
@@ -371,7 +371,7 @@ def urbanize(pop, srfMax, zau=False):
             else:
                 tmpInteret[row][col] = 0
 
-        if verboose:
+        if verbose:
             print(str(chosenCells) + " cells were successfully rebuilt.")
 
     # Mise à jour des variables globales
@@ -484,7 +484,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write('Area consumption per person in 2014: ' + str(int(round(m2SolHab14))) + ' m2\n')
         log.write('Average annual evolution of area consumption per person: ' + str(round(m2SolHabEvo * 100, 4)) + ' %\n')
         log.write('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m2\n')
-        if verboose:
+        if verbose:
             print(("\nPopulation to put up until " + str(finalYear) + " : " + str(sumPopALoger)))
             print(('Computed threshold for area consumption per person: ' + str(int(round(srfMax))) + ' m2'))
 
@@ -577,11 +577,11 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         demographie = demographie14.copy()
         # Boucle principale pour itération annuelle
         for year in range(2015, finalYear + 1):
-            if verboose:
+            if verbose:
                 print('\n')
             progres = "Year %i/%i" %(year, finalYear)
             printer(progres)
-            if verboose:
+            if verbose:
                 print('\n')
             srfMax = dicSrf[year]
             popALoger = popDic[year]
@@ -589,7 +589,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
             preBuilt = -resteSrf
             preLog = -restePop
 
-            if verboose:
+            if verbose:
                 print('Remaining population : '  + str(restePop))
                 print('Remaining surface to build : ' + str(resteSrf))
 
@@ -606,7 +606,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         end_time = time()
         execTime = round(end_time - start_time, 2)
         print('\nDuration of the simulation: ' + str(execTime) + ' seconds')
-        if verboose:
+        if verbose:
             print('\nWriting outputs...')
 
         # Calcul et export des résultats
@@ -671,7 +671,7 @@ with (project/'log.txt').open('w') as log, (project/'output/mesures.csv').open('
         log.write("Total number of randomly chosen cells: " + str(countChoices) + '\n')
         log.write("Execution time: " + str(execTime) + '\n')
 
-        if verboose:
+        if verbose:
             print('Done.')
 
     except:

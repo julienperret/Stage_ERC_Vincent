@@ -68,7 +68,7 @@ Deux paramètres au minimum :
 | maxContig            | 0.5       | 1          | float  | 0.8               | Taux maximal de cellules urbanisées dans le voisinage pour construction dans une cellule vide                         |
 | tiffs                | False     | True       | bool   | True              | Indique si les tiffs sont sauvés en sortie                                                                            |
 | snaps                | False     | True       | bool   | False             | Pour enregistrer des instantanés chaque année (et générer des GIF)                                                    |
-| verboose             | False     | True       | bool   | False             | Pour des messages détaillés sur les erreurs + statistiques sur le peuplement et la construction chaque année (debug)  |
+| verbose             | False     | True       | bool   | False             | Pour des messages détaillés sur les erreurs + statistiques sur le peuplement et la construction chaque année (debug)  |
 
 Usage :
 ```shell
