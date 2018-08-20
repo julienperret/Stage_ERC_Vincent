@@ -333,7 +333,6 @@ def urbanize(pop, srfMax, zau=False):
         else:
             tmpInteret[row][col] = 0
 
-    print(str((np.where(tmpInteret > 0, 1, 0)).sum()))
     if tmpInteret.sum() == 0 and zau:
         skipZau = True
         skipZauYear = year
