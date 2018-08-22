@@ -7,7 +7,12 @@ library(actuar)
 args <- commandArgs(trailingOnly=TRUE)
 wd <- args[1]
 setwd(wd)
+
+#setwd("encadrement/repoJulienERC/erc/fitting/")
+
 dfniv <- read_csv("distrib_floors.csv")
+
+
 
 #les codes iris sont des facteurs
 dfniv$ID_IRIS <- factor(dfniv$ID_IRIS)
@@ -123,8 +128,8 @@ pdistinct
 
 
 
-# c'est ANTIGONE
-IRISvarious <- dfnivDistinctByIRIS$ID_IRIS[2]
+# c'est ANTIGONE ?
+IRISvarious <- dfnivDistinctByIRIS$ID_IRIS[1]
 
 dvarious <- dfniv %>% filter(ID_IRIS==IRISvarious)
 
@@ -202,9 +207,7 @@ logfitter <-  function(dd)
 }
 
 
-fitter <- function(dd, criterion )
-{
-
+fitter <- function(dd, criterion ){
   # distribution qui marchent sans paramètres supplementaires :#  "binom", "nbinom", "geom", "hyper" or "pois"
 
   poiss <- fitdist(dd$FLOOR, discrete = T, "pois")
@@ -215,7 +218,6 @@ fitter <- function(dd, criterion )
   )
 
   geo <- fitdist(dd$FLOOR, discrete = T, "geom")
-
 
   # celles qui marchent avec des params
   ztpoiss <- fitdist(
@@ -236,20 +238,21 @@ fitter <- function(dd, criterion )
   )
 
 
-
-
   lolog <- logfitter(dd)
   candidats <- list(poiss, negbin, geo, ztpoiss, ztgeom, lolog)
+  # on vire les elements nulls si jamais y en a 
+  candidats <-  candidats[!(sapply(candidats, is.null))]
+  
   gofs <- list()
   minKipval <- Inf
   minAic <- Inf
   bestCandidateKipval <- NULL
   bestCandidateAic <- NULL
-  for (c in candidats) {
-    #cat("candidat :", c$distname, "\n")
+  for (candi in candidats) {
+    #cat("candidat :", candi$distname, "\n")
     gof <- NULL
     tryCatch({
-      gof <- gofstat(c)
+      gof <- gofstat(candi)
     }, error = function(e) {
       cat("ERROR :", conditionMessage(e), "\n")
     })
@@ -257,12 +260,12 @@ fitter <- function(dd, criterion )
     if (!is.null(gof)) {
       if (gof$chisqpvalue < 0.05 & gof$chisqpvalue < minKipval) {
         minKipval <- gof$chisqpvalue
-        bestCandidateKipval <- c
-       # cat("======> meilleur candidat v/v chi pval" , bestCandidateKipval$distname, "\n")
+        bestCandidateKipval <- candi
+     #   cat("======> meilleur candidat v/v chi pval" , bestCandidateKipval$distname, "\n")
       }
       if (gof$aic < minAic & gof$chisqpvalue < 0.05) {
         minAic <- gof$aic
-        bestCandidateAic <- c
+        bestCandidateAic <- candi
       #  cat("======> meilleur candidat v/v  AIC" , bestCandidateAic$distname, "\n")
       }
 
@@ -270,6 +273,7 @@ fitter <- function(dd, criterion )
   }
 
 
+  
   if (criterion=="AIC") {
     return(bestCandidateAic)
   }
@@ -288,35 +292,35 @@ fittedDistGenerator <-  function(nEtagesMax, meilleureDist)
     #cat(" distribution de Poisson\n")
 
     lambda <-  meilleureDist$estimate
-    distrib <-  dpois(1:max(nEtagesMax), lambda = lambda)
+    distrib <-  dpois(1:nEtagesMax, lambda = lambda)
 
   }
   if (meilleureDist$distname == "ztpois") {
     #cat("distribution zero truncated Poisson\n")
     lambda <-  meilleureDist$estimate
-    distrib <-  dztpois(1:max(nEtagesMax), lambda = lambda)
+    distrib <-  dztpois(1:nEtagesMax, lambda = lambda)
 
   }
   if (meilleureDist$distname == "geom") {
     #cat("distribution géométrique \n")
     prob <-  meilleureDist$estimate
-    distrib <-  dgeom(1:max(nEtagesMax), prob = prob)
+    distrib <-  dgeom(1:nEtagesMax, prob = prob)
   }
   if (meilleureDist$distname == "ztgeom") {
     #cat("distribution zero truncated geometrique\n")
     prob <- meilleureDist$estimate
-    distrib <- dztgeom(1:max(nEtagesMax), prob = prob)
+    distrib <- dztgeom(1:nEtagesMax, prob = prob)
   }
   if (meilleureDist$distname == "nbinom") {
     #cat("distribution negative binomiale\n")
     mu <-  meilleureDist$estimate[2]
     size <-  meilleureDist$estimate[1]
-    distrib <- dnbinom(1:max(nEtagesMax), size = size, prob = 0.5)
+    distrib <- dnbinom(1:nEtagesMax, size = size, prob = 0.5)
   }
   if (meilleureDist$distname == "logarithmic") {
     #cat("distribution logarihtmique\n")
     probn <-  meilleureDist$estimate
-    distrib <-  dlogarithmic(1:max(nEtagesMax), prob =probn)
+    distrib <-  dlogarithmic(1:nEtagesMax, prob =probn)
   }
   return(distrib)
 
@@ -335,7 +339,16 @@ distribsResults <-  data.frame(
 )
 bckupNames <-  names(distribsResults)
 
+
+library(compiler)
+
+fitter <-  cmpfun(fitter)
+fittedDistGenerator <- cmpfun(fittedDistGenerator)
+
+
+
 i <- 0
+
 for (c in unique(dfniv$ID_IRIS)) {
   # cat("###########IRIS ", c , "###################\n")
   distribObservee <-  dfniv %>% filter(ID_IRIS == c)
@@ -364,9 +377,8 @@ for (c in unique(dfniv$ID_IRIS)) {
             effectifComplets))
     currentIrisResult <-cbind(currentIrisResult, distSimuleeAIC, distSimuleechi2pval)
 
-    names(distribsResults) <-  bckupNames
+    names(currentIrisResult) <-  bckupNames
 
-        names(currentIrisResult) <-  bckupNames
     # on empile dans les resultats
     distribsResults <-  rbind (distribsResults, currentIrisResult)
 
@@ -388,8 +400,8 @@ for (c in unique(dfniv$ID_IRIS)) {
                               seq(from = 1, to = netagesmax, by = 1),
                               effectifComplets))
 
-    currentIrisResult$poidsFitAIC <- currentIrisResult$effectifComplets / sum(as.numeric(as.character(currentIrisResult$effectifComplets)))
-    currentIrisResult$poidsFitCHI2 <- currentIrisResult$effectifComplets / sum(as.numeric(as.character(currentIrisResult$effectifComplets)))
+    currentIrisResult$poidsFitAIC <- as.numeric(currentIrisResult$effectifComplets) / sum(as.numeric((currentIrisResult$effectifComplets)))
+    currentIrisResult$poidsFitCHI2 <- as.numeric(currentIrisResult$effectifComplets) / sum(as.numeric((currentIrisResult$effectifComplets)))
 
     names(currentIrisResult) <-  bckupNames
     names(distribsResults) <-  bckupNames
@@ -404,6 +416,11 @@ for (c in unique(dfniv$ID_IRIS)) {
 names(distribsResults) <-  bckupNames
 
 
+# teste l'existence de NA dans le data frame 
+anyNA(distribsResults)
+
+
+
 #sauvegarde en fichier
 write.csv(distribsResults, "fitting/floors_weights.csv")
 
@@ -414,6 +431,8 @@ write.csv(distribsResults, "fitting/floors_weights.csv")
 ddd <-  read.csv("fitting/floors_weights.csv")
 #somme des poids par IRIS
 xx <- ddd %>% group_by(ID_IRIS) %>% summarise(totProbAIC = sum(poidsFitAIC), totProbCHI2 = sum(poidsFitCHI2))
+xx <- distribsResults %>% group_by(ID_IRIS) %>% summarise(totProbAIC = sum(poidsFitAIC), totProbCHI2 = sum(poidsFitCHI2))
+
 ## => le poifsFitAIC semble plus adapté puisque la la somme tend vers 1 (faudrait vérifier avec un statisticien )
 
 
@@ -427,7 +446,15 @@ xx <- ddd %>% group_by(ID_IRIS) %>% summarise(totProbAIC = sum(poidsFitAIC), tot
 
 
 
-dd <-  dfniv %>% filter(ID_IRIS == 67)
+dd <-  dfniv %>% filter(ID_IRIS == 1)
+
+pniv <-  ggplot(dd, aes(FLOOR))+
+  geom_histogram( fill="darkolivegreen2", colour="darkgrey", binwidth = 1 )+
+  labs(x="nombre d'étages", y="effectif")+
+  ggtitle("Distribution du nombre d'étages")
+pniv
+
+
 
 
 meilleureDistAIC <- fitter(dd,"AIC")
@@ -437,6 +464,8 @@ meilleureDistchipval <- fitter(dd,"chi2pval")
 meilleureDistAIC
 meilleureDistchipval
 
+sum(fittedDistGenerator(max(dd$FLOOR),meilleureDistAIC ))
+sum(fittedDistGenerator(max(dd$FLOOR),meilleureDistchipval ))
 
 #dessin comparant les distribs fittées et la distrib observée
 cdfcomp(list(meilleureDistAIC, meilleureDistchipval))

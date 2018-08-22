@@ -1,0 +1,21 @@
+sampling= (
+            (growth in (0.1 to 1.6 by 0.1)) x
+            (scenario in  List(0.0, 1.0, 2.0) )x
+            (pluPriority  in  List(0.0, 1.0)  )x
+            (buildNonRes   in  List(0.0, 1.0)  )  x
+            (exclusionRatio  in  (0 to 1 by 0.1)  ) x
+            (maxBuiltRatio in  (30.0 to 90.0 by 5.0))  x
+            (forceEachYear in  List(0.0, 1.0) )  x
+            (densifyOld   in  List(0.0, 1.0)  ) x
+            (winSize in (3.0 to 7.0 by 1.0))x
+            (minContig in (0.0 to  0.33 by 0.01))x
+            (maxContig in (0.66 to  1.0 by 0.01))x
+            (sirene in List(0,1,2,3,4,5)) x
+            (transport in List(0,1,2,3,4,5)) x
+            (routes in List(0,1,2,3,4,5)) x
+            (ecologie in List(0,1,2,3,4,5)) x
+            (seed in (UniformDistribution[Int](max=2147483646) take 100)) x
+            filter ("minContig<maxContig") take 5
+            //filter("if (winSize == 3)  ( minContig <= 8 | maxContig <= 8 ) else true " )
+            //filter(" if (winSize > 3) (minContig <= 1 | maxContig <= 1) else true ")
+)
