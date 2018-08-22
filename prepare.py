@@ -1467,6 +1467,7 @@ with (project/(strftime('%Y%m%d%H%M') + '_log.txt')).open('w') as log:
             bati_clean = QgsVectorLayer(str(workspace/'data/2014_bati/bati_clean.shp'))
             bati_clean.dataProvider().createSpatialIndex()
             iris = QgsVectorLayer(str(workspace/'data/iris.shp'), 'iris')
+            iris.addExpressionField('$id + 1', QgsField('ID_IRIS', QVariant.Int, len=4))
             params = {
                 'INPUT': str(workspace/'data/2014_bati/bati_clean.shp'),
                 'OVERLAY': iris,
