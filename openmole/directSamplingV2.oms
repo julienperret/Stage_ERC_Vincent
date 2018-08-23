@@ -35,6 +35,7 @@ val inputDirectory = Val[File]
 val output = Val[File]
 
 val impact = Val[Double]
+val nbCells = Val[Double]
 
 
 // python task
