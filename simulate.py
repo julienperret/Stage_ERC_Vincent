@@ -86,6 +86,7 @@ elif len(sys.argv) > 5:
     ecologie =  round(float(sys.argv[17]))
     seed = round(float(sys.argv[18]))
     tiffs = to_bool(float(sys.argv[19]))
+    maxUsedSrfPla = round(float(sys.argv[20]))
     # or snaps or verbose..
 
 ### Valeurs de paramètres par défaut ###
