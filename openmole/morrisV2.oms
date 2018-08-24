@@ -1,0 +1,165 @@
+// departement 
+val dept = Val[Int]
+//options passées en string
+val optionsPrep = Val[String]
+
+
+// tout est passé en double car la methode morris ne prend que ça pour le moment
+val taux = Val[Double]
+val scenario = Val[Double] 
+val pluPriority = Val[Double] 
+val buildNonRes= Val[Double]
+val exclusionRatio= Val[Double]
+val maxBuiltRatio = Val[Double]
+val forceEachYear = Val[Double] 
+val densifyOld = Val[Double]
+
+val winSize = Val[Double] 
+val minContig = Val[Double]  
+val maxContig  = Val[Double] 
+val tiffs = Val[Double]
+val sirene= Val[Double]
+val transport= Val[Double]
+val routes= Val[Double]
+val ecologie= Val[Double]
+val seed = Val [Int]
+val snaps = Val[Double]
+val verbose = Val[Double]
+val maxUsedSrfPla = Val[Double]
+
+
+val res = Val[Int]
+
+//=========================
+val inputDirectory = Val[File]
+val output = Val[File]
+
+val impact = Val[Double]
+val nbCells = Val[Double]
+
+
+// python task
+val pythonTask =
+  UDockerTask(workDirectory / "erc17.tar",
+  //UDockerTask(DockerImage("juperret/erc"),
+"""xvfb-run -a python3 simulate.py /tmp/data_pour_simulation/50m /tmp/results ${taux} ${scenario} ${pluPriority} ${buildNonRes} ${exclusionRatio} ${maxBuiltRatio} ${forceEachYear} ${densifyOld}   ${winSize} ${minContig} ${maxContig} ${sirene} ${transport} ${routes} ${ecologie} ${seed} ${tiffs} ${snaps} ${verbose} ${maxUsedSrfPla} """)set (
+    inputDirectory := workDirectory / "data_pour_simulation/50m",
+    inputs += (taux, scenario, pluPriority, buildNonRes, exclusionRatio, maxBuiltRatio, forceEachYear, densifyOld,  winSize, minContig, maxContig, sirene, transport , routes, ecologie, seed, tiffs , snaps, verbose, maxUsedSrfPla),
+    inputs += optionsPrep,
+    outputs += (taux, scenario, pluPriority, buildNonRes, exclusionRatio, maxBuiltRatio, forceEachYear, densifyOld,  winSize, minContig, maxContig, sirene, transport , routes, ecologie, seed, tiffs , snaps, verbose, maxUsedSrfPla),
+    inputFiles += (inputDirectory, "/tmp/data_pour_simulation/50m"),
+    outputFiles += ("/tmp/results", output),
+    optionsPrep:="",
+    //winSize := 3,
+    //minContig := 1,
+    //maxContig :=5,
+    scenario := 0.0,
+    tiffs := 0.0,
+    seed := 42 ,
+    snaps := 0.0,
+    verbose:= 0.0,
+    forceEachYear :=0.0,
+    buildNonRes := 0.0,
+    densifyOld := 0.0,
+    maxUsedSrfPla := 200
+    
+    
+  )
+
+val extractImpact = ScalaTask("""
+|    import scala.io.Source
+|    val measures = output.listFiles().filter(_.isDirectory).flatMap(_.listFiles().filter(_.isDirectory)).flatMap(_.listFiles().filter(_.getName.equalsIgnoreCase("mesures.csv"))).head
+|    val src = Source.fromFile(measures)
+|    val lineArray = src.getLines().drop(7).next().split(",")
+|    val impact = lineArray(1).trim.toDouble
+    """.stripMargin) set (
+    inputs += output,
+    outputs += impact
+    )
+    
+    
+    
+
+val extractNBCells = ScalaTask("""
+|    import scala.io.Source
+|    val measures = output.listFiles().filter(_.isDirectory).flatMap(_.listFiles().filter(_.isDirectory)).flatMap(_.listFiles().filter(_.getName.equalsIgnoreCase("mesures.csv"))).head
+|    val src = Source.fromFile(measures)
+|    val lineArray = src.getLines().drop(5).next().split(",")
+|    val nbCells = lineArray(1).trim.toDouble
+    """.stripMargin) set (
+    inputs += output,
+    outputs += nbCells
+    )
+    
+    
+    
+    
+val extractImpactNBCells = ScalaTask("""
+|    import scala.io.Source
+|    val measures = output.listFiles().filter(_.isDirectory).flatMap(_.listFiles().filter(_.isDirectory)).flatMap(_.listFiles().filter(_.getName.equalsIgnoreCase("mesures.csv"))).head
+|    val src1 = Source.fromFile(measures)
+|    val src2 = Source.fromFile(measures)
+|    val lineArrayImpact = src1.getLines().drop(7).next().split(",")
+|    val lineArraynbCells = src2.getLines().drop(5).next().split(",")
+|    val impact = lineArrayImpact(1).trim.toDouble
+|    val nbCells = lineArraynbCells(1).trim.toDouble
+
+    """.stripMargin) set (
+    inputs += output,
+    outputs += (impact,nbCells)
+    
+    )
+    
+    
+
+
+
+
+
+
+val copy = CopyFileHook(output, workDirectory / "results" / "sim_${taux}_${scenario}_${pluPriority}_${maxBuiltRatio}_${winSize}_${minContig}_${maxContig}_${seed}.csv")
+
+val stringHook = DisplayHook("Impact  : ${impact} NBCellsOpen : ${nbCells}.")
+
+//val env = EGIEnvironment("vo.complex-systems.eu",openMOLEMemory = 2500 megabytes)
+val env = LocalEnvironment(4)
+
+
+
+
+
+// hooks to save results
+val storeSimuCSV = AppendToCSVFileHook(workDirectory / "morris_simus" / "simu.csv")
+val storeSensitivityCSV = AppendToCSVFileHook(workDirectory / "morris_results" / "sensitivity.csv")
+
+
+
+// drive the sensitivity analysis
+val momo = SensitivityMorris(
+    evaluation =  ((pythonTask on env hook copy)  -- (extractImpactNBCells  hook stringHook)),
+    inputs = Seq(   taux in (0.0 , 2.0 ),
+                    scenario in (0.0, 2.0),
+                    pluPriority in (0.0 , 1.0) ,
+                    buildNonRes in (0.0 , 1.0) ,
+                    exclusionRatio in (0.0, 0.8),
+                    maxBuiltRatio in  (50.0 , 100.0 ),
+                    forceEachYear in (0.0, 1.0),
+                    densifyOld in (0.0 , 1.0) ,
+                    winSize in (3.0 , 7.0),
+                    minContig in (0.0 , 0.3),
+                    maxContig in (0.6 , 1.0),
+                    sirene in (0.0,10.0),
+                    transport in (0.0, 10.0),
+                    routes in (0.0,10.0),
+                    ecologie in (0.0,10.0),
+                    maxUsedSrfPla in (50.0,200.0)
+   
+                   
+                ),
+    outputs = Seq(impact, nbCells),
+    repetitions = 1000,
+    levels = 10) hook storeSensitivityCSV
+
+
+
+momo
