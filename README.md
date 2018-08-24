@@ -73,6 +73,7 @@ Deux paramètres au minimum :
 | tiffs                | False     | True       | bool   | True              | Indique si les tiffs sont sauvés en sortie                                                                            |
 | snaps                | False     | True       | bool   | False             | Pour enregistrer des instantanés chaque année (et générer des GIF)                                                    |
 | verbose              | False     | True       | bool   | False             | Pour des messages détaillés sur les erreurs + statistiques sur le peuplement et la construction chaque année (debug)  |
+| maxUsedSrfPla              | 50     | 200       | float   | 200             | nombre de mètres carrés par habitants ?   |
 
 Usage :
 ```shell
