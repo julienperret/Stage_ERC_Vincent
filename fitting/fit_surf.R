@@ -7,11 +7,12 @@ library(actuar)
 args <- commandArgs(trailingOnly=TRUE)
 wd <- args[1]
 setwd(wd)
-df <-  read_csv("distrib_surf.csv")
+setwd("/home/paulchapron/encadrement/repoJulienERC/erc22222/erc/fitting/")
+df <-  read_csv("distrib_surf/20m_distrib_surf.csv")
 
 #les codes iris sont des facteurs
 df$ID_IRIS <- factor(df$ID_IRIS)
-
+names(df) <-  c("ID_IRIS", "SURF")
 head(df)
 
 #plot global de la distribution des surfaces
@@ -103,23 +104,23 @@ pvarious
 # Si une hauteur est absente, elle ne sera pas comptabilisée lors du count()  et il n'y aura pas de poids correspondant
 
 
-# dataframe avec les poids de chaque hauteur, normalisés par rapport à l'existant, pour chaque IRIS
+# dataframe avec les poids de chaque surface observée, normalisés par rapport à l'existant, pour chaque IRIS
 dSurfNormExist  <- df  %>% group_by(ID_IRIS) %>%  count(round(SURF))  %>% mutate(SurfNorm = n / sum(n) )
 names(dSurfNormExist) <-  c("ID_IRIS", "SURFACE", "effectif", "Surface_normalisee_a_lIRIS" )
 
 # ecriture du fichier de poids
-write_csv(dSurfNormExist,path = "fitting/surf_weights_nofit.csv")
+write_csv(dSurfNormExist,path = "poidsDistObservee.csv")
 
 
 #########################################################
 # fit des distributions
 #########################################################
 
-dd <- df %>% filter(ID_IRIS==IRISvarious)
+dvarious <- df %>% filter(ID_IRIS==IRISvarious)
 
 fitter <-  function (dd)
 {
-    candidats <-  c("gamma", "norm", "lnorm", "pois", "exp","cauchy", "gamma",  "geom", "beta" , "logis")
+    candidats <-  c("gamma", "norm", "lnorm", "pois", "exp","cauchy", "geom", "beta" , "logis")
     methods <-  c("mle", "mme", "mge")
 
     minAIC <-  Inf
@@ -131,37 +132,39 @@ fitter <-  function (dd)
     bestCandidateCVM <-  NULL
     bestCandidateAD <-  NULL
 
-    for (candid in candidats) {
-      #cat("test avec distrib =", candid, "\n")
+    for (candid in rev(candidats)) {
+      cat("test avec distrib =", candid, "\n")
       for (met in methods) {
-       # cat("methode : " , met, "\n")
+        cat("methode : " , met, "\n")
         tryCatch({
           fit <-  fitdist(dd$SURF, distr = candid, method=met, discrete = F)
           gof <-  gofstat(fit)
 
-          if (gof$aic < minAIC){
+          if (gof$aic < minAIC & gof$aic > -Inf  ){
+            cat("candidat : ",fit$distname,"AIC:", gof$aic, "min courrant :", minAIC, "\n")
                 minAIC <-  gof$aic
                 bestCandidateAIC <-  fit
           }
-          if (gof$ks < minKS){
+          if (gof$ks < minKS & gof$ks > -Inf){
+            cat("candidat : ",fit$distname,"KS :", gof$ks,"min courrant :", minKS, "\n")
             minKS <-  gof$ks
             bestCandidateKS <-  fit
           }
-          if (gof$cvm < minCVM){
+          if (gof$cvm < minCVM & gof$cvm > -Inf){
+            cat("candidat : ",fit$distname,"CVM" , gof$cvm,"min courrant :", minCVM, "\n")
             minCVM <-  gof$cvm
             bestCandidateCVM <-  fit
           }
-          if (gof$ad < minAD){
+          if (gof$ad < minAD & gof$ad > -Inf){
+            cat("candidat : ",fit$distname,  "AD:" , gof$ad, "min courrant :", minAD,"\n")
             minAD <-  gof$ad
             bestCandidateAD <-  fit
           }
 
-          }, error = function(e) {
-          cat("ERROR :", conditionMessage(e), "\n")
-        })
+          }, error = function(e) {})
 
-      }
-    }
+      } # for method
+    } #for candidat
 
     besties <-  list(bestCandidateAD, bestCandidateCVM, bestCandidateKS, bestCandidateAIC)
     if(anyNA(besties))
@@ -177,17 +180,76 @@ fitter <-  function (dd)
 }
 
 
+
+
+distgen <- function(ft, discrete, surfaceBinwidth) {
+  nft <- length(ft)
+  mydata <- ft[[1]]$data
+  myBins <-  seq(from=0, to=round(max(mydata))+ surfaceBinwidth, by=surfaceBinwidth)
+  Bmaxs <- c(0,head(myBins, length(myBins)-1), max(myBins))
+  
+
+  verif.ftidata <- function(fti) {
+    if (any(fti$data != mydata)) 
+      stop("All compared fits must have been obtained with the same dataset")
+    invisible()
+  }
+  lapply(ft, verif.ftidata)
+  xmin <- min(mydata)
+  xmax <- max(mydata)
+  xlim <- c(xmin, xmax)
+
+    distname <- ft[[1]]$distname
+  n <- length(mydata)
+  
+  sfin <- seq(xmin, xmax, length.out = 101)
+    comput.fti <- function(i) {
+    fti <- ft[[i]]
+    para <- c(as.list(fti$estimate), as.list(fti$fix.arg))
+    distname <- fti$distname
+    pdistname <- paste("p", distname, sep = "")
+    
+    do.call(pdistname, c(list(q = myBins), as.list(para)))
+    
+    }
+    giveMeTheName <- function(i){
+      labels <-  c("bestAD", "bestCVM", "bestKS", "bestAIC")
+         return(labels[i])
+    }
+    
+  fittedprob <- sapply(1:nft, comput.fti)
+  fittedprob <-  as.data.frame(fittedprob)
+  fittedprobTosubstract <- rbind(rep(0,nft),head(fittedprob, nrow(fittedprob)-1))
+  
+  fittedprob <-  fittedprob - fittedprobTosubstract
+  names(fittedprob) <- sapply(1:nft, giveMeTheName)
+  fittedprob$surface <- myBins
+  return(fittedprob)
+}
+
+
+yy <- fitter(xx)
+zz <-  distgen(yy, F,10)
+
+dobs  <- xx %>%  count(round(SURF))  %>% mutate(SurfNorm = n / sum(n) )
+
+
+
+plot(round(dobs$SURF), dobs$SurfNorm)
+points(zz$surface, zz$bestAD, col="green")
+points(zz$surface, zz$bestCVM, col="red")
+points(zz$surface, zz$bestKS, col="blue")
+points(zz$surface, zz$bestAIC, col="purple")
+
+denscomp(yy)
+max(yy[[1]]$data)
+
+ppcomp(yy)
+
+
 fittedDistSurfGenerator <-  function(surfmax, distribModels, surfaceBinwidth)
 {
-  distribGamma <-  NULL
-  distribNorm <-  NULL
-  distribLognorm <-  NULL
-  distribPoiss <-  NULL
-  distribCauchy <-  NULL
-  distribGeom <-  NULL
-  distribExp <-  NULL
-  distribLogis <-  NULL
-  distribBeta <-  NULL
+ 
 
   surfaceBins <-  seq(from=0, to=round(surfmax)+ surfaceBinwidth, by=surfaceBinwidth)
 
@@ -208,15 +270,16 @@ fittedDistSurfGenerator <-  function(surfmax, distribModels, surfaceBinwidth)
   Bmaxs <- c(tail(surfaceBins, length(surfaceBins)-1), max(surfaceBins)+surfaceBinwidth)
 
   distrib <-  NULL
-
+  
   for (i in 1: length(distribModels))
   {
     b <- distribModels[[i]]
-
+    distrib <-  NULL
+    
     if (b$distname == "gamma") {
       cat(" distribution  gamma\n")
       shape <-  b$estimate
-      distribGamma <-  pgamma(Bmaxs, shape) - pgamma(Bmins, shape)
+      distrib <-  pgamma(Bmaxs, shape) - pgamma(Bmins, shape)
     }
 
     if (b$distname == "norm") {
@@ -290,8 +353,8 @@ for (c in unique(df$ID_IRIS)) {
   surfmax <-  round(max(distribObservee$SURF))
 
   tryCatch({
-  models <-  fitter(df)
-  },error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  models <-  fitter(distribObservee)
+  },error=function(e){})
 
   surfbinwidth <-  10
   fittedDistros <-  fittedDistSurfGenerator(surfmax , distribModels = models, surfaceBinwidth = surfbinwidth)
@@ -304,8 +367,13 @@ for (c in unique(df$ID_IRIS)) {
 
 }
 
+distribsResults
 
-write.csv(distribsResults, "fitting/surf_weights.csv")
+
+write.csv(distribsResults, "fittedWeights.csv")
+
+
+
 dd <-  read.csv("fitting/surf_weights.csv")
 
 ####### Code de tests pour obtenir les probas (poids) qui somment à 1
@@ -349,7 +417,7 @@ names(distribsResults) <-  bckupNames
 
 
 
-riri <-  df %>% filter(ID_IRIS == 58)
+riri <-  df %>% filter(ID_IRIS == 14)
 mods  <- fitter(dd = riri)
 #dessin comparant les distribs fittées et la distrib observée
 cdfcomp(mods)
