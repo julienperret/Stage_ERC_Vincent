@@ -231,11 +231,13 @@ distgen <- function(ft, discrete, surfaceBinwidth) {
 yy <- fitter(xx)
 zz <-  distgen(yy, F,10)
 
-dobs  <- xx %>%  count(round(SURF))  %>% mutate(SurfNorm = n / sum(n) )
+dobs  <- xx %>% count(round(SURF))  %>% mutate(SurfNorm = n / sum(n) )
 
 
+hist(xx$SURF,breaks = 31)
 
-plot(round(dobs$SURF), dobs$SurfNorm)
+
+plot((dobs$`round(SURF)`), dobs$SurfNorm)
 points(zz$surface, zz$bestAD, col="green")
 points(zz$surface, zz$bestCVM, col="red")
 points(zz$surface, zz$bestKS, col="blue")

@@ -3,16 +3,15 @@ library(dplyr)
 
 
 
-setwd("~/encadrement/repoJulienERC/erc/traitements_Stats/Direct_Sampling_Analysis/")
+setwd("~/encadrement/repoJulienERC/erc22222/erc/traitements_Stats/Direct_Sampling_Analysis/")
 #################################
 # A partir du fichier agrégé et structuré 
 ###################################
 
-#dd <-  read.csv("directSamplingfulldataframe.csv")
 
 dd <-  read.csv("simudataframe_13Aout_616klines.csv")
 
-
+names(dd)
 #distribution des impacts 
 pniv <-  ggplot(dd, aes(impact))+
   geom_histogram( fill="darkolivegreen2", colour="darkgrey", binwidth = 100000 )
@@ -28,9 +27,11 @@ pniv
 dd$densifyGround <- factor(dd$densifyGround, labels=c("Not DensifyGround", "DensifyGround"))
 
 
+names(dd)
+
 pp <-  ggplot(dd, aes(taux,  impact,scenario,maxBuiltRatio,densifyGround))+
 geom_jitter(aes( color=maxBuiltRatio), height = 0.4, size = 0.4 )+
-  facet_grid(rows = vars(scenario), cols = vars(densifyGround))+
+  facet_grid(rows = vars(scenario), cols = vars(pluPriority))+
   ggtitle("Impacts par scénarios et choix de densification", subtitle = "valeurs de taux et de maxBuiltRatio uniformément échantillonnées")
 pp
 
@@ -124,13 +125,16 @@ impAreaExp
 library(ade4)
 library(factoextra)
 
-
+names(dd)
 summary(dd)
 
 # on retire les colonnes qui ne sont pas des sorties
-ddACP <-  dd[, -c(1:6)]
+ddACP <-  dd[, c(1,20:28)]
 
 ddACP <-  na.omit(ddACP)
+
+
+backupX <-  ddACP$X
 
 # ACP de base
 mypca <- prcomp(ddACP, scale. = T)
@@ -149,18 +153,24 @@ fviz_pca_var(mypca,
 )
 
 
+#jointure pour remettre les paramètres 
+slc <-  dd[ dd$X %in% backupX,c(2:19)]
+joindd <-  cbind(slc, ddACP)
+
+
 #inidividus projetés dans le plan CP1,CP2
-#colorés suivant l'impact
-fviz_pca_ind(
+summary(joindd )
+str(joindd)
+fviz_pca_ind( 
   mypca,
   geom="point",
   geom.size= 0.02,
-  col.ind = ddACP$impact,
+    col.ind = as.numeric(joindd$routes),
   gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07")
 )
 
 
-
+joindd %>% group_by(taux) %>% count()
 
 ##Effet de winSize/minContig/maxContig  sur les impacts ------------------------------------------
 
