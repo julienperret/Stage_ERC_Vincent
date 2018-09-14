@@ -1,8 +1,8 @@
 library(ggplot2)
 library(dplyr)
 library(readr)
-library(fitdistrplus)
 library(actuar)
+library(fitdistrplus)
 
 args <- commandArgs(trailingOnly=TRUE)
 wd <- args[1]
@@ -10,113 +10,9 @@ setwd(wd)
 setwd("/home/paulchapron/encadrement/repoJulienERC/erc22222/erc/fitting/")
 df <-  read_csv("distrib_surf/20m_distrib_surf.csv")
 
-#les codes iris sont des facteurs
-df$ID_IRIS <- factor(df$ID_IRIS)
-names(df) <-  c("ID_IRIS", "SURF")
-head(df)
-
-#plot global de la distribution des surfaces
-psurf <-  ggplot(df, aes(SURF))+
-  geom_histogram( fill="darkolivegreen2", colour="darkgrey", binwidth = 1 )+
-  labs(x="surface", y="effectif")+
-  ggtitle("Distribution des surfaces")
-psurf
-
-
-psurf2 <-  ggplot(df, aes(SURF))+
-  geom_density( fill="darkolivegreen2", colour="darkgrey")+
-  labs(x="surface", y="effectif")+
-  ggtitle("Distribution des surfaces")
-psurf2
-
-#group by IRIS + nombre de lignes
-dfSurfByIRIS <- df %>% group_by(ID_IRIS) %>% summarize(Surf_Tot=sum(SURF)) %>% arrange(desc(Surf_Tot))
-
-# réordonne les niveaux de facteurs
-dfSurfByIRIS$ID_IRIS <- factor(dfSurfByIRIS$ID_IRIS, levels = dfSurfByIRIS$ID_IRIS[order(-dfSurfByIRIS$Surf_Tot)])
-
-
-#allure de la distribution globale
-
-p<- ggplot(dfSurfByIRIS, aes( ID_IRIS,Surf_Tot  ))+
-  geom_bar(fill="darkolivegreen2", colour="darkgrey", stat = "identity")+
-  ggtitle(" Surface totale par IRIS , ordonnées par nombre décroissant")+
-  labs(x="Code IRIS", y="Surface cumulée")+
-  theme(axis.text.x=element_text(angle = -90, hjust = 0))
-
-p
-
-#30+gros
-
-ppp<- ggplot(head(dfSurfByIRIS,30), aes( ID_IRIS,Surf_Tot))+
-  geom_bar(fill="darkolivegreen2", colour="darkgrey", stat = "identity")+
-  ggtitle("Surface des  30 plus gros IRIS")+
-  labs(x="Code IRIS", y="Surface cumulée dans l'IRIS")+
-  theme(axis.text.x=element_text(angle = -90, hjust = 0))
-
-ppp
-
-
-#30+ petits
-
-pp<- ggplot(tail(dfSurfByIRIS,30), aes( ID_IRIS,Surf_Tot))+
-  geom_bar(fill="darkolivegreen2", colour="darkgrey", stat = "identity")+
-  ggtitle("Surface des 30 plus petits IRIS")+
-  labs(x="Code IRIS", y="Surface cumulée dans l'IRIS")+
-  theme(axis.text.x=element_text(angle = -90, hjust = 0))
-
-pp
-
-
-# détail plus gros IRIS
-IRISmaousse <-  dfSurfByIRIS$ID_IRIS[1]
-dbig <-  df %>% filter(ID_IRIS== IRISmaousse)
-
-pmaousse <-  ggplot(dbig, aes(SURF))+
-  geom_histogram( fill="darkolivegreen2", colour="darkgrey", binwidth = 1)+
-  labs(x="Surface ", y="effectif")+
-  scale_x_continuous(breaks = seq(0,max(dbig$SURF), by = 1000))+
-  ggtitle(paste("Distribution de la surface de l'IRIS", IRISmaousse, "(le plus représenté dans le fichier)"))
-pmaousse
-
-
-# Variété de hauteurs distinctes par IRIS
-dfSurfDistinct <- df %>% group_by(ID_IRIS) %>% summarize(Surf_Tot= sum(SURF),distcount=n_distinct(SURF)) %>% arrange(desc(distcount))
-
-# réordonne les niveaux de facteurs   par nombre de hauteurs distinctes
-dfSurfDistinct$ID_IRIS <- factor(dfSurfDistinct$ID_IRIS, levels = dfSurfDistinct$ID_IRIS[order(-dfSurfDistinct$distcount)])
-
-
-IRISvarious <- dfSurfDistinct$ID_IRIS[1]
-
-dvarious <- df %>% filter(ID_IRIS==IRISvarious)
-
-pvarious <-  ggplot(dvarious, aes(SURF))+
-  geom_histogram( fill="darkolivegreen2", colour="darkgrey", binwidth = 1)+
-  labs(x="Surfaces", y="effectif")+
-  scale_x_continuous(breaks = seq(0,max(dvarious$SURF), by = 100))+
-  ggtitle(paste("Distribution des surfaces de l'IRIS", IRISvarious, "(contient le plus de surfaces distinctes)"))
-pvarious
-
-
-#compte les surfaces distinctes, et le poids normalisé associé
-# ATTENTION , ces poids ne sont calculés que pour  des hauteurs déjà présentes dans l'IRIS
-# Si une hauteur est absente, elle ne sera pas comptabilisée lors du count()  et il n'y aura pas de poids correspondant
-
-
-# dataframe avec les poids de chaque surface observée, normalisés par rapport à l'existant, pour chaque IRIS
-dSurfNormExist  <- df  %>% group_by(ID_IRIS) %>%  count(round(SURF))  %>% mutate(SurfNorm = n / sum(n) )
-names(dSurfNormExist) <-  c("ID_IRIS", "SURFACE", "effectif", "Surface_normalisee_a_lIRIS" )
-
-# ecriture du fichier de poids
-write_csv(dSurfNormExist,path = "poidsDistObservee.csv")
-
-
 #########################################################
 # fit des distributions
 #########################################################
-
-dvarious <- df %>% filter(ID_IRIS==IRISvarious)
 
 fitter <-  function (dd)
 {
@@ -228,113 +124,6 @@ distgen <- function(ft, discrete, surfaceBinwidth) {
 }
 
 
-yy <- fitter(xx)
-zz <-  distgen(yy, F,10)
-
-dobs  <- xx %>% count(round(SURF))  %>% mutate(SurfNorm = n / sum(n) )
-
-
-hist(xx$SURF,breaks = 31)
-
-
-plot((dobs$`round(SURF)`), dobs$SurfNorm)
-points(zz$surface, zz$bestAD, col="green")
-points(zz$surface, zz$bestCVM, col="red")
-points(zz$surface, zz$bestKS, col="blue")
-points(zz$surface, zz$bestAIC, col="purple")
-
-denscomp(yy)
-max(yy[[1]]$data)
-
-ppcomp(yy)
-
-
-fittedDistSurfGenerator <-  function(surfmax, distribModels, surfaceBinwidth)
-{
- 
-
-  surfaceBins <-  seq(from=0, to=round(surfmax)+ surfaceBinwidth, by=surfaceBinwidth)
-
-  #les candidats arrivent dans l'ordre :
-  #list(bestCandidateAD, bestCandidateCVM, bestCandidateKS, bestCandidateAIC)
-
-
-  dResult <-  data.frame(
-    surface= surfaceBins,
-    dBestAD = numeric(length(surfaceBins)),
-    dBestCVM= numeric(length(surfaceBins)),
-    dBestKS= numeric(length(surfaceBins)),
-    dBestAIC = numeric(length(surfaceBins))
-  )
-  #bornes des bandes pour le calcul de probas
-
-  Bmins <- surfaceBins
-  Bmaxs <- c(tail(surfaceBins, length(surfaceBins)-1), max(surfaceBins)+surfaceBinwidth)
-
-  distrib <-  NULL
-  
-  for (i in 1: length(distribModels))
-  {
-    b <- distribModels[[i]]
-    distrib <-  NULL
-    
-    if (b$distname == "gamma") {
-      cat(" distribution  gamma\n")
-      shape <-  b$estimate
-      distrib <-  pgamma(Bmaxs, shape) - pgamma(Bmins, shape)
-    }
-
-    if (b$distname == "norm") {
-      cat(" distribution  de loi normale\n")
-      mu <-  b$estimate[1]
-      mysigma <- b$estimate[2]
-      distrib <-  pnorm(Bmaxs, mu, mysigma) - pnorm(Bmins, mu, mysigma)
-    }
-    if (b$distname == "lnorm") {
-      cat(" distribution  lognormale\n")
-      mulog <-  b$estimate[1]
-      sigmalog <- b$estimate[2]
-      distrib <-  plnorm(Bmaxs, mulog, sigmalog) - plnorm(Bmins, mulog, sigmalog)
-    }
-    if (b$distname == "pois") {
-      cat(" distribution  de Poisson\n")
-      lambda <-  b$estimate[1]
-      distrib <-  ppois(Bmaxs, lambda) - ppois(Bmins, lambda)
-    }
-    if (b$distname == "exp") {
-      cat(" distribution  exponentielle\n")
-      rate <-  b$estimate
-      distrib <-  pexp(Bmaxs, rate) - pexp(Bmins, rate)
-    }
-    if (b$distname == "cauchy") {
-      cat(" distribution  de Cauchy\n")
-      location <-  b$estimate[1]
-      scale <-  b$estimate[2]
-      distrib <-  pcauchy(Bmaxs, location, scale) - pcauchy(Bmins, location, scale)
-    }
-    if (b$distname == "geom") {
-      cat(" distribution  geométrique\n")
-      prob <- b$estimate[1]
-      distrib <-  pgeom(Bmaxs, prob) - pgeom(Bmins, prob)
-    }
-    if (b$distname == "beta") {
-      cat(" distribution  beta\n")
-      shape1 <- b$estimate[1]
-      shape2 <- b$estimate[2]
-      distrib <-  pbeta(Bmaxs, shape1, shape2) -pbeta(Bmins, shape1, shape2)
-    }
-    if (b$distname == "logis") {
-      cat(" distribution  logistique\n")
-      loc <-  b$estimate[1]
-      sca <- b$estimate[2]
-      distrib <-  plogis(Bmaxs, loc,sca)-plogis(Bmins, loc,sca)
-    }
-
-    dResult[,i+1] <-  distrib
-
-  }
-  return(dResult)
-}
 
 
 #dataframe vide pour stocker les resultats
@@ -369,7 +158,30 @@ for (c in unique(df$ID_IRIS)) {
 
 }
 
-distribsResults
+
+#on arrondit à l'entier 
+df$SURF <-  round(df$SURF)
+qplot(df$SURF)
+
+#fitting
+fifi <-  fitter(df)
+
+#stats de qulaité d'ajustement
+gofstat(fifi)
+
+
+#graphe de comapraison fit / data pour déterminer quel est le meilleur candidat
+cdfcomp(fifi)
+ppcomp(fifi)
+qqcomp(fifi)
+# => pour MTP , le fit 1 et 4 sont meilleurs
+
+fifi <-  fifi[-(2:3)]
+
+
+distg1 <- distgen(fifi,F,20)  
+
+qplot(distg1$)
 
 
 write.csv(distribsResults, "fittedWeights.csv")
@@ -423,3 +235,94 @@ riri <-  df %>% filter(ID_IRIS == 14)
 mods  <- fitter(dd = riri)
 #dessin comparant les distribs fittées et la distrib observée
 cdfcomp(mods)
+
+
+
+
+
+fittedDistSurfGenerator <-  function(surfmax, distribModels, surfaceBinwidth)
+{
+  
+  
+  surfaceBins <-  seq(from=0, to=round(surfmax)+ surfaceBinwidth, by=surfaceBinwidth)
+  
+  #les candidats arrivent dans l'ordre :
+  #list(bestCandidateAD, bestCandidateCVM, bestCandidateKS, bestCandidateAIC)
+  
+  
+  dResult <-  data.frame(
+    surface= surfaceBins,
+    dBestAD = numeric(length(surfaceBins)),
+    dBestCVM= numeric(length(surfaceBins)),
+    dBestKS= numeric(length(surfaceBins)),
+    dBestAIC = numeric(length(surfaceBins))
+  )
+  #bornes des bandes pour le calcul de probas
+  
+  Bmins <- surfaceBins
+  Bmaxs <- c(tail(surfaceBins, length(surfaceBins)-1), max(surfaceBins)+surfaceBinwidth)
+  
+  distrib <-  NULL
+  
+  for (i in 1: length(distribModels))
+  {
+    b <- distribModels[[i]]
+    distrib <-  NULL
+    
+    if (b$distname == "gamma") {
+      cat(" distribution  gamma\n")
+      shape <-  b$estimate
+      distrib <-  pgamma(Bmaxs, shape) - pgamma(Bmins, shape)
+    }
+    
+    if (b$distname == "norm") {
+      cat(" distribution  de loi normale\n")
+      mu <-  b$estimate[1]
+      mysigma <- b$estimate[2]
+      distrib <-  pnorm(Bmaxs, mu, mysigma) - pnorm(Bmins, mu, mysigma)
+    }
+    if (b$distname == "lnorm") {
+      cat(" distribution  lognormale\n")
+      mulog <-  b$estimate[1]
+      sigmalog <- b$estimate[2]
+      distrib <-  plnorm(Bmaxs, mulog, sigmalog) - plnorm(Bmins, mulog, sigmalog)
+    }
+    if (b$distname == "pois") {
+      cat(" distribution  de Poisson\n")
+      lambda <-  b$estimate[1]
+      distrib <-  ppois(Bmaxs, lambda) - ppois(Bmins, lambda)
+    }
+    if (b$distname == "exp") {
+      cat(" distribution  exponentielle\n")
+      rate <-  b$estimate
+      distrib <-  pexp(Bmaxs, rate) - pexp(Bmins, rate)
+    }
+    if (b$distname == "cauchy") {
+      cat(" distribution  de Cauchy\n")
+      location <-  b$estimate[1]
+      scale <-  b$estimate[2]
+      distrib <-  pcauchy(Bmaxs, location, scale) - pcauchy(Bmins, location, scale)
+    }
+    if (b$distname == "geom") {
+      cat(" distribution  geométrique\n")
+      prob <- b$estimate[1]
+      distrib <-  pgeom(Bmaxs, prob) - pgeom(Bmins, prob)
+    }
+    if (b$distname == "beta") {
+      cat(" distribution  beta\n")
+      shape1 <- b$estimate[1]
+      shape2 <- b$estimate[2]
+      distrib <-  pbeta(Bmaxs, shape1, shape2) -pbeta(Bmins, shape1, shape2)
+    }
+    if (b$distname == "logis") {
+      cat(" distribution  logistique\n")
+      loc <-  b$estimate[1]
+      sca <- b$estimate[2]
+      distrib <-  plogis(Bmaxs, loc,sca)-plogis(Bmins, loc,sca)
+    }
+    
+    dResult[,i+1] <-  distrib
+    
+  }
+  return(dResult)
+}
