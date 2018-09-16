@@ -169,6 +169,8 @@ points(distg1$surface,distg1$freqObs, col="red")
 
 names(distg1) <-  c("poidsFit1", "poidsFit2", "SURF", "poidsObserve", "effectifZone")
 
+write.csv(distg1, "FittedWeigthsMTP.csv")
+
 
 dev.off()
 
